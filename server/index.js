@@ -1,9 +1,16 @@
 const express = require('express');
+const cors = require('cors');
 const { verifyConnection, driver } = require('./neo4j');
-const neo4jRoutes = require('./routes/neo4jRoutes.js');
+const neo4jRoutes = require('./routes/neo4jRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
+
+// CORS for frontend to call backend
+app.use(cors());
+
+// To parse JSON
+app.use(express.json());
 
 app.use(express.json());
 app.use('/api', neo4jRoutes);

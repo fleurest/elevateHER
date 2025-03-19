@@ -8,6 +8,7 @@ module.exports = {
     filename: 'bundle.[contenthash].js',
     clean: true,
   },
+  devtool: 'source-map',
   module: {
     rules: [
       {
@@ -38,6 +39,7 @@ module.exports = {
     static: './dist',
     port: 5173,
     hot: true,
+    historyApiFallback: true, 
   },
   mode: 'development',
 };

@@ -1,5 +1,121 @@
-html, body, #root {
-  margin: 0;
-  padding: 0;
-  height: 100%;
+/* Color scheme */
+:root {
+  --navy: #35374b;
+  --purple: #575a7b;
+  --light-purple: #797ca0;
+  --pink: #dbbdc5;
+  --grey: #f1f2f3;
+}
+
+.App {
+  text-align: center;
+  background-color: var(--grey);
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: var(--navy);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: var(--grey);
+}
+
+.App-link {
+  color: var(--grey);
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Profile page */
+.App-profile-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.App-top-panel {
+  background-color: var(--light-purple);
+  height: 60px;
+  width: 100%;
+}
+
+.App-main-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 60px);
+}
+
+.App-top-section {
+  display: flex;
+  height: 40%;
+  padding: 20px;
+  justify-content: space-between;
+}
+
+.App-left-panel {
+  background-color: var(--pink);
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border-right: 1px solid var(--navy);
+  color: var(--navy);
+}
+
+.App-right-panel {
+  background-color: var(--light-purple);
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border-left: 1px solid var(--navy);
+  color: var(--navy);
+}
+
+.App-left-panel h2, .App-right-panel h2 {
+  margin: 0 0 10px 0;
+  font-size: 24px;
+}
+
+.App-left-panel p, .App-right-panel p {
+  margin: 5px 0;
+  font-size: 16px;
+}
+
+.App-center-panel {
+  background-color: var(--grey);
+  padding: 20px;
+  overflow-y: auto;
+  color: var(--navy);
+}
+
+.player-network-graph {
+  width: 100%;
+  height: 60vh;
+  margin-top: 20px;
+  padding: 20px;
+  box-sizing: border-box;
 }

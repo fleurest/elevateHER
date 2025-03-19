@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const { verifyConnection, driver } = require('./neo4j');
 const neo4jRoutes = require('./routes/neo4jRoutes');
@@ -14,6 +15,9 @@ app.use(express.json());
 
 app.use(express.json());
 app.use('/api', neo4jRoutes);
+
+// Logo for default node image
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
 app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);

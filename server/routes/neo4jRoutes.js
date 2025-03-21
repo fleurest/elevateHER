@@ -128,7 +128,7 @@ router.get('/graph', async (req, res) => {
               label: endNode.properties.name || endNode.labels[0],
               image: (profileImage && profileImage !== 'null' && profileImage !== '')
                 ? profileImage
-                : '../public/images/logo-default-profile.png',
+                : './images/logo-default-profile.png',
               ...endNode.properties
             }
           });

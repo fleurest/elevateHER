@@ -36,8 +36,12 @@ module.exports = {
     }),
   ],
   devServer: {
+    port: 3000,
+    proxy: {
+      '/api': 'http://localhost:3001',
+      '/images': 'http://localhost:3001'
+    },
     static: './dist',
-    port: 5173,
     hot: true,
     historyApiFallback: true, 
   },

@@ -9,7 +9,7 @@ const Dashboard = ({ handleLogout }) => {
 
   // get athletes
   useEffect(() => {
-    fetch('http://localhost:3000/api/athletes')
+    fetch('http://localhost:3001/api/athletes')
       .then(res => res.json())
       .then(data => {
         console.log('Athletes Data:', data);
@@ -24,7 +24,7 @@ const Dashboard = ({ handleLogout }) => {
 
     const fetchGraph = async () => {
       try {
-        const res = await fetch('http://localhost:3000/api/graph');
+        const res = await fetch('http://localhost:3001/api/graph');
         const graphData = await res.json();
 
         if (isMounted && cyContainerRef.current) {

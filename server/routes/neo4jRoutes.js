@@ -159,20 +159,66 @@ router.get('/graph', async (req, res) => {
   }
 });
 
+// Register route
 router.post('/register', async (req, res) => {
   const { username, password } = req.body;
   const session = driver.session();
 
   try {
+    // Check if user already exists
+    const existing = await session.run(
+      'MATCH (u:User {username: $username}) RETURN u',
+      { username }
+    );
+
+    if (existing.records.length > 0) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    // Hash password
     const hash = await bcrypt.hash(password, saltRounds);
+
+    // Create user
     await session.run(
       'CREATE (u:User {username: $username, password: $password})',
       { username, password: hash }
     );
-    res.status(201).send({ message: 'User registered' });
+
+    res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
-    console.error(err);
-    res.status(500).send({ error: 'Registration failed' });
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Registration failed' });
+  } finally {
+    await session.close();
+  }
+});
+
+// Login route
+router.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      'MATCH (u:User {username: $username}) RETURN u.password AS hash',
+      { username }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const hash = result.records[0].get('hash');
+    const match = await bcrypt.compare(password, hash);
+
+    if (match) {
+      res.status(200).json({ message: 'Login successful', username });
+    } else {
+      res.status(401).json({ error: 'Invalid credentials' });
+    }
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
   } finally {
     await session.close();
   }

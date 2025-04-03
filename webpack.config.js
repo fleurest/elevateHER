@@ -39,11 +39,17 @@ module.exports = {
     port: 3000,
     proxy: {
       '/api': 'http://localhost:3001',
-      '/images': 'http://localhost:3001'
+      '/images': 'http://localhost:3001',
     },
-    static: './dist',
+    static: {
+      directory: path.join(__dirname, 'dist'),
+    },
+    open: true,
     hot: true,
-    historyApiFallback: true, 
+    historyApiFallback: true,
+    client: {
+      overlay: true,
+    },
   },
   mode: 'development',
 };

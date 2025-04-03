@@ -7,6 +7,7 @@
   --grey: #f1f2f3;
 }
 
+/* General App Styling */
 .App {
   text-align: center;
   background-color: var(--grey);
@@ -23,6 +24,15 @@
   }
 }
 
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .App-header {
   background-color: var(--navy);
   min-height: 100vh;
@@ -36,15 +46,6 @@
 
 .App-link {
   color: var(--grey);
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* Profile page */
@@ -95,12 +96,14 @@
   color: var(--navy);
 }
 
-.App-left-panel h2, .App-right-panel h2 {
+.App-left-panel h2,
+.App-right-panel h2 {
   margin: 0 0 10px 0;
   font-size: 24px;
 }
 
-.App-left-panel p, .App-right-panel p {
+.App-left-panel p,
+.App-right-panel p {
   margin: 5px 0;
   font-size: 16px;
 }
@@ -119,3 +122,94 @@
   padding: 20px;
   box-sizing: border-box;
 }
+
+/* ----------------------- */
+/* Login/Register Styling  */
+/* ----------------------- */
+.auth-container {
+  background-color: var(--grey);
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.auth-card {
+  background-color: var(--pink);
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.auth-title {
+  color: var(--navy);
+  margin-bottom: 20px;
+  font-size: 28px;
+}
+
+.auth-input {
+  padding: 12px;
+  margin: 10px 0;
+  width: 100%;
+  font-size: 16px;
+  border: 1px solid var(--purple);
+  border-radius: 8px;
+}
+
+.auth-button {
+  background-color: var(--purple);
+  color: var(--grey);
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.auth-button-alt {
+  background-color: var(--light-purple);
+  color: var(--grey);
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.auth-switch-link {
+  margin-top: 15px;
+  background: none;
+  border: none;
+  color: var(--navy);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.auth-error {
+  margin-top: 10px;
+  color: red;
+  font-size: 14px;
+}
+
+.auth-logo {
+  width: 140px;
+  height: auto;
+  margin-bottom: 32px;
+}
+
+.auth-brand-text {
+  margin: 10px 0;
+  font-size: 24px;
+  color: var(--purple);
+}
+

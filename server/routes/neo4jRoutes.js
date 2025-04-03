@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { driver } = require('../neo4j');
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
 // Get a few nodes
 router.get('/nodes', async (req, res) => {
@@ -152,6 +154,25 @@ router.get('/graph', async (req, res) => {
   } catch (err) {
     console.error('Graph query error:', err);
     res.status(500).json({ error: 'Failed to get graph data' });
+  } finally {
+    await session.close();
+  }
+});
+
+router.post('/register', async (req, res) => {
+  const { username, password } = req.body;
+  const session = driver.session();
+
+  try {
+    const hash = await bcrypt.hash(password, saltRounds);
+    await session.run(
+      'CREATE (u:User {username: $username, password: $password})',
+      { username, password: hash }
+    );
+    res.status(201).send({ message: 'User registered' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: 'Registration failed' });
   } finally {
     await session.close();
   }

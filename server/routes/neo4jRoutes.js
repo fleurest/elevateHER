@@ -164,6 +164,17 @@ router.post('/register', async (req, res) => {
   const { username, password } = req.body;
   const session = driver.session();
 
+  if (username.length < 4) {
+    return res.status(400).json({ error: 'Username must be at least 4 characters' });
+  }
+  
+  const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+  if (!passwordRegex.test(password)) {
+    return res.status(400).json({
+      error: 'Password must be at least 8 characters and include a letter, number, and symbol'
+    });
+  }
+  
   try {
     // Check if user already exists
     const existing = await session.run(

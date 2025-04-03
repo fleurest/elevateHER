@@ -213,3 +213,23 @@
   color: var(--purple);
 }
 
+.auth-feedback {
+  font-size: 12px;
+  margin: 5px 0 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.auth-feedback.valid {
+  color: green;
+}
+
+.auth-feedback.invalid {
+  color: red;
+}
+
+.auth-button:disabled,
+.auth-button-alt:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

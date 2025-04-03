@@ -8,9 +8,41 @@ const Login = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const navigate = useNavigate();
+  const [passwordValid, setPasswordValid] = useState(false);
+  const [usernameValid, setUsernameValid] = useState(false);
+  const [usernameTouched, setUsernameTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+
+  const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+
+  const validateUsername = (value) => {
+    setUsername(value);
+    setUsernameTouched(true);
+    setUsernameValid(value.length >= 4);
+  };
+
+  const validatePassword = (value) => {
+    setPassword(value);
+    setPasswordTouched(true);
+    setPasswordValid(passwordRegex.test(value));
+  };
 
   const handleLogin = async () => {
     setError('');
+
+    if (username.length < 4) {
+      setError('Username must be at least 4 characters long');
+      return;
+    }
+
+    // Validate password (min 8 chars, includes letter, number, and symbol)
+    if (!passwordRegex.test(password)) {
+      setError(
+        'Password must be at least 8 characters and include a letter, number, and symbol'
+      );
+      return;
+    }
+
     try {
       const response = await fetch('http://localhost:3001/api/login', {
         method: 'POST',
@@ -34,6 +66,10 @@ const Login = ({ onLogin }) => {
 
   const handleRegister = async () => {
     setError('');
+    if (username.length < 4) {
+      setError('Username must be at least 4 characters long');
+      return;
+    }
     try {
       const response = await fetch('http://localhost:3001/api/register', {
         method: 'POST',
@@ -64,27 +100,49 @@ const Login = ({ onLogin }) => {
           />
           <h2 className="auth-brand-text">ElevateHER</h2>
         </div>
-        <h1 className="auth-title">{isRegistering ? 'Register' : ''}</h1>
         <input
           type="text"
           placeholder="Username"
           value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          onChange={(e) => validateUsername(e.target.value)}
           className="auth-input"
         />
         <input
           type="password"
           placeholder="Password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => validatePassword(e.target.value)}
           className="auth-input"
         />
+        {usernameTouched && (
+          <p className={`auth-feedback ${usernameValid ? 'valid' : 'invalid'}`}>
+            {usernameValid ? '✅ Username looks good' : '❌ Must be at least 4 characters'}
+          </p>
+        )}
+
+        {passwordTouched && (
+          <p className={`auth-feedback ${passwordValid ? 'valid' : 'invalid'}`}>
+            {passwordValid
+              ? '✅ Strong password'
+              : '❌ Must include letter, number, symbol (min 8 chars)'}
+          </p>
+        )}
+
+
         {isRegistering ? (
-          <button onClick={handleRegister} className="auth-button-alt">
+          <button
+            onClick={handleRegister}
+            className="auth-button-alt"
+            disabled={!usernameValid || !passwordValid}
+          >
             Register
           </button>
         ) : (
-          <button onClick={handleLogin} className="auth-button">
+          <button
+            onClick={handleLogin}
+            className="auth-button"
+            disabled={!usernameValid || !passwordValid}
+          >
             Login
           </button>
         )}

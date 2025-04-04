@@ -235,4 +235,36 @@ router.post('/login', async (req, res) => {
   }
 });
 
+router.get('/user-likes/:username', async (req, res) => {
+  const { username } = req.params; 
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (u:User {username: $username})-[r:LIKED]->(p:Play)
+      RETURN p
+      LIMIT 5
+      `,
+      { username }
+    );
+
+    const plays = result.records.map(record => {
+      const playNode = record.get('p');
+      return {
+        id: playNode.identity.toNumber(),
+        title: playNode.properties.title,
+        description: playNode.properties.description || null,
+      };
+    });
+
+    res.json(plays);
+  } catch (err) {
+    console.error('Error fetching user likes:', err);
+    res.status(500).json({ error: 'Failed to fetch user likes' });
+  } finally {
+    await session.close();
+  }
+});
+
 module.exports = router;

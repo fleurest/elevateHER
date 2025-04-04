@@ -5,6 +5,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import HamburgerMenu from './components/HamburgerMenu';
 import Home from './components/Home';
+import Profile from './components/Profile';
 
 function AppContent() {
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ function AppContent() {
     localStorage.setItem('user', JSON.stringify({ username }));
     setIsAuthenticated(true);
     console.log(`${username} logged in`);
-    navigate('/dashboard');
+    navigate('/profile');
   };
 
   const handleLogout = () => {
@@ -30,13 +31,26 @@ function AppContent() {
   return (
     <>
       <Routes>
+
         <Route
           path="/"
-          element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login onLogin={handleLogin} />}
+          element={
+            isAuthenticated ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />
+          }
         />
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route
-          path="/login"
-          element={<Login onLogin={handleLogin} />}
+          path="/profile"
+          element={
+            isAuthenticated
+              ? (
+                <Profile
+                  username={JSON.parse(localStorage.getItem('user') || '{}').username}
+                  handleLogout={handleLogout}
+                />
+              )
+              : <Navigate to="/login" />
+          }
         />
         <Route
           path="/dashboard"

@@ -12,6 +12,7 @@ const Login = ({ onLogin }) => {
   const [usernameValid, setUsernameValid] = useState(false);
   const [usernameTouched, setUsernameTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
@@ -105,22 +106,23 @@ const Login = ({ onLogin }) => {
           placeholder="Username"
           value={username}
           onChange={(e) => validateUsername(e.target.value)}
-          className="auth-input"
+          className="auth-input auth-input-user"
         />
         <input
-          type="password"
+          type={showPassword ? "text" : "password"}
           placeholder="Password"
           value={password}
           onChange={(e) => validatePassword(e.target.value)}
           className="auth-input"
         />
-        {usernameTouched && (
+
+        {isRegistering && usernameTouched && (
           <p className={`auth-feedback ${usernameValid ? 'valid' : 'invalid'}`}>
             {usernameValid ? '✅ Username looks good' : '❌ Must be at least 4 characters'}
           </p>
         )}
 
-        {passwordTouched && (
+        {isRegistering && passwordTouched && (
           <p className={`auth-feedback ${passwordValid ? 'valid' : 'invalid'}`}>
             {passwordValid
               ? '✅ Strong password'

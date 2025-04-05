@@ -16,10 +16,16 @@ const Login = ({ onLogin }) => {
 
   const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
+  const sanitizeInput = (value) => {
+    // Allows alphanumeric, ., @, -, _
+    return value.replace(/[\x00-\x1F\x7F]/g, '');
+  };
+
   const validateUsername = (value) => {
-    setUsername(value);
+    const sanitizedValue = sanitizeInput(value);
+    setUsername(sanitizedValue);
     setUsernameTouched(true);
-    setUsernameValid(value.length >= 4);
+    setUsernameValid(sanitizedValue.length >= 4);
   };
 
   const validatePassword = (value) => {

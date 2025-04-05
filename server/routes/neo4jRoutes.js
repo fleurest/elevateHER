@@ -3,6 +3,7 @@ const router = express.Router();
 const { driver } = require('../neo4j');
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
+const { sanitizeUsername, sanitizePassword } = require('./shared/inputSanitizers');
 
 // Get a few nodes
 router.get('/nodes', async (req, res) => {
@@ -161,7 +162,8 @@ router.get('/graph', async (req, res) => {
 
 // Register route
 router.post('/register', async (req, res) => {
-  const { username, password } = req.body;
+  const username = sanitizeUsername(req.body.username);
+  const password = sanitizePassword(req.body.password);
   const session = driver.session();
 
   if (username.length < 4) {
@@ -206,8 +208,8 @@ router.post('/register', async (req, res) => {
 
 // Login route
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const session = driver.session();
+  const username = sanitizeUsername(req.body.username);
+  const password = sanitizePassword(req.body.password);
 
   try {
     const result = await session.run(
@@ -230,6 +232,38 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
+  } finally {
+    await session.close();
+  }
+});
+
+router.get('/user-likes/:username', async (req, res) => {
+  const { username } = req.params; 
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (u:User {username: $username})-[r:LIKED]->(p:Play)
+      RETURN p
+      LIMIT 5
+      `,
+      { username }
+    );
+
+    const plays = result.records.map(record => {
+      const playNode = record.get('p');
+      return {
+        id: playNode.identity.toNumber(),
+        title: playNode.properties.title,
+        description: playNode.properties.description || null,
+      };
+    });
+
+    res.json(plays);
+  } catch (err) {
+    console.error('Error fetching user likes:', err);
+    res.status(500).json({ error: 'Failed to fetch user likes' });
   } finally {
     await session.close();
   }

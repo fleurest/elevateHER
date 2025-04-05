@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { sanitizeUsername, sanitizePassword } from '../../../utils/inputSanitizers';
+
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
@@ -22,16 +24,17 @@ const Login = ({ onLogin }) => {
   };
 
   const validateUsername = (value) => {
-    const sanitizedValue = sanitizeInput(value);
+    const sanitizedValue = sanitizeUsername(value);
     setUsername(sanitizedValue);
     setUsernameTouched(true);
     setUsernameValid(sanitizedValue.length >= 4);
   };
-
+  
   const validatePassword = (value) => {
-    setPassword(value);
+    const sanitizedValue = sanitizePassword(value);
+    setPassword(sanitizedValue);
     setPasswordTouched(true);
-    setPasswordValid(passwordRegex.test(value));
+    setPasswordValid(passwordRegex.test(sanitizedValue));
   };
 
   const handleLogin = async () => {

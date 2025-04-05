@@ -3,6 +3,7 @@ const router = express.Router();
 const { driver } = require('../neo4j');
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
+const { sanitizeUsername, sanitizePassword } = require('./shared/inputSanitizers');
 
 // Get a few nodes
 router.get('/nodes', async (req, res) => {
@@ -161,7 +162,8 @@ router.get('/graph', async (req, res) => {
 
 // Register route
 router.post('/register', async (req, res) => {
-  const { username, password } = req.body;
+  const username = sanitizeUsername(req.body.username);
+  const password = sanitizePassword(req.body.password);
   const session = driver.session();
 
   if (username.length < 4) {
@@ -206,8 +208,8 @@ router.post('/register', async (req, res) => {
 
 // Login route
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const session = driver.session();
+  const username = sanitizeUsername(req.body.username);
+  const password = sanitizePassword(req.body.password);
 
   try {
     const result = await session.run(

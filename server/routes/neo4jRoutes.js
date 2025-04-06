@@ -331,4 +331,89 @@ router.post('/user-likes', async (req, res) => {
   }
 });
 
+router.get('/search', async (req, res) => {
+  const { query, sport } = req.query;
+  const session = driver.session();
+
+  if (!query || query.trim() === '') {
+    return res.status(400).json({ error: 'Query is required' });
+  }
+
+  try {
+    const cypher = `
+      MATCH (p:Player)
+      WHERE toLower(p.name) CONTAINS toLower($query)
+      ${sport ? 'AND toLower(p.sport) = toLower($sport)' : ''}
+      RETURN p LIMIT 10
+    `;
+
+    const result = await session.run(cypher, { query, sport });
+
+    let players = result.records.map(record => {
+      const p = record.get('p');
+      return {
+        id: p.identity.toNumber(),
+        name: p.properties.name,
+        sport: p.properties.sport || null,
+        profileImage: p.properties.profileImage || null,
+        description: p.properties.description || null,
+      };
+    });
+
+    // no players found? ok fetch top 5 similar names
+    if (players.length === 0) {
+      const altResult = await session.run(
+        `
+        MATCH (p:Player)
+        WITH p, apoc.text.sorensenDiceSimilarity(toLower(p.name), toLower($query)) AS similarity
+        WHERE similarity > 0.1
+        RETURN p ORDER BY similarity DESC LIMIT 5
+        `,
+        { query }
+      );
+
+      const suggestions = altResult.records.map(record => {
+        const p = record.get('p');
+        return {
+          id: p.identity.toNumber(),
+          name: p.properties.name,
+          sport: p.properties.sport || null,
+        };
+      });
+
+      return res.json({ players: [], suggestions });
+    }
+
+    res.json({ players });
+  } catch (err) {
+    console.error('Search error:', err);
+    res.status(500).json({ error: 'Search failed' });
+  } finally {
+    await session.close();
+  }
+});
+
+router.post('/add-player', async (req, res) => {
+  const { name, sport } = req.body;
+  const session = driver.session();
+
+  if (!name || !sport) {
+    return res.status(400).json({ error: 'Name and sport are required' });
+  }
+
+  try {
+    await session.run(
+      `MERGE (p:Player {name: $name}) SET p.sport = $sport`,
+      { name, sport }
+    );
+
+    res.status(201).json({ message: `Player ${name} added to ${sport}` });
+  } catch (err) {
+    console.error('Add player error:', err);
+    res.status(500).json({ error: 'Failed to add player' });
+  } finally {
+    await session.close();
+  }
+});
+
 module.exports = router;

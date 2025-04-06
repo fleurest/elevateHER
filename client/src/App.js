@@ -6,6 +6,8 @@ import Dashboard from './components/Dashboard';
 import HamburgerMenu from './components/HamburgerMenu';
 import Home from './components/Home';
 import Profile from './components/Profile';
+import Search from './components/Search';
+
 
 function AppContent() {
   const navigate = useNavigate();
@@ -80,6 +82,7 @@ function AppContent() {
           }
         />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="/search" element={<Search />} />
         <Route
           path="/profile"
           element={

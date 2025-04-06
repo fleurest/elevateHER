@@ -169,14 +169,14 @@ router.post('/register', async (req, res) => {
   if (username.length < 4) {
     return res.status(400).json({ error: 'Username must be at least 4 characters' });
   }
-  
+
   const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};':"\\|,.<>\/?]).{8,}$/;
   if (!passwordRegex.test(password)) {
     return res.status(400).json({
       error: 'Password must be at least 8 characters and include a letter, number, and symbol'
     });
   }
-  
+
   try {
     // Check if user already exists
     const existing = await session.run(
@@ -271,32 +271,61 @@ router.post('/logout', (req, res) => {
 
 
 router.get('/user-likes/:username', async (req, res) => {
-  const { username } = req.params; 
+  const { username } = req.params;
   const session = driver.session();
+  console.time('FetchUserLikes');
 
   try {
     const result = await session.run(
       `
-      MATCH (u:User {username: $username})-[r:LIKED]->(p:Play)
+      MATCH (u:User {username: $username})-[:LIKED]->(p:Player)
       RETURN p
       LIMIT 5
       `,
       { username }
     );
 
-    const plays = result.records.map(record => {
-      const playNode = record.get('p');
+    const likedPlayers = result.records.map(record => {
+      const player = record.get('p');
       return {
-        id: playNode.identity.toNumber(),
-        title: playNode.properties.title,
-        description: playNode.properties.description || null,
+        id: player.identity.toNumber(),
+        name: player.properties.name,
+        description: player.properties.description || null,
+        profileImage: player.properties.profileImage || null
       };
     });
 
-    res.json(plays);
+    res.json(likedPlayers);
   } catch (err) {
-    console.error('Error fetching user likes:', err);
-    res.status(500).json({ error: 'Failed to fetch user likes' });
+    console.error('Error fetching liked players:', err);
+    res.status(500).json({ error: 'Failed to fetch liked players' });
+  } finally {
+    await session.close();
+  }
+});
+
+router.post('/user-likes', async (req, res) => {
+  const { username, playerName } = req.body;
+  const session = driver.session();
+
+  if (!username || !playerName) {
+    return res.status(400).json({ error: 'Username and player name required' });
+  }
+
+  try {
+    await session.run(
+      `
+      MERGE (u:User {username: $username})
+      MERGE (p:Player {name: $playerName})
+      MERGE (u)-[:LIKED]->(p)
+      `,
+      { username, playerName }
+    );
+
+    res.status(200).json({ message: `${username} liked ${playerName}` });
+  } catch (err) {
+    console.error('Error creating LIKE relationship:', err);
+    res.status(500).json({ error: 'Failed to like player' });
   } finally {
     await session.close();
   }

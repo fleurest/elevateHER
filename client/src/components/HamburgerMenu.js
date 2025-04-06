@@ -9,7 +9,7 @@ const handleLogout = () => {
   navigate('/login');
 };
 
-function HamburgerMenu({handleLogout}) {
+function HamburgerMenu({ handleLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -46,9 +46,12 @@ function HamburgerMenu({handleLogout}) {
           <Link to="/dashboard" style={{ display: 'block', padding: '10px' }}>
             Dashboard
           </Link>
+          <Link to="/search" style={{ display: 'block', padding: '10px' }}>
+            Search Players
+          </Link>
           <Link
             to="/login"
-            onClick={() => {/*TODO*/}}
+            onClick={handleLogout}
             style={{
               display: "block",
               padding: "10px",
@@ -65,3 +68,4 @@ function HamburgerMenu({handleLogout}) {
 }
 
 export default HamburgerMenu;
+

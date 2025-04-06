@@ -49,6 +49,11 @@ module.exports = {
     historyApiFallback: true,
     client: {
       overlay: true,
+      webSocketURL: {
+        hostname: 'localhost',
+        port: 3000,
+        protocol: 'ws',
+      },
     },
   },
   mode: 'development',

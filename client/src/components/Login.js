@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { sanitizeUsername, sanitizePassword } from '../../../utils/inputSanitizers';
+import { sanitizeUsername, sanitizePassword } from '../utils/inputSanitizers';
 
 
 const Login = ({ onLogin }) => {
@@ -57,6 +57,7 @@ const Login = ({ onLogin }) => {
       const response = await fetch('http://localhost:3001/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password }),
       });
 

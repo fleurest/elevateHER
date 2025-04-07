@@ -383,4 +383,40 @@ router.post('/add-player', async (req, res) => {
   }
 });
 
+router.put('/player/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, sport, description } = req.body;
+  const session = driver.session();
+
+  try {
+    await session.run(
+      `
+      MATCH (p)
+      WHERE id(p) = $id
+      SET p:Person  // ensure label is Person
+      SET p.name = $name,
+          p.sport = $sport,
+          p.description = $description
+
+      MERGE (s:Sport {name: $sport})
+      MERGE (p)-[:PARTICIPATES_IN]->(s)
+      `,
+      {
+        id: parseInt(id),
+        name,
+        sport,
+        description
+      }
+    );
+
+    res.status(200).json({ message: 'Player updated and linked to sport' });
+  } catch (err) {
+    console.error('Error updating person:', err);
+    res.status(500).json({ error: 'Failed to update person' });
+  } finally {
+    await session.close();
+  }
+});
+
+
 module.exports = router;

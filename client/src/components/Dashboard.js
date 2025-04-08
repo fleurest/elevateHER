@@ -24,15 +24,21 @@ const Dashboard = ({ handleLogout }) => {
 
     const fetchGraph = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/graph');
+        const res = await fetch('http://localhost:3001/api/graph',{
+          credentials: 'include'
+        });
         const graphData = await res.json();
+
+        console.log('Fetched Graph Data:', graphData);
 
         if (isMounted && cyContainerRef.current) {
           const nodes = graphData.nodes || [];
           const edges = graphData.edges || [];
           const elements = [...nodes, ...edges];
 
-          // wipe previous instance to start fresh
+          console.log('Graph Elements:', elements); 
+
+          // clear previous instance to start fresh
           if (cyInstanceRef.current) {
             cyInstanceRef.current.destroy();
           }
@@ -84,7 +90,7 @@ const Dashboard = ({ handleLogout }) => {
           cyInstanceRef.current = cy;
         }
       } catch (err) {
-        console.error(err);
+        console.error('Graph fetch error:', err); 
       }
     };
 

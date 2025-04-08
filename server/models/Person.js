@@ -54,7 +54,7 @@ class Person {
         const session = this.driver.session();
         try {
             const cypher = `
-                MATCH (p:Player)
+                MATCH (p:Person)
                 WHERE toLower(p.name) CONTAINS toLower($query)
                 ${sport ? 'AND toLower(p.sport) = toLower($sport)' : ''}
                 RETURN p LIMIT 10
@@ -71,7 +71,7 @@ class Person {
         try {
             const result = await session.run(
                 `
-                MATCH (p:Player)
+                MATCH (p:Person)
                 WITH p, apoc.text.sorensenDiceSimilarity(toLower(p.name), toLower($query)) AS similarity
                 WHERE similarity > 0.1
                 RETURN p ORDER BY similarity DESC LIMIT 5
@@ -89,7 +89,7 @@ class Person {
         try {
             const result = await session.run(
                 `
-                MATCH (u:User {username: $username})-[:LIKED]->(p:Player)
+                MATCH (u:User {username: $username})-[:LIKED]->(p:Person)
                 RETURN p
                 LIMIT 5
                 `,
@@ -107,7 +107,7 @@ class Person {
             await session.run(
                 `
                 MERGE (u:User {username: $username})
-                MERGE (p:Player {name: $playerName})
+                MERGE (p:Person {name: $playerName})
                 MERGE (u)-[:LIKED]->(p)
                 `,
                 { username, playerName }

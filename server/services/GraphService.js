@@ -4,7 +4,10 @@ class GraphService {
     }
   
     async buildGraph(limit = 100, filterByType = null) {
-        const records = await this.graphModel.getAllConnections(limit);
+        console.log('buildGraph called with limit:', limit, '| type:', typeof limit);
+        const intLimit = Number.isInteger(limit) ? limit : parseInt(limit, 10);
+        const records = await this.graphModel.getAllConnections(intLimit);
+      
       
         const nodesMap = new Map();
         const edges = [];

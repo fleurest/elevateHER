@@ -1,49 +1,124 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import cytoscape from 'cytoscape';
 import HamburgerMenu from './HamburgerMenu';
-import App from '../App';
 
 function HomePage({ handleLogout }) {
-  const [homePageData, setHomePageData] = useState(null);
+  const [graphData, setGraphData] = useState(null);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const cyContainerRef = useRef(null);
+  const cyInstanceRef = useRef(null);
 
-  // starter home page data
   useEffect(() => {
-    setHomePageData({
-      welcomeMessage: 'Welcome to the ElevateHER App',
-      featuredArticle: 'Lookup your favourite players',
-      upcomingEvent: 'Next Match',
-    });
+    async function fetchGraph() {
+      try {
+        const res = await fetch('http://localhost:3001/api/graph');
+        const data = await res.json();
+        console.log('Graph Data:', data);
+        setGraphData(data);
+      } catch (err) {
+        console.error('Error fetching graph:', err);
+      }
+    }
+    fetchGraph();
   }, []);
 
+  useEffect(() => {
+    if (!graphData) return;
+
+    const timeout = setTimeout(() => {
+      if (!cyContainerRef.current) return;
+
+      const nodes = graphData.nodes.map(n => ({ data: n.data }));
+      const edges = graphData.edges.map(e => ({ data: e.data }));
+      const elements = [...nodes, ...edges];
+
+      if (cyInstanceRef.current) {
+        cyInstanceRef.current.destroy();
+      }
+
+      const cy = cytoscape({
+        container: cyContainerRef.current,
+        elements,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'background-color': '#0074D9',
+              'label': 'data(label)',
+              'color': '#fff',
+              'text-valign': 'center',
+              'text-halign': 'center',
+              'font-size': 10,
+              'width': 40,
+              'height': 40
+            }
+          },
+          {
+            selector: 'edge',
+            style: {
+              'width': 2,
+              'line-color': '#ccc',
+              'target-arrow-color': '#ccc',
+              'target-arrow-shape': 'triangle',
+              'curve-style': 'bezier',
+              'label': 'data(label)',
+              'font-size': 8,
+              'text-background-color': '#fff',
+              'text-background-opacity': 1,
+              'text-background-shape': 'roundrectangle',
+              'text-rotation': 'none',
+              'text-margin-y': -10,
+              'min-zoomed-font-size': 4
+            }
+          }
+        ],
+        layout: { name: 'cose', animate: true }
+      });
+
+      cy.on('tap', 'node', (evt) => {
+        setSelectedNode(evt.target.data());
+      });
+
+      cyInstanceRef.current = cy;
+      // delay to allow container to mount
+    }, 100);
+
+    return () => {
+      clearTimeout(timeout);
+      if (cyInstanceRef.current) {
+        cyInstanceRef.current.destroy();
+      }
+    };
+  }, [graphData]);
+
   return (
-    <div className="App-home-page">
-      <HamburgerMenu handleLogout={handleLogout} />
-      <div className="App-top-panel">
-        {/* TODO: Add Logo or Header */}
-        <h1>ElevateHER</h1>
+    <div className="home-page-layout">
+      <div className="home-page-column home-page-left">
+        <h2>Explore</h2>
+        <ul className="space-y-2">
+          <li className="hover:underline cursor-pointer">Friends</li>
+          <li className="hover:underline cursor-pointer">Players</li>
+          <li className="hover:underline cursor-pointer">Sports</li>
+          <li className="hover:underline cursor-pointer">Events</li>
+        </ul>
       </div>
 
-      <div className="App-main-content">
-        <div className="App-left-panel">
-          <h2>Home</h2>
-          {homePageData ? (
-            <div>
-              <p><strong>{homePageData.welcomeMessage}</strong></p>
-              <p><strong>Search for:</strong> {homePageData.featuredArticle}</p>
-              <p><strong>Upcoming Event:</strong> {homePageData.upcomingEvent}</p>
-            </div>
-          ) : (
-            <p>Loading home page data...</p>
-          )}
-        </div>
+      <div className="home-page-column home-page-center">
+        <h2>Network</h2>
+        <div ref={cyContainerRef} style={{ height: '500px', width: '100%' }} />
+      </div>
 
-        <div className="App-center-panel">
-          <h2>Latest News</h2>
-          <ul>
-            <li>New player data available now</li>
-            <li>Join our new community</li>
-            <li>ElevateHER's latest partnerships announced.</li>
-          </ul>
-        </div>
+      <div className="home-page-column home-page-right">
+        <h2>Details</h2>
+        {selectedNode ? (
+          <div>
+            {Object.entries(selectedNode).map(([key, value]) => (
+              <p key={key}><strong>{key}:</strong> {JSON.stringify(value)}</p>
+            ))}
+          </div>
+        ) : (
+          <p>Click a node to see details.</p>
+        )}
       </div>
     </div>
   );

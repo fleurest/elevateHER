@@ -249,3 +249,42 @@
   border: 1px solid var(--purple);
   border-radius: 8px;
 }
+
+.home-page-layout {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  gap: 20px;
+  padding: 20px;
+  background-color: var(--grey);
+  box-sizing: border-box;
+}
+
+.home-page-column {
+  flex: 1;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  overflow-y: auto;
+}
+
+.home-page-column h2 {
+  margin-bottom: 12px;
+  font-size: 20px;
+  color: var(--navy);
+}
+
+.home-page-left {
+  background-color: var(--pink);
+  color: var(--navy);
+}
+
+.home-page-center {
+  background-color: var(--grey);
+  color: var(--navy);
+}
+
+.home-page-right {
+  background-color: var(--light-purple);
+  color: var(--grey);
+}

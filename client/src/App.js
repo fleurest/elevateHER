@@ -8,7 +8,6 @@ import Home from './components/Home';
 import Profile from './components/Profile';
 import Search from './components/Search';
 
-
 function AppContent() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(
@@ -33,37 +32,50 @@ function AppContent() {
   return (
     <>
       <Routes>
-
         <Route
           path="/"
           element={
             isAuthenticated ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />
           }
         />
-        <Route path="/login" element={<Login onLogin={handleLogin} />} />
-        <Route path="/search" element={<Search />} />
         <Route
-          path="/profile"
-          element={
-            isAuthenticated
-              ? (
-                <Profile
-                  username={JSON.parse(localStorage.getItem('user') || '{}').username}
-                  handleLogout={handleLogout}
-                />
-              )
-              : <Navigate to="/login" />
-          }
+          path="/login"
+          element={<Login onLogin={handleLogin} />}
         />
         <Route
           path="/dashboard"
-          element={isAuthenticated ? <Dashboard /> : <Navigate to="/" />}
+          element={
+            isAuthenticated ? (
+              <Dashboard handleLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
         <Route
           path="/home"
-          element={isAuthenticated ? <Home /> : <Navigate to="/home" />}
+          element={
+            isAuthenticated ? (
+              <Home handleLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
         />
+        <Route
+          path="/profile"
+          element={
+            isAuthenticated ? (
+              <Profile handleLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route path="/search" element={<Search />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
     </>
   );
 }

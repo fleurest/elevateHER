@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import cytoscape from 'cytoscape';
 import HamburgerMenu from './HamburgerMenu';
-import App from '../App';
 
 function HomePage({ handleLogout, user }) {
   const [graphData, setGraphData] = useState(null);
@@ -14,11 +13,17 @@ function HomePage({ handleLogout, user }) {
   const [showMyPlayers, setShowMyPlayers] = useState(false);
 
   useEffect(() => {
-    setHomePageData({
-      welcomeMessage: 'Welcome to the ElevateHER App',
-      featuredArticle: 'Lookup your favourite players',
-      upcomingEvent: 'Next Match',
-    });
+    async function fetchGraph() {
+      try {
+        const res = await fetch('http://localhost:3001/api/graph');
+        const data = await res.json();
+        console.log('Graph Data:', data);
+        setGraphData(data);
+      } catch (err) {
+        console.error('Error fetching graph:', err);
+      }
+    }
+    fetchGraph();
   }, []);
 
   useEffect(() => {

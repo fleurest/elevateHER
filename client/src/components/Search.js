@@ -1,109 +1,175 @@
 import React, { useState } from 'react';
+import '../style.css';
+import HamburgerMenu from './HamburgerMenu';
+
 
 function Search() {
     const [query, setQuery] = useState('');
     const [sport, setSport] = useState('');
+
+    // results & suggestions
     const [results, setResults] = useState([]);
     const [suggestions, setSuggestions] = useState([]);
     const [error, setError] = useState('');
-    const [showAddForm, setShowAddForm] = useState(false);
-    const [newPlayerSport, setNewPlayerSport] = useState('');
-    const [editPlayerId, setEditPlayerId] = useState(null);
-    const [editData, setEditData] = useState({ name: '', sport: '', description: '' });
+    const [showForm, setShowForm] = useState(false);
 
-    const startEditing = (player) => {
-        setEditPlayerId(player.id);
-        setEditData({
-            name: player.name,
-            sport: player.sport || '',
-            description: player.description || ''
-        });
-    };
+    // editing an existing person id
+    const [editPersonId, setEditPersonId] = useState(null);
 
-    const savePlayerEdit = async () => {
-        try {
-            const res = await fetch(`/api/player/${editPlayerId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(editData)
-            });
+    // form state for the complete set of person data
+    const [personForm, setPersonForm] = useState({
+        name: '',
+        nationality: '',
+        gender: '',
+        profileImage: '',
+        birthDate: '',
+        roles: '',
+        primaryRole: '',
+        sport: ''
+    });
 
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to update player');
+    // event handlers
 
-            alert('Player updated successfully!');
-            setEditPlayerId(null);
-            handleSearch(new Event('submit')); // refresh results
-        } catch (err) {
-            alert(err.message);
-        }
-    };
-
-    const handleSearch = async (e) => {
+    async function handleSearch(e) {
         e.preventDefault();
         setError('');
         setResults([]);
         setSuggestions([]);
-        setShowAddForm(false);
-
-        const params = new URLSearchParams({ query });
-        if (sport) params.append('sport', sport);
+        setEditPersonId(null);
+        setShowForm(false);
 
         try {
+            // creating the  query string, e.g. /api/search?query=Serena&sport=Tennis
+            const params = new URLSearchParams({ query });
+            if (sport) params.append('sport', sport);
+
             const res = await fetch(`/api/search?${params.toString()}`, {
                 credentials: 'include',
             });
-
-            const data = await res.json();
-
-            if (!res.ok) throw new Error(data.error || 'Search failed');
-
+            let data;
+            try {
+                data = await res.json();
+            } catch (parseError) {
+                throw new Error(`Invalid JSON response (status ${res.status}).`);
+            }
             setResults(data.players || []);
             setSuggestions(data.suggestions || []);
         } catch (err) {
             setError(err.message);
         }
-    };
+    }
 
-    const handleAddPlayer = async () => {
+    function handleFormChange(e) {
+        const { name, value } = e.target;
+        setPersonForm(prev => ({ ...prev, [name]: value }));
+    }
+
+    function startEditing(player) {
+        setEditPersonId(player.id);
+
+        // to handle DB role array, join them with commas
+        const rolesString = (player.roles || []).join(', ');
+
+        setPersonForm({
+            name: player.name || '',
+            nationality: player.nationality || '',
+            gender: player.gender || '',
+            profileImage: player.profileImage || '',
+            birthDate: player.birthDate || '',
+            roles: rolesString,
+            primaryRole: player.primaryRole || '',
+            sport: player.sport || ''
+        });
+
+        setShowForm(true);
+    }
+
+    function startCreating() {
+        setEditPersonId(null);
+        setPersonForm({
+            name: query || '',
+            nationality: '',
+            gender: '',
+            profileImage: '',
+            birthDate: '',
+            roles: '',
+            primaryRole: '',
+            sport: sport || ''
+        });
+        setShowForm(true);
+    }
+
+    async function handleSubmit(e) {
+        e.preventDefault();
+
+        // convert roles from comma-separated string into array
+        const rolesArr = personForm.roles
+            ? personForm.roles.split(',').map(r => r.trim()).filter(Boolean)
+            : [];
+
+        const payload = {
+            ...personForm,
+            roles: rolesArr
+        };
+
         try {
-            const res = await fetch('/api/add-player', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ name: query, sport: newPlayerSport }),
+            let method = 'POST';
+            let url = '/api/person';
+            if (editPersonId) {
+                method = 'PUT';
+                url = `/api/person/${editPersonId}`;
+            }
+
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
 
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to add player');
+            if (!res.ok) throw new Error(data.error || 'Failed to save');
 
-            alert(data.message);
-            setShowAddForm(false);
-            setQuery('');
-            setNewPlayerSport('');
+            alert(data.message || 'Success!');
+            setShowForm(false);
+            setEditPersonId(null);
+            setPersonForm({
+                name: '',
+                nationality: '',
+                gender: '',
+                profileImage: '',
+                birthDate: '',
+                roles: '',
+                primaryRole: '',
+                sport: ''
+            });
+
+            // also refresh search results
+            if (method === 'PUT') {
+                handleSearch(new Event('submit'));
+            }
         } catch (err) {
             alert(err.message);
         }
-    };
+    }
 
+    // search form
     return (
-        <div style={{ padding: '1rem' }}>
-            <h2>Search Players</h2>
+        <div className="App-center-panel">
+            <h2 style={{ marginTop: 0 }}>Search People</h2>
+
             <form onSubmit={handleSearch} style={{ marginBottom: '1rem' }}>
                 <input
+                    className="auth-input"
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search by name"
-                    style={{ padding: '0.5rem', width: '40%' }}
                 />
                 <select
+                    className="auth-input"
                     value={sport}
                     onChange={(e) => setSport(e.target.value)}
-                    style={{ marginLeft: '1rem', padding: '0.5rem' }}
+                    style={{ marginLeft: '10px' }}
                 >
                     <option value="">All Sports</option>
                     <option value="Figure Skating">Figure Skating</option>
@@ -111,7 +177,10 @@ function Search() {
                     <option value="Tennis">Tennis</option>
                     <option value="Basketball">Basketball</option>
                 </select>
-                <button type="submit" style={{ marginLeft: '1rem' }}>Search</button>
+
+                <button className="auth-button" type="submit" style={{ marginLeft: '10px' }}>
+                    Search
+                </button>
             </form>
 
             {error && <p style={{ color: 'red' }}>{error}</p>}
@@ -119,48 +188,28 @@ function Search() {
             {results.length > 0 && (
                 <>
                     <h3>Results</h3>
-                    <ul>
-                        {results.map(player => (
+                    <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+                        {results.map((player) => (
                             <li key={player.id} style={{ marginBottom: '1rem' }}>
-                                {editPlayerId === player.id ? (
-                                    <div>
-                                        <input
-                                            value={editData.name}
-                                            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                                            placeholder="Name"
-                                        />
-                                        <input
-                                            value={editData.sport}
-                                            onChange={(e) => setEditData({ ...editData, sport: e.target.value })}
-                                            placeholder="Sport"
-                                        />
-                                        <textarea
-                                            value={editData.description}
-                                            onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                                            placeholder="Description"
-                                        />
-                                        <button onClick={savePlayerEdit}>Save</button>
-                                        <button onClick={() => setEditPlayerId(null)}>Cancel</button>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <strong>{player.name}</strong> – {player.sport}
-                                        {player.description && <p>{player.description}</p>}
-                                        <button onClick={() => startEditing(player)} style={{ marginTop: '5px' }}>
-                                            Edit
-                                        </button>
-                                    </>
-                                )}
+                                <strong>{player.name}</strong> – {player.sport || 'N/A'}
+                                <button
+                                    className="auth-button"
+                                    onClick={() => startEditing(player)}
+                                    style={{ marginLeft: '10px', width: 'auto' }}
+                                >
+                                    Edit
+                                </button>
                             </li>
                         ))}
                     </ul>
                 </>
             )}
+
             {results.length === 0 && suggestions.length > 0 && (
                 <>
                     <h3>No exact match. Did you mean:</h3>
-                    <ul>
-                        {suggestions.map(player => (
+                    <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+                        {suggestions.map((player) => (
                             <li key={player.id}>
                                 <strong>{player.name}</strong> – {player.sport || 'Unknown sport'}
                             </li>
@@ -169,40 +218,107 @@ function Search() {
                 </>
             )}
 
-            {results.length === 0 && suggestions.length === 0 && query && (
+            {results.length === 0 && suggestions.length === 0 && query && !showForm && (
                 <>
-                    <p>No players found.</p>
-                    {!showAddForm ? (
-                        <button onClick={() => setShowAddForm(true)}>
-                            Add "{query}" as a new player
-                        </button>
-                    ) : (
-                        <div style={{ marginTop: '1rem' }}>
-                            <h4>Add New Player</h4>
-                            <label>
-                                Sport:
-                                <select
-                                    value={newPlayerSport}
-                                    onChange={(e) => setNewPlayerSport(e.target.value)}
-                                    style={{ marginLeft: '0.5rem' }}
-                                >
-                                    <option value="">Select sport</option>
-                                    <option value="Figure Skating">Figure Skating</option>
-                                    <option value="Soccer">Soccer</option>
-                                    <option value="Tennis">Tennis</option>
-                                    <option value="Basketball">Basketball</option>
-                                </select>
-                            </label>
-                            <button
-                                onClick={handleAddPlayer}
-                                style={{ marginLeft: '1rem' }}
-                                disabled={!newPlayerSport}
-                            >
-                                Confirm Add
-                            </button>
-                        </div>
-                    )}
+                    <p>No matches found for "{query}".</p>
+                    <button
+                        className="auth-button-alt"
+                        onClick={startCreating}
+                        style={{ width: 'auto' }}
+                    >
+                        Add "{query}" as a new person
+                    </button>
                 </>
+            )}
+
+            {showForm && (
+                <div style={{ marginTop: '2rem' }}>
+                    <h3>{editPersonId ? 'Update Person' : 'Create New Person'}</h3>
+                    <form onSubmit={handleSubmit}>
+                        <label>Name</label>
+                        <input
+                            className="auth-input"
+                            type="text"
+                            name="name"
+                            value={personForm.name}
+                            onChange={handleFormChange}
+                            required
+                        />
+
+                        <label>Nationality</label>
+                        <input
+                            className="auth-input"
+                            type="text"
+                            name="nationality"
+                            value={personForm.nationality}
+                            onChange={handleFormChange}
+                        />
+
+                        <label>Gender</label>
+                        <select
+                            className="auth-input"
+                            name="gender"
+                            value={personForm.gender}
+                            onChange={handleFormChange}
+                        >
+                            <option value="">Select Gender</option>
+                            <option value="Female">Female</option>
+                            <option value="Male">Male</option>
+                            <option value="Other">Other</option>
+                        </select>
+
+                        <label>Profile Image URL</label>
+                        <input
+                            className="auth-input"
+                            type="text"
+                            name="profileImage"
+                            value={personForm.profileImage}
+                            onChange={handleFormChange}
+                        />
+
+                        <label>Birth Date</label>
+                        <input
+                            className="auth-input"
+                            type="date"
+                            name="birthDate"
+                            value={personForm.birthDate}
+                            onChange={handleFormChange}
+                        />
+
+                        <label>Roles (comma-separated)</label>
+                        <input
+                            className="auth-input"
+                            type="text"
+                            name="roles"
+                            placeholder="Coach, Player, etc."
+                            value={personForm.roles}
+                            onChange={handleFormChange}
+                        />
+
+                        <label>Primary Role</label>
+                        <input
+                            className="auth-input"
+                            type="text"
+                            name="primaryRole"
+                            placeholder="e.g. Player"
+                            value={personForm.primaryRole}
+                            onChange={handleFormChange}
+                        />
+
+                        <label>Sport</label>
+                        <input
+                            className="auth-input"
+                            type="text"
+                            name="sport"
+                            value={personForm.sport}
+                            onChange={handleFormChange}
+                        />
+
+                        <button className="auth-button" type="submit" style={{ marginTop: '10px', width: 'auto' }}>
+                            {editPersonId ? 'Update' : 'Create'}
+                        </button>
+                    </form>
+                </div>
             )}
         </div>
     );

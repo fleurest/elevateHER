@@ -7,6 +7,8 @@ const { sanitizeUsername, sanitizePassword } = require('../utils/inputSanitizers
 const Person = require('../models/Person');
 const PersonService = require('../services/PersonService');
 const PersonController = require('../controllers/PersonController');
+const path = require('path');
+console.log('Looking for Graph at:', path.resolve(__dirname, '../models/Graph'));
 const Graph = require('../models/Graph');
 const GraphService = require('../services/GraphService');
 
@@ -16,7 +18,7 @@ const personModel = new Person(driver);
 const personService = new PersonService(personModel);
 const personController = new PersonController(personService);
 
-// Nodes
+// nodes
 router.get('/nodes', async (req, res) => {
   try {
     const graph = await graphService.buildBasicGraph();

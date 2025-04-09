@@ -5,6 +5,7 @@ import HamburgerMenu from './HamburgerMenu';
 function HomePage({ handleLogout }) {
   const [graphData, setGraphData] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
+  const [filterType, setFilterType] = useState(null);
   const cyContainerRef = useRef(null);
   const cyInstanceRef = useRef(null);
 
@@ -20,86 +21,113 @@ function HomePage({ handleLogout }) {
       }
     }
     fetchGraph();
+    
   }, []);
 
   useEffect(() => {
-    if (!graphData) return;
+    if (!graphData || !cyContainerRef.current || !cyContainerRef.current.offsetParent) return;
 
     const timeout = setTimeout(() => {
-      if (!cyContainerRef.current) return;
+      try {
+        let nodes = graphData.nodes;
+        let edges = graphData.edges;
 
-      const nodes = graphData.nodes.map(n => ({ data: n.data }));
-      const edges = graphData.edges.map(e => ({ data: e.data }));
-      const elements = [...nodes, ...edges];
+        if (filterType) {
+          nodes = nodes.filter(n => n.data.label === filterType);
+        }
 
-      if (cyInstanceRef.current) {
-        cyInstanceRef.current.destroy();
+        const nodeIds = new Set(nodes.map(n => n.data.id));
+        edges = edges.filter(e => nodeIds.has(e.data.source) && nodeIds.has(e.data.target));
+
+        const elements = [...nodes.map(n => ({ data: n.data })), ...edges.map(e => ({ data: e.data }))];
+
+        if (cyInstanceRef.current) {
+          cyInstanceRef.current.destroy();
+          cyInstanceRef.current = null;
+        }
+
+        if (elements.length === 0) {
+          console.warn('No elements to display in Cytoscape.');
+          return;
+        }
+
+        const cy = cytoscape({
+          container: cyContainerRef.current,
+          elements,
+          style: [
+            {
+              selector: 'node',
+              style: {
+                'background-color': '#35374b',
+                'label': 'data(name)',
+                'color': '#f1f2f3',
+                'text-valign': 'center',
+                'text-halign': 'center',
+                'font-size': 10,
+                'width': 40,
+                'height': 40
+              }
+            },
+            {
+              selector: 'edge',
+              style: {
+                'width': 2,
+                'line-color': '#797ca0',
+                'target-arrow-color': '#797ca0',
+                'target-arrow-shape': 'triangle',
+                'curve-style': 'bezier',
+                'label': 'data(label)',
+                'font-size': 8,
+                'text-background-color': '#fff',
+                'text-background-opacity': 1,
+                'text-background-shape': 'roundrectangle',
+                'text-rotation': 'none',
+                'text-margin-y': -10,
+                'min-zoomed-font-size': 4
+              }
+            }
+          ],
+          layout: { name: 'breadthfirst', direction: 'TB', animate: true }
+        });
+
+        cy.on('tap', 'node', (evt) => {
+          setSelectedNode(evt.target.data());
+        });
+
+        cyInstanceRef.current = cy;
+      } catch (err) {
+        console.error('Cytoscape init error:', err);
       }
-
-      const cy = cytoscape({
-        container: cyContainerRef.current,
-        elements,
-        style: [
-          {
-            selector: 'node',
-            style: {
-              'background-color': '#0074D9',
-              'label': 'data(label)',
-              'color': '#fff',
-              'text-valign': 'center',
-              'text-halign': 'center',
-              'font-size': 10,
-              'width': 40,
-              'height': 40
-            }
-          },
-          {
-            selector: 'edge',
-            style: {
-              'width': 2,
-              'line-color': '#ccc',
-              'target-arrow-color': '#ccc',
-              'target-arrow-shape': 'triangle',
-              'curve-style': 'bezier',
-              'label': 'data(label)',
-              'font-size': 8,
-              'text-background-color': '#fff',
-              'text-background-opacity': 1,
-              'text-background-shape': 'roundrectangle',
-              'text-rotation': 'none',
-              'text-margin-y': -10,
-              'min-zoomed-font-size': 4
-            }
-          }
-        ],
-        layout: { name: 'cose', animate: true }
-      });
-
-      cy.on('tap', 'node', (evt) => {
-        setSelectedNode(evt.target.data());
-      });
-
-      cyInstanceRef.current = cy;
-      // delay to allow container to mount
-    }, 100);
+      
+    }, 150);
 
     return () => {
       clearTimeout(timeout);
       if (cyInstanceRef.current) {
         cyInstanceRef.current.destroy();
+        cyInstanceRef.current = null;
       }
     };
-  }, [graphData]);
+  }, [graphData, filterType]);
 
   return (
     <div className="home-page-layout">
       <div className="home-page-column home-page-left">
         <h2>Explore</h2>
         <ul className="space-y-2">
-          <li className="hover:underline cursor-pointer">Friends</li>
-          <li className="hover:underline cursor-pointer">Players</li>
-          <li className="hover:underline cursor-pointer">Sports</li>
-          <li className="hover:underline cursor-pointer">Events</li>
+          <li className="cursor-pointer">
+            Friends <button onClick={() => setFilterType('Friend')}>+</button>
+          </li>
+          <li className="cursor-pointer">
+            Players <button onClick={() => setFilterType('Player')}>+</button>
+          </li>
+          <li className="cursor-pointer">
+            Sports <button onClick={() => setFilterType('Sport')}>+</button>
+          </li>
+          <li className="cursor-pointer">
+            Events <button onClick={() => setFilterType('Event')}>+</button>
+          </li>
+          <li className="cursor-pointer text-sm mt-2 underline" onClick={() => setFilterType(null)}>Reset Filter</li>
         </ul>
       </div>
 

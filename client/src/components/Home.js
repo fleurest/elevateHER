@@ -7,6 +7,7 @@ function HomePage({ handleLogout, user }) {
   const [graphData, setGraphData] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [filterType, setFilterType] = useState(null);
+  const [filterType, setFilterType] = useState(null);
   const cyContainerRef = useRef(null);
   const cyInstanceRef = useRef(null);
   const [showProfile, setShowProfile] = useState(false);
@@ -24,6 +25,7 @@ function HomePage({ handleLogout, user }) {
       }
     }
     fetchGraph();
+    
   }, []);
 
   useEffect(() => {
@@ -117,9 +119,9 @@ function HomePage({ handleLogout, user }) {
             layout: { name: 'breadthfirst', direction: 'TB', animate: true }
           });
 
-          cy.on('tap', 'node', (evt) => {
-            setSelectedNode(evt.target.data());
-          });
+            cy.on('tap', 'node', (evt) => {
+              setSelectedNode(evt.target.data());
+            });
 
           cyInstanceRef.current = cy;
         } catch (err) {
@@ -135,14 +137,31 @@ function HomePage({ handleLogout, user }) {
       if (cyInstanceRef.current) {
         cyInstanceRef.current.destroy();
         cyInstanceRef.current = null;
+        cyInstanceRef.current = null;
       }
     };
-  }, [graphData, filterType, user?.username]);
+  }, [graphData, filterType, filterType, user?.username]);
 
 
   return (
     <div className="home-page-layout">
       <div className="home-page-column home-page-left">
+        <h2>Explore</h2>
+        <ul className="space-y-2">
+          <li className="cursor-pointer">
+            Friends <button onClick={() => setFilterType('Friend')}>+</button>
+          </li>
+          <li className="cursor-pointer">
+            Players <button onClick={() => setFilterType('Player')}>+</button>
+          </li>
+          <li className="cursor-pointer">
+            Sports <button onClick={() => setFilterType('Sport')}>+</button>
+          </li>
+          <li className="cursor-pointer">
+            Events <button onClick={() => setFilterType('Event')}>+</button>
+          </li>
+          <li className="cursor-pointer text-sm mt-2 underline" onClick={() => setFilterType(null)}>Reset Filter</li>
+        </ul>
         <div className="logo-section">
           <img src={logo} alt="Logo" className="small-logo" />
         </div>

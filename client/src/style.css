@@ -288,3 +288,109 @@
   background-color: var(--light-purple);
   color: var(--grey);
 }
+.logo-section {
+  padding: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.small-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid var(--purple);
+  object-fit: cover;
+}
+
+.center-top-icons-bar {
+  background-color: #35374b; /* a darker background to stand out */
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 12px; /* space below the bar */
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.icon-link {
+  color: #f1f2f3;
+  text-decoration: none;
+  font-weight: 500;
+  border: 1px solid #f1f2f3;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.icon-link:hover {
+  background-color: #f1f2f3;
+  color: #35374b;
+}
+
+.my-icon {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+
+  /* The color that fills the shape */
+  background-color: #575a7b;
+}
+
+.home-icon {
+  -webkit-mask-image: url('../src//assets/icon_home.png');
+  mask-image: url('../src/assets/icon_home.png');
+  /* Ensure it's not repeated or stretched weirdly */
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.players-icon {
+  -webkit-mask-image: url('../src/assets/icon_player.png');
+  mask-image: url('../src//assets/icon_player.png');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.events-icon {
+  -webkit-mask-image: url('../src/assets/icon_events.png');
+  mask-image: url('../src/assets/icon_events.png');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.pages-icon {
+  -webkit-mask-image: url('../src/assets/icon_pages.png');
+  mask-image: url('../src/assets/icon_pages.png');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+/* Outer wrapper for centering and border */
+.icon-bar-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 16px;
+
+  border: 2px solid #575a7b; /* soft purple border */
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: #f9f9fa;
+}
+
+/* Flex row of icons */
+.center-top-icons {
+  display: flex;
+  gap: 16px;
+}

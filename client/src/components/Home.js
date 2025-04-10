@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import cytoscape from 'cytoscape';
 import HamburgerMenu from './HamburgerMenu';
+import logo from '../assets/logo-default-profile.png';
+
+import homeIcon from '../assets/icon_home.png';
+import playersIcon from '../assets/icon_player.png';
+import eventsIcon from '../assets/icon_events.png';
+import pagesIcon from '../assets/icon_pages.png';
 
 function HomePage({ handleLogout }) {
   const [graphData, setGraphData] = useState(null);
@@ -21,7 +27,6 @@ function HomePage({ handleLogout }) {
       }
     }
     fetchGraph();
-    
   }, []);
 
   useEffect(() => {
@@ -98,7 +103,7 @@ function HomePage({ handleLogout }) {
       } catch (err) {
         console.error('Cytoscape init error:', err);
       }
-      
+
     }, 150);
 
     return () => {
@@ -112,30 +117,47 @@ function HomePage({ handleLogout }) {
 
   return (
     <div className="home-page-layout">
+      {/* First column (Logo + Favourites + Explore) */}
       <div className="home-page-column home-page-left">
-        <h2>Explore</h2>
-        <ul className="space-y-2">
-          <li className="cursor-pointer">
-            Friends <button onClick={() => setFilterType('Friend')}>+</button>
-          </li>
-          <li className="cursor-pointer">
-            Players <button onClick={() => setFilterType('Player')}>+</button>
-          </li>
-          <li className="cursor-pointer">
-            Sports <button onClick={() => setFilterType('Sport')}>+</button>
-          </li>
-          <li className="cursor-pointer">
-            Events <button onClick={() => setFilterType('Event')}>+</button>
-          </li>
-          <li className="cursor-pointer text-sm mt-2 underline" onClick={() => setFilterType(null)}>Reset Filter</li>
-        </ul>
+        <div className="logo-section">
+          <img src={logo} alt="Logo" className="small-logo" />
+        </div>
+
+        <div className="favourites-section">
+          <h2>Favourites</h2>
+          <ul>
+            <li>My Profile</li>
+            <li>My Players</li>
+          </ul>
+        </div>
+
+        <div className="explore-section">
+          <h2>Explore</h2>
+          <ul>
+            <li>Friends <button onClick={() => setFilterType('Friend')}>+</button></li>
+            <li>Players <button onClick={() => setFilterType('Player')}>+</button></li>
+            <li>Sports <button onClick={() => setFilterType('Sport')}>+</button></li>
+            <li>Events <button onClick={() => setFilterType('Event')}>+</button></li>
+            <li className="reset-filter" onClick={() => setFilterType(null)}>Reset Filter</li>
+          </ul>
+        </div>
       </div>
 
       <div className="home-page-column home-page-center">
+        <div className="icon-bar-wrapper">
+          <div className="center-top-icons">
+            <a href="#home" className="icon-link my-icon home-icon" />
+            <a href="#my-players" className="icon-link my-icon players-icon" />
+            <a href="#events" className="icon-link my-icon events-icon" />
+            <a href="#pages" className="icon-link my-icon pages-icon" />
+          </div>
+        </div>
+
         <h2>Network</h2>
         <div ref={cyContainerRef} style={{ height: '500px', width: '100%' }} />
       </div>
 
+      {/* Third column (Details) */}
       <div className="home-page-column home-page-right">
         <h2>Details</h2>
         {selectedNode ? (

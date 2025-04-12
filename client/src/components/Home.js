@@ -150,7 +150,6 @@ function HomePage({ handleLogout, user }) {
 
   return (
     <div className="home-page-layout">
-      {/* First column (Logo + Favourites + Explore) */}
       <div className="home-page-column home-page-left">
         <div className="logo-section">
           <img src={logo} alt="Logo" className="small-logo" />
@@ -159,10 +158,26 @@ function HomePage({ handleLogout, user }) {
         <div className="favourites-section">
           <h2>Favourites</h2>
           <ul>
-            <li>My Profile</li>
-            <li>My Players</li>
+            <li
+              className="cursor-pointer"
+              onClick={() => setShowProfile(!showProfile)}
+            >
+              My Profile {showProfile ? '▲' : '▼'}
+            </li>
+            {showProfile}
+
+            <li
+              className="cursor-pointer"
+              onClick={() => {
+                setFilterType('favourites');
+                setShowProfile(false);
+              }}
+            >
+              My Players {showMyPlayers ? '▲' : '▼'}
+            </li>
           </ul>
         </div>
+
 
         <div className="explore-section">
           <h2>Explore</h2>
@@ -237,7 +252,6 @@ function HomePage({ handleLogout, user }) {
         <div ref={cyContainerRef} style={{ height: '500px', width: '100%' }} />
       </div>
 
-      {/* Third column (Details) */}
       <div className="home-page-column home-page-right">
         <h2>Details</h2>
         {selectedNode ? (

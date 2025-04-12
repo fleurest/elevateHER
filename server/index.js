@@ -27,6 +27,18 @@ app.use(session({
   }
 }));
 
+
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  }
+}));
+
 app.use('/api', neo4jRoutes);
 
 app.use('/images', express.static(path.join(__dirname, 'public/images')));

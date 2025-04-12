@@ -13,7 +13,6 @@ function HomePage({ handleLogout, user }) {
   const [graphData, setGraphData] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [filterType, setFilterType] = useState(null);
-  const [filterType, setFilterType] = useState(null);
   const cyContainerRef = useRef(null);
   const cyInstanceRef = useRef(null);
   const [showProfile, setShowProfile] = useState(false);

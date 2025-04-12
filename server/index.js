@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const session = require('express-session');
 const { verifyConnection, driver } = require('./neo4j');
 const neo4jRoutes = require('./routes/neo4jRoutes');
 
@@ -14,6 +15,18 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  }
+}));
+
 app.use('/api', neo4jRoutes);
 
 app.use('/images', express.static(path.join(__dirname, 'public/images')));

@@ -48,7 +48,6 @@
   color: var(--grey);
 }
 
-/* Profile page */
 .App-profile-page {
   display: flex;
   flex-direction: column;
@@ -304,10 +303,10 @@
 }
 
 .center-top-icons-bar {
-  background-color: #35374b; /* a darker background to stand out */
+  background-color: #35374b;
   padding: 10px;
   border-radius: 8px;
-  margin-bottom: 12px; /* space below the bar */
+  margin-bottom: 12px;
   display: flex;
   justify-content: center;
   gap: 16px;
@@ -332,15 +331,12 @@
   display: inline-block;
   width: 32px;
   height: 32px;
-
-  /* The color that fills the shape */
   background-color: #575a7b;
 }
 
 .home-icon {
-  -webkit-mask-image: url('../src//assets/icon_home.png');
+  -webkit-mask-image: url('../src/assets/icon_home.png');
   mask-image: url('../src/assets/icon_home.png');
-  /* Ensure it's not repeated or stretched weirdly */
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: contain;
@@ -349,7 +345,7 @@
 
 .players-icon {
   -webkit-mask-image: url('../src/assets/icon_player.png');
-  mask-image: url('../src//assets/icon_player.png');
+  mask-image: url('../src/assets/icon_player.png');
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: contain;
@@ -373,14 +369,13 @@
   -webkit-mask-size: contain;
   mask-size: contain;
 }
-/* Outer wrapper for centering and border */
 .icon-bar-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
   margin-bottom: 16px;
 
-  border: 2px solid #575a7b; /* soft purple border */
+  border: 2px solid #575a7b;
   border-radius: 8px;
   padding: 8px 12px;
   width: fit-content;
@@ -389,8 +384,38 @@
   background-color: #f9f9fa;
 }
 
-/* Flex row of icons */
 .center-top-icons {
   display: flex;
   gap: 16px;
+}
+
+.profile-panel {
+  background-color: #f1f2f3;
+  border: 2px solid #575a7b;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px auto;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.profile-panel h3 {
+  margin-top: 0;
+  color: #35374b;
+}
+
+.profile-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-pic {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 2px solid #575a7b;
 }

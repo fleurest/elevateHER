@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
@@ -10,21 +10,65 @@ import Search from './components/Search';
 
 function AppContent() {
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    localStorage.getItem('isAuthenticated') === 'true'
-  );
-  const handleLogin = (username) => {
-    // stored
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('user', JSON.stringify({ username }));
-    setIsAuthenticated(true);
-    console.log(`${username} logged in`);
-    navigate('/profile');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const res = await fetch('/api/session', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Session check failed', err);
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false); //
+      }
+    }
+    checkSession();
+  }, []);
+
+
+  const handleLogin = async (username, password) => {
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+        setIsAuthenticated(true);
+        navigate('/home');
+      } else {
+        console.error('Login failed');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+    }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+    setUser(null);
     setIsAuthenticated(false);
     navigate('/login');
   };
@@ -44,31 +88,18 @@ function AppContent() {
         />
         <Route
           path="/dashboard"
-          element={
-            isAuthenticated ? (
-              <Dashboard handleLogout={handleLogout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
+          element={isAuthenticated ? <Dashboard handleLogout={handleLogout} /> : <Navigate to="/login" />}
         />
         <Route
           path="/home"
-          element={
-            isAuthenticated ? (
-              <Home handleLogout={handleLogout} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
+          element={isAuthenticated ? <Home handleLogout={handleLogout}  user={user} /> : <Navigate to="/login" replace />} />
         <Route
           path="/profile"
           element={
-            isAuthenticated ? (
-              <Profile handleLogout={handleLogout} />
+            isAuthenticated && user ? (
+              <Profile handleLogout={handleLogout} username={user.username} />
             ) : (
-              <Navigate to="/login" replace />
+              <Navigate to="/login" />
             )
           }
         />

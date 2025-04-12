@@ -19,9 +19,10 @@ const Login = ({ onLogin }) => {
   const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
   const sanitizeInput = (value) => {
-    // Allows alphanumeric, ., @, -, _
+    if (typeof value !== 'string') value = String(value);
     return value.replace(/[\x00-\x1F\x7F]/g, '');
   };
+
 
   const validateUsername = (value) => {
     const sanitizedValue = sanitizeUsername(value);
@@ -29,12 +30,15 @@ const Login = ({ onLogin }) => {
     setUsernameTouched(true);
     setUsernameValid(sanitizedValue.length >= 4);
   };
-  
+
   const validatePassword = (value) => {
-    const sanitizedValue = sanitizePassword(value);
-    setPassword(sanitizedValue);
-    setPasswordTouched(true);
-    setPasswordValid(passwordRegex.test(sanitizedValue));
+    if (value.length >= 8) {
+      setPasswordValid(true);
+      setError('');
+    } else {
+      setPasswordValid(false);
+      setError('Password must be at least 8 characters');
+    }
   };
 
   const handleLogin = async () => {
@@ -44,35 +48,7 @@ const Login = ({ onLogin }) => {
       setError('Username must be at least 4 characters long');
       return;
     }
-
-    // Validate password (min 8 chars, includes letter, number, and symbol)
-    if (!passwordRegex.test(password)) {
-      setError(
-        'Password must be at least 8 characters and include a letter, number, and symbol'
-      );
-      return;
-    }
-
-    try {
-      const response = await fetch('http://localhost:3001/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('isAuthenticated', 'true');
-        onLogin(data.username);
-        navigate('/dashboard');
-      } else {
-        const err = await response.json();
-        setError(err.error || 'Login failed');
-      }
-    } catch (err) {
-      setError('Network error during login');
-    }
+    onLogin(username, password);
   };
 
   const handleRegister = async () => {
@@ -105,7 +81,7 @@ const Login = ({ onLogin }) => {
       <div className="auth-card">
         <div className="auth-logo-container">
           <img
-            src="/images/logo-default-profile.png"
+            src="/favicon.png"
             alt="ElevateHER Logo"
             className="auth-logo"
           />
@@ -122,8 +98,11 @@ const Login = ({ onLogin }) => {
           type={showPassword ? "text" : "password"}
           placeholder="Password"
           value={password}
-          onChange={(e) => validatePassword(e.target.value)}
-          className="auth-input"
+          onChange={(e) => {
+            const input = e.target.value;
+            setPassword(input);
+            validatePassword(input);
+          }} className="auth-input"
         />
 
         {isRegistering && usernameTouched && (
@@ -151,7 +130,7 @@ const Login = ({ onLogin }) => {
           </button>
         ) : (
           <button
-            onClick={handleLogin}
+            onClick = {handleLogin}
             className="auth-button"
             disabled={!usernameValid || !passwordValid}
           >

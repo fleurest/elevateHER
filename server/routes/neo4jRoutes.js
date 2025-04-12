@@ -3,7 +3,7 @@ const router = express.Router();
 const { driver } = require('../neo4j');
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
-const { sanitizeUsername, sanitizePassword } = require('./shared/inputSanitizers');
+const { sanitizeUsername, sanitizePassword } = require('../../utils/inputSanitizers');
 
 // Get a few nodes
 router.get('/nodes', async (req, res) => {

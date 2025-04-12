@@ -3,7 +3,6 @@ const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const session = require('express-session');
-const session = require('express-session');
 const { verifyConnection, driver } = require('./neo4j');
 const neo4jRoutes = require('./routes/neo4jRoutes');
 

@@ -208,9 +208,17 @@ router.post('/register', async (req, res) => {
 
 // Login route
 router.post('/login', async (req, res) => {
+  console.log('>>> LOGIN route hit');
+  console.log('>>> request body:', req.body);
   const username = sanitizeUsername(req.body.username);
   const password = sanitizePassword(req.body.password);
 
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Missing credentials' });
+  }
+
+  const session = driver.session();
+  
   try {
     const result = await session.run(
       'MATCH (u:User {username: $username}) RETURN u.password AS hash',
@@ -225,7 +233,8 @@ router.post('/login', async (req, res) => {
     const match = await bcrypt.compare(password, hash);
 
     if (match) {
-      res.status(200).json({ message: 'Login successful', username });
+      req.session.user = { username };
+      res.status(200).json({ message: 'Login successful', user: { username } });
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -236,6 +245,30 @@ router.post('/login', async (req, res) => {
     await session.close();
   }
 });
+
+router.get('/me', (req, res) => {
+  if (req.session?.user?.username) {
+    return res.json({ username: req.session.user.username });
+  } else {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+});
+
+router.get('/session', (req, res) => {
+  if (req.session?.user?.username) {
+    return res.status(200).json({ authenticated: true, user: req.session.user });
+  } else {
+    return res.status(401).json({ authenticated: false });
+  }
+});
+
+router.post('/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.clearCookie('connect.sid');
+    res.status(200).json({ message: 'Logged out' });
+  });
+});
+
 
 router.get('/user-likes/:username', async (req, res) => {
   const { username } = req.params; 

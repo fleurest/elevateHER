@@ -12,6 +12,7 @@ function AppContent() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function checkSession() {
@@ -25,9 +26,11 @@ function AppContent() {
           setIsAuthenticated(false);
           setUser(null);
         }
-      } catch (error) {
-        console.error("Session check failed:", error);
+      } catch (err) {
+        console.error('Session check failed', err);
         setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false); //
       }
     }
     checkSession();

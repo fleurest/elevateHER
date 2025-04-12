@@ -18,6 +18,14 @@ const personModel = new Person(driver);
 const personService = new PersonService(personModel);
 const personController = new PersonController(personService);
 
+router.get('/session', (req, res) => {
+  if (req.session && req.session.user) {
+    res.json({ user: req.session.user });
+  } else {
+    res.status(401).json({ error: 'Not authenticated' });
+  }
+});
+
 // nodes
 router.get('/nodes', async (req, res) => {
   try {

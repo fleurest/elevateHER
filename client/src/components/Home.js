@@ -188,36 +188,9 @@ function HomePage({ handleLogout, user }) {
             <li className="reset-filter" onClick={() => setFilterType(null)}>Reset Filter</li>
           </ul>
         </div>
-        <div className="logo-section">
-          <img src={logo} alt="Logo" className="small-logo" />
-        </div>
-
-        <div className="favourites-section">
-          <h2>Favourites</h2>
-          <ul>
-            <li
-              className="cursor-pointer"
-              onClick={() => setShowProfile(!showProfile)}
-            >
-              My Profile {showProfile ? '▲' : '▼'}
-            </li>
-            {showProfile}
-
-            <li
-              className="cursor-pointer"
-              onClick={() => {
-                setFilterType('favourites');
-                setShowProfile(false);
-              }}
-            >
-              My Players {showMyPlayers ? '▲' : '▼'}
-            </li>
-          </ul>
-        </div>
-
 
         <div className="explore-section">
-          <h2>Explore</h2>
+          <h2>News</h2>
           <ul>
             <li>New player data available now</li>
             <li>Join our new community</li>
@@ -229,7 +202,7 @@ function HomePage({ handleLogout, user }) {
       <div className="home-page-column home-page-center">
         <div className="icon-bar-wrapper">
           <div className="center-top-icons">
-            <a href="#home" className="icon-link my-icon home-icon" />
+            <a href="./home" className="icon-link my-icon home-icon" />
             <a href="#my-players" className="icon-link my-icon players-icon" />
             <a href="#events" className="icon-link my-icon events-icon" />
             <a href="#pages" className="icon-link my-icon pages-icon" />

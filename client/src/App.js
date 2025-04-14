@@ -52,71 +52,72 @@ function AppContent() {
         setIsAuthenticated(true);
         navigate('/home');
       } else {
-        console.error('Login failed');
+        const errorData = await res.json();
+        console.error('Login failed:', errorData);
       }
     } catch (err) {
       console.error('Login error:', err);
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch (err) {
-      console.error('Logout failed:', err);
-    }
-    setUser(null);
-    setIsAuthenticated(false);
-    navigate('/login');
-  };
+    const handleLogout = async () => {
+      try {
+        await fetch('/api/logout', {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch (err) {
+        console.error('Logout failed:', err);
+      }
+      setUser(null);
+      setIsAuthenticated(false);
+      navigate('/login');
+    };
 
-  return (
-    <>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />
-          }
-        />
-        <Route
-          path="/login"
-          element={<Login onLogin={handleLogin} />}
-        />
-        <Route
-          path="/dashboard"
-          element={isAuthenticated ? <Dashboard handleLogout={handleLogout} /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/home"
-          element={isAuthenticated ? <Home handleLogout={handleLogout}  user={user} /> : <Navigate to="/login" replace />} />
-        <Route
-          path="/profile"
-          element={
-            isAuthenticated && user ? (
-              <Profile handleLogout={handleLogout} username={user.username} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route path="/search" element={<Search />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+    return (
+      <>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />
+            }
+          />
+          <Route
+            path="/login"
+            element={<Login onLogin={handleLogin} />}
+          />
+          <Route
+            path="/dashboard"
+            element={isAuthenticated ? <Dashboard handleLogout={handleLogout} /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/home"
+            element={isAuthenticated ? <Home handleLogout={handleLogout} user={user} /> : <Navigate to="/login" replace />} />
+          <Route
+            path="/profile"
+            element={
+              isAuthenticated && user ? (
+                <Profile handleLogout={handleLogout} username={user.username} />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route path="/search" element={<Search />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
 
-    </>
-  );
-}
+      </>
+    );
+  }
 
-function App() {
-  return (
-    <Router>
-      <AppContent />
-    </Router>
-  );
-}
+  function App() {
+    return (
+      <Router>
+        <AppContent />
+      </Router>
+    );
+  }
 
-export default App;
+  export default App;

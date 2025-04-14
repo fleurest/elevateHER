@@ -17,6 +17,7 @@ const graphService = new GraphService(graphModel);
 const personModel = new Person(driver);
 const personService = new PersonService(personModel);
 const personController = new PersonController(personService);
+const graph = new Graph(driver);
 
 router.get('/session', (req, res) => {
   if (req.session && req.session.user) {
@@ -104,7 +105,7 @@ router.post('/register', async (req, res) => {
   try {
     // Check if user already exists
     const existing = await session.run(
-      'MATCH (u:User {username: $username}) RETURN u',
+      'MATCH (p:Person {username: $username}) RETURN u',
       { username }
     );
 
@@ -117,7 +118,7 @@ router.post('/register', async (req, res) => {
 
     // Create user
     await session.run(
-      'CREATE (u:User {username: $username, password: $password})',
+      'CREATE (p:Person {username: $username, password: $password, roles: "user"})',
       { username, password: hash }
     );
 
@@ -142,10 +143,10 @@ router.post('/login', async (req, res) => {
   }
 
   const session = driver.session();
-  
+
   try {
     const result = await session.run(
-      'MATCH (u:User {username: $username}) RETURN u.password AS hash',
+      'MATCH (p:Person {username: $username}) RETURN p.password AS hash',
       { username }
     );
 
@@ -230,6 +231,40 @@ router.post('/user-likes', async (req, res) => {
   }
 });
 
+router.get('/user-friends/:username', async (req, res) => {
+  const { username } = req.params;
+
+  try {
+    const records = await graph.getAcceptedFriends(username); // <— make sure this exists
+
+    const elements = [];
+
+    records.forEach(record => {
+      const u1 = record.get('u1');
+      const rel = record.get('r');
+      const u2 = record.get('u2');
+
+      elements.push(
+        { data: { id: u1.identity.toString(), label: u1.labels[0], ...u1.properties } },
+        { data: { id: u2.identity.toString(), label: u2.labels[0], ...u2.properties } },
+        {
+          data: {
+            id: rel.identity.toString(),
+            source: u1.identity.toString(),
+            target: u2.identity.toString(),
+            label: rel.type,
+            ...rel.properties
+          }
+        }
+      );
+    });
+
+    res.json(elements);
+  } catch (err) {
+    console.error('Error fetching accepted friends:', err);
+    res.status(500).json({ error: 'Could not fetch friends' });
+  }
+});
 
 router.get('/search', async (req, res) => {
   const { query, sport } = req.query;
@@ -278,6 +313,111 @@ router.put('/player/:id', async (req, res) => {
   } catch (err) {
     console.error('Error updating person:', err);
     res.status(500).json({ error: 'Failed to update player' });
+  }
+});
+
+router.get('/search-users', async (req, res) => {
+  const { query } = req.query;
+  if (!query) return res.status(400).json({ error: 'No query provided' });
+
+  try {
+    const results = await personModel.searchUsers(query);
+    res.json(results);
+  } catch (err) {
+    console.error('Search failed:', err);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+// friend request
+router.post('/friend-request', async (req, res) => {
+  const { fromUsername, toUsername } = req.body;
+
+  try {
+    await personModel.sendFriendRequest(fromUsername, toUsername);
+    res.json({ message: 'Friend request sent' });
+  } catch (err) {
+    console.error('Error sending friend request:', err);
+    res.status(500).json({ error: 'Failed to send friend request' });
+  }
+});
+
+// friend request accepted
+router.post('/friend-accept', async (req, res) => {
+  const { fromUsername, toUsername } = req.body;
+
+  try {
+    await personModel.acceptFriendRequest(fromUsername, toUsername);
+    res.json({ message: 'Friend request accepted' });
+  } catch (err) {
+    console.error('Error accepting friend request:', err);
+    res.status(500).json({ error: 'Failed to accept friend request' });
+  }
+});
+
+// incoming friend requests
+router.get('/friends/pending-incoming/:username', async (req, res) => {
+  try {
+    const results = await personModel.getIncomingFriendRequests(req.params.username);
+    res.json({ incoming: results });
+  } catch (err) {
+    console.error('Error getting incoming requests:', err);
+    res.status(500).json({ error: 'Failed to fetch incoming requests' });
+  }
+});
+
+// outgoing friend requests
+router.get('/friends/pending-outgoing/:username', async (req, res) => {
+  try {
+    const results = await personModel.getOutgoingFriendRequests(req.params.username);
+    res.json({ outgoing: results });
+  } catch (err) {
+    console.error('Error getting outgoing requests:', err);
+    res.status(500).json({ error: 'Failed to fetch outgoing requests' });
+  }
+});
+
+// accepted friends
+router.get('/friends/accepted/:username', async (req, res) => {
+  try {
+    const results = await personModel.getAcceptedFriends(req.params.username);
+    res.json({ friends: results });
+  } catch (err) {
+    console.error('Error getting accepted friends:', err);
+    res.status(500).json({ error: 'Failed to fetch friends' });
+  }
+});
+
+router.get('/user-friends/:username', async (req, res) => {
+  const { username } = req.params;
+  try {
+    const records = await graph.getAcceptedFriends(username);
+    const elements = [];
+
+    records.forEach(record => {
+      const u1 = record.get('u1');
+      const rel = record.get('r');
+      const u2 = record.get('u2');
+
+      elements.push(
+        { data: { id: u1.identity.toString(), label: u1.labels[0], ...u1.properties } },
+        { data: { id: u2.identity.toString(), label: u2.labels[0], ...u2.properties } },
+        {
+          data: {
+            id: rel.identity.toString(),
+            source: u1.identity.toString(),
+            target: u2.identity.toString(),
+            label: rel.type,
+            ...rel.properties
+          }
+        }
+      );
+    });
+
+    res.json(elements);
+  } catch (err) {
+    console.error('Error fetching friends:', err);
+    res.status(500).json({ error: 'Failed to fetch friends graph' });
   }
 });
 

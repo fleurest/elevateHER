@@ -52,6 +52,22 @@ class Graph {
         }
     }
 
+    async getAcceptedFriends(username) {
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                `
+                MATCH (u1:Person {username: $username})-[r:FRIENDS_WITH {status: "accepted"}]-(u2:Person)
+                RETURN u1, r, u2
+                `,
+                { username }
+            );
+            return result.records;
+        } finally {
+            await session.close();
+        }
+    }    
+
 }
 
 

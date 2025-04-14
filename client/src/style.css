@@ -335,8 +335,8 @@
 }
 
 .home-icon {
-  -webkit-mask-image: url('../src/assets/icon_home.png');
-  mask-image: url('../src/assets/icon_home.png');
+  -webkit-mask-image: url('./assets/icon_home.png');
+  mask-image: url('./assets/icon_home.png');
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: contain;
@@ -344,8 +344,8 @@
 }
 
 .players-icon {
-  -webkit-mask-image: url('../src/assets/icon_player.png');
-  mask-image: url('../src/assets/icon_player.png');
+  -webkit-mask-image: url('./assets/icon_player.png');
+  mask-image: url('./assets/icon_player.png');
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: contain;
@@ -353,8 +353,8 @@
 }
 
 .events-icon {
-  -webkit-mask-image: url('../src/assets/icon_events.png');
-  mask-image: url('../src/assets/icon_events.png');
+  -webkit-mask-image: url('./assets/icon_events.png');
+  mask-image: url('./assets/icon_events.png');
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: contain;
@@ -362,8 +362,8 @@
 }
 
 .pages-icon {
-  -webkit-mask-image: url('../src/assets/icon_pages.png');
-  mask-image: url('../src/assets/icon_pages.png');
+  -webkit-mask-image: url('./assets/icon_pages.png');
+  mask-image: url('./assets/icon_pages.png');
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: contain;

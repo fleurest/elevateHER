@@ -65,7 +65,7 @@ class Person {
             await session.close();
         }
     }
-    
+
     async suggestSimilarNames(query) {
         const session = this.driver.session();
         try {
@@ -83,13 +83,13 @@ class Person {
             await session.close();
         }
     }
-    
+
     async getLikedPlayersByUser(username) {
         const session = this.driver.session();
         try {
             const result = await session.run(
                 `
-                MATCH (u:User {username: $username})-[:LIKED]->(p:Person)
+                MATCH (p:Person {username: $username})-[:LIKED]->(p:Person)
                 RETURN p
                 LIMIT 5
                 `,
@@ -100,7 +100,7 @@ class Person {
             await session.close();
         }
     }
-    
+
     async likePlayer(username, playerName) {
         const session = this.driver.session();
         try {
@@ -116,7 +116,107 @@ class Person {
             await session.close();
         }
     }
-    
+
+    // friend request
+    async sendFriendRequest(fromUsername, toUsername) {
+        const session = driver.session();
+
+        try {
+            const query = `
+        MATCH (p1:Person {username: $fromUsername})
+        MATCH (p2:Person {username: $toUsername})
+        WHERE p1 <> p2
+        MERGE (p1)-[r:FRIENDS_WITH]->(p2)
+        SET r.status = "pending", r.requestedAt = datetime()
+      `;
+            await session.run(query, { fromUsername, toUsername });
+        } finally {
+            await session.close();
+        }
+    }
+
+    // accept friend request
+    async acceptFriendRequest(fromUsername, toUsername) {
+        const session = driver.session();
+
+        try {
+            const query = `
+        MATCH (p1:Person {username: $fromUsername})- [r:FRIENDS_WITH {status: "pending"}] -> (p2:Person {username: $toUsername})
+        SET r.status = "accepted", r.acceptedAt = datetime()
+      `;
+            await session.run(query, { fromUsername, toUsername });
+        } finally {
+            await session.close();
+        }
+    }
+
+    // incoming pending requests
+    async getIncomingFriendRequests(username) {
+        const session = driver.session();
+        try {
+            const result = await session.run(`
+        MATCH (other:Person)-[r:FRIENDS_WITH {status: "pending"}]->(me:Person {username: $username})
+        RETURN other.username AS from
+      `, { username });
+
+            return result.records.map(rec => rec.get('from'));
+        } finally {
+            await session.close();
+        }
+    }
+
+    // outgoing pending requests
+    async getOutgoingFriendRequests(username) {
+        const session = driver.session();
+        try {
+            const result = await session.run(`
+        MATCH (me:Person {username: $username})-[r:FRIENDS_WITH {status: "pending"}]->(other:Person)
+        RETURN other.username AS to
+      `, { username });
+
+            return result.records.map(rec => rec.get('to'));
+        } finally {
+            await session.close();
+        }
+    }
+
+    // accepted friends
+    async getAcceptedFriends(username) {
+        const session = driver.session();
+        try {
+            const result = await session.run(`
+        MATCH (me:Person {username: $username})-[r:FRIENDS_WITH {status: "accepted"}]->(other:Person)
+        RETURN other.username AS friend
+      `, { username });
+
+            return result.records.map(rec => rec.get('friend'));
+        } finally {
+            await session.close();
+        }
+    }
+
+    async searchUsersByName(query) {
+        const session = driver.session();
+        try {
+          const cypher = `
+            MATCH (p:Person)
+            WHERE toLower(p.name) CONTAINS toLower($query)
+              AND "user" IN p.roles
+            RETURN p
+          `;
+          const result = await session.run(cypher, { query });
+          return result.records.map(record => {
+            const node = record.get('p');
+            return {
+              id: node.identity.toNumber(),
+              ...node.properties
+            };
+          });
+        } finally {
+          await session.close();
+        }
+      }
+
 }
 
 module.exports = Person;

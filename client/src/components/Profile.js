@@ -27,21 +27,14 @@ function Profile({ username, handleLogout }) {
     useEffect(() => {
         async function fetchLikedPlays() {
             try {
-                const response = await fetch(`/api/user-likes/${username}`, {
-                    method: 'GET',
-                    credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
+                const response = await fetch(`/api/user-likes/${username}`);
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch liked plays: ${response.status} ${response.statusText}`);
+                    throw new Error('Failed to fetch liked plays');
                 }
-
                 const playsData = await response.json();
                 setLikedPlays(playsData);
             } catch (err) {
-                console.error('Error fetching liked plays:', err.message);
+                console.error(err);
             }
         }
 
@@ -87,35 +80,6 @@ function Profile({ username, handleLogout }) {
         console.log('Saving Profile:', userProfile, profilePic);
         alert('Profile changes saved (demo only).');
     }
-
-    const likePlayer = async (username, playerName) => {
-        try {
-            const response = await fetch('/api/user-likes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({ username, playerName }),
-            });
-            const text = await response.text();
-            console.log('Raw response:', text);
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch {
-                throw new Error('Invalid JSON from server: ' + text);
-            }
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Unknown error');
-            }
-            alert(data.message);
-        } catch (err) {
-            console.error('Error liking player:', err);
-            alert('Failed to like player');
-        }
-    };
 
     // render
     return (
@@ -199,29 +163,22 @@ function Profile({ username, handleLogout }) {
                         )}
                     </ul>
                 </div>
-                <div>
-                    <h2>Like a Player</h2>
-                    <button onClick={() => likePlayer(username, 'Amber Glenn')}>
-                        Like Amber Glenn
-                    </button>
-                </div>
-
             </div>
             <div>
-                <h2>My Top 5 Players</h2>
-                {likedPlays.length > 0 ? (
-                    <ul>
-                        {likedPlays.map((player) => (
-                            <li key={player.id}>
-                                <strong>{player.name}</strong>
-                                {player.description ? <p>{player.description}</p> : null}
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p>No players liked yet.</p>
-                )}
-            </div>
+        <h2>My Top 5 Plays</h2>
+        {likedPlays.length > 0 ? (
+          <ul>
+            {likedPlays.map((play) => (
+              <li key={play.id}>
+                <strong>{play.title}</strong>
+                {play.description ? <p>{play.description}</p> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No players liked yet.</p>
+        )}
+      </div>
         </div>
     );
 }

@@ -17,6 +17,83 @@ function HomePage({ handleLogout, user }) {
   const cyInstanceRef = useRef(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showMyPlayers, setShowMyPlayers] = useState(false);
+  const [friends, setFriends] = useState([]);
+  const [showFriendsPanel, setShowFriendsPanel] = useState(false);
+  // search add friend
+  const [showAddFriendPanel, setShowAddFriendPanel] = useState(false);
+  const [showFriendSearch, setShowFriendSearch] = useState(false);
+  const [friendResults, setFriendResults] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [suggestedUsers, setSuggestedUsers] = useState([]);
+  // show person on node click
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  const navigate = useNavigate();
+  const graphRef = useRef(null);
+
+  useEffect(() => {
+    const fetchFriends = async () => {
+      try {
+        const res = await fetch(`/api/user-friends/${user.username}`);
+        const data = await res.json();
+        setFriends(data || []);
+      } catch (err) {
+        console.error('Could not fetch friends:', err);
+      }
+    };
+
+    fetchFriends();
+  }, [user.username]);
+
+  const fetchSuggestedUsers = async () => {
+    try {
+      const res = await fetch('/api/top-users');
+      const data = await res.json();
+      setSuggestedUsers(data);
+    } catch (err) {
+      console.error('Could not fetch suggested users:', err);
+    }
+  };
+
+  const filterGraphToFriends = async () => {
+    const res = await fetch(`/api/user-friends/${user.username}`);
+    const data = await res.json();
+    setGraphElements(data);
+  };
+
+  const filterGraphForFriends = async () => {
+    try {
+      const res = await fetch(`/api/user-friends/${user.username}`);
+      const data = await res.json();
+      if (graphRef.current) {
+        graphRef.current.setElements(data);
+      }
+    } catch (err) {
+      console.error('Failed to filter graph for friends:', err);
+    }
+  };
+
+  // user search in the last panel
+  const handleSearch = async () => {
+    try {
+      const res = await fetch(`/api/search-users?query=${encodeURIComponent(searchQuery)}`);
+      const data = await res.json();
+      setSearchResults(data);
+    } catch (err) {
+      console.error('Search error:', err);
+    }
+  };
+
+  const handleFriendSearch = async (query) => {
+    try {
+      const res = await fetch(`/api/search-friends?query=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      setFriendResults(data);
+    } catch (err) {
+      console.error('Friend search failed:', err);
+      setFriendResults([]);
+    }
+  };
 
   useEffect(() => {
     async function fetchGraph() {
@@ -31,6 +108,30 @@ function HomePage({ handleLogout, user }) {
     }
     fetchGraph();
   }, []);
+
+  useEffect(() => {
+    if (!cyInstanceRef.current) return;
+
+    const cy = cyInstanceRef.current;
+    const tapHandler = (event) => {
+      const nodeData = event.target.data();
+      if (nodeData.label === "Person") {
+        setSelectedPerson({
+          name: nodeData.name,
+          description: nodeData.description,
+          profileImage: nodeData.profileImage
+        });
+        setShowAddFriendPanel(true);
+      }
+    };
+
+    cy.on('tap', 'node', tapHandler);
+
+    return () => {
+      cy.removeListener('tap', 'node', tapHandler);
+    };
+  }, [cyInstanceRef.current]);
+
 
   useEffect(() => {
     if (!graphData || !cyContainerRef.current || !cyContainerRef.current.offsetParent) return;
@@ -123,9 +224,9 @@ function HomePage({ handleLogout, user }) {
             layout: { name: 'breadthfirst', direction: 'TB', animate: true }
           });
 
-            cy.on('tap', 'node', (evt) => {
-              setSelectedNode(evt.target.data());
-            });
+          cy.on('tap', 'node', (evt) => {
+            setSelectedNode(evt.target.data());
+          });
 
           cyInstanceRef.current = cy;
         } catch (err) {
@@ -162,26 +263,36 @@ function HomePage({ handleLogout, user }) {
               onClick={() => setShowProfile(!showProfile)}
             >
               My Profile {showProfile ? '▲' : '▼'}
+              {showProfile}
             </li>
-            {showProfile}
 
             <li
               className="cursor-pointer"
-              onClick={() => {
-                setFilterType('favourites');
-                setShowProfile(false);
+              onClick={(e) => {
+                e.stopPropagation();
+                setFilterType('Player');
               }}
             >
-              My Players {showMyPlayers ? '▲' : '▼'}
+              My Players {showProfile ? '▲' : '▼'}
             </li>
           </ul>
         </div>
 
 
+
         <div className="explore-section">
           <h2>Explore</h2>
           <ul>
-            <li>Friends <button onClick={() => setFilterType('Friend')}>+</button></li>
+            <li
+              className="cursor-pointer"
+              onClick={() => {
+                setShowFriendsPanel(!showFriendsPanel);
+                setShowFriendSearch(true);
+                filterGraphForFriends();
+              }}
+            >
+              Friends {showFriendsPanel ? '▲' : '▼'}
+            </li>
             <li>Players <button onClick={() => setFilterType('Player')}>+</button></li>
             <li>Sports <button onClick={() => setFilterType('Sport')}>+</button></li>
             <li>Events <button onClick={() => setFilterType('Event')}>+</button></li>
@@ -192,12 +303,17 @@ function HomePage({ handleLogout, user }) {
         <div className="explore-section">
           <h2>News</h2>
           <ul>
-            <li>Friends <button onClick={() => setFilterType('Friend')}>+</button></li>
-            <li>Players <button onClick={() => setFilterType('Player')}>+</button></li>
-            <li>Sports <button onClick={() => setFilterType('Sport')}>+</button></li>
-            <li>Events <button onClick={() => setFilterType('Event')}>+</button></li>
-            <li className="reset-filter" onClick={() => setFilterType(null)}>Reset Filter</li>
+            <li>My News </li>
           </ul>
+          <div style={{ textAlign: "center", marginTop: "20px" }}>
+            <button
+              onClick={handleLogout}
+              type="button"
+              style={{ padding: "10px 20px", fontSize: "16px" }}
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </div>
 
@@ -222,6 +338,82 @@ function HomePage({ handleLogout, user }) {
             </div>
           </div>
         )}
+
+        {showFriendSearch && friendResults.length > 0 && (
+          <ul className="mt-2 ml-4 border rounded bg-white shadow">
+            {friendResults.map(user => (
+              <li key={user.id} className="p-2 border-b flex justify-between items-center">
+                {user.name}
+                <button
+                  onClick={() => sendFriendRequest(user.username)}
+                  className="text-sm text-purple-600 hover:underline"
+                >
+                  Add
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {showMyPlayers && (
+          <div
+            className="players-panel"
+            style={{
+              margin: '20px 0',
+              padding: '20px',
+              border: '1px solid #ccc',
+              borderRadius: '8px',
+              backgroundColor: '#fff'
+            }}
+          >
+          </div>
+        )}
+
+        {showFriendsPanel && (
+          <div className="mt-2 pl-4">
+            <p className="text-sm mb-2">Search or view your friends here</p>            <ul>
+              {friends.map((friend, index) => (
+                <li key={index}>
+                  {friend.username || friend.name || friend.properties?.username || friend.properties?.name || 'Unknown'}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {showAddFriendPanel && (
+          <div className="bg-purple-50 p-4 border-l border-purple-200">
+            <h2 className="text-xl font-semibold mb-2">Find Friends</h2>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search users"
+              className="w-full p-2 border rounded mb-2"
+            />
+            <button
+              onClick={handleSearch}
+              className="bg-purple-600 text-white px-4 py-2 rounded"
+            >
+              Search
+            </button>
+
+            <ul className="mt-4">
+              {Array.isArray(searchResults) && searchResults.length > 0 ? (
+                searchResults.map(result => (
+                  <li key={result.id} className="p-2 border-b">
+                    {result.name}
+                    {/* TODO: Add Friend button */}
+                  </li>
+                ))
+              ) : (
+                <li className="p-2 text-gray-500">No results found</li>
+              )}
+            </ul>
+
+          </div>
+        )}
+
         <h2>Network</h2>
         <div ref={cyContainerRef} style={{ height: '500px', width: '100%' }} />
       </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import cytoscape from 'cytoscape';
 import HamburgerMenu from './HamburgerMenu';
 import logo from '../assets/logo-default-profile.png';
+import { Link } from 'react-router-dom';
 
 import homeIcon from '../assets/icon_home.png';
 import playersIcon from '../assets/icon_player.png';
@@ -320,10 +321,10 @@ function HomePage({ handleLogout, user }) {
       <div className="home-page-column home-page-center">
         <div className="icon-bar-wrapper">
           <div className="center-top-icons">
-            <a href="./home" className="icon-link my-icon home-icon" />
-            <a href="#my-players" className="icon-link my-icon players-icon" />
-            <a href="#events" className="icon-link my-icon events-icon" />
-            <a href="#pages" className="icon-link my-icon pages-icon" />
+            <Link to="/home" className="icon-link my-icon home-icon" ></Link>
+            <Link to="/dashboard" className="icon-link my-icon players-icon"></Link>
+            <Link to="/profile" className="icon-link my-icon events-icon" ></Link>
+            <Link to="/search" className="icon-link my-icon pages-icon" ></Link>
           </div>
         </div>
 

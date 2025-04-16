@@ -4,6 +4,7 @@ import cytoscape from 'cytoscape';
 import HamburgerMenu from './HamburgerMenu';
 import logo from '../assets/logo-default-profile.png';
 import { Link } from 'react-router-dom';
+import EditProfileForm from '../components/EditProfileForm';
 
 import homeIcon from '../assets/icon_home.png';
 import playersIcon from '../assets/icon_player.png';
@@ -17,6 +18,12 @@ function HomePage({ handleLogout, user }) {
   const cyContainerRef = useRef(null);
   const cyInstanceRef = useRef(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [prevFilter, setPrevFilter] = useState(null);
+  const [editProfile, setEditProfile] = useState(false);
+
+  const handleShowProfile = () => setShowProfile(true);
+  const handleHideProfile = () => setShowProfile(false);
+
   const [showMyPlayers, setShowMyPlayers] = useState(false);
   const [friends, setFriends] = useState([]);
   const [showFriendsPanel, setShowFriendsPanel] = useState(false);
@@ -31,6 +38,39 @@ function HomePage({ handleLogout, user }) {
   const [selectedPerson, setSelectedPerson] = useState(null);
   const navigate = useNavigate();
   const graphRef = useRef(null);
+  const [editableUser, setEditableUser] = useState(user);
+
+  const toggleProfile = () => {
+    setShowProfile((prev) => {
+      const next = !prev;
+  
+      if (next) {
+        setPrevFilter(filterType);
+        setFilterType(null);
+      } else {
+        setFilterType(prevFilter);
+        setEditProfile(false);
+      }
+  
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
+
+  if (!user) {
+    return null;
+  }
+
+  useEffect(() => {
+    if (!showProfile) {
+      setFilterType(null);
+    }
+  }, [showProfile]);
 
   useEffect(() => {
     const fetchFriends = async () => {
@@ -135,6 +175,7 @@ function HomePage({ handleLogout, user }) {
 
 
   useEffect(() => {
+    if (showProfile) return;
     if (!graphData || !cyContainerRef.current || !cyContainerRef.current.offsetParent) return;
 
     const timeout = setTimeout(() => {
@@ -246,7 +287,7 @@ function HomePage({ handleLogout, user }) {
         cyInstanceRef.current = null;
       }
     };
-  }, [graphData, filterType, filterType, user?.username]);
+  }, [graphData, filterType, user?.username, showProfile]);
 
 
   return (
@@ -259,10 +300,7 @@ function HomePage({ handleLogout, user }) {
         <div className="favourites-section">
           <h2>Favourites</h2>
           <ul>
-            <li
-              className="cursor-pointer"
-              onClick={() => setShowProfile(!showProfile)}
-            >
+            <li className="cursor-pointer" onClick={toggleProfile}>
               My Profile {showProfile ? '▲' : '▼'}
               {showProfile}
             </li>
@@ -274,7 +312,7 @@ function HomePage({ handleLogout, user }) {
                 setFilterType('Player');
               }}
             >
-              My Players {showProfile ? '▲' : '▼'}
+              My Players {showMyPlayers ? '▲' : '▼'}
             </li>
           </ul>
         </div>
@@ -328,16 +366,32 @@ function HomePage({ handleLogout, user }) {
           </div>
         </div>
 
-        {showProfile && (
+        {showProfile ? (
           <div className="profile-panel">
             <h3>Profile Info</h3>
             <div className="profile-details">
               <img src={logo} alt="Profile" className="profile-pic" />
               <p><strong>Username:</strong> {user?.username || 'Unknown'}</p>
               <p><strong>Email:</strong> {user?.email || 'Not provided'}</p>
-
+              <button className="auth-button-alt" onClick={toggleProfile}>
+                Close Profile
+              </button>
+              <button
+                className="mt-2 text-sm text-blue-600 underline"
+                onClick={() => setEditProfile(true)}
+                disabled={!showProfile}
+              >
+                Edit Profile
+              </button>
             </div>
           </div>
+        ) : (
+          <>
+            <h2>Player Graph</h2>
+            <div className="player-network-graph">
+              <div ref={cyContainerRef} style={{ height: '500px', width: '100%' }} />
+            </div>
+          </>
         )}
 
         {showFriendSearch && friendResults.length > 0 && (
@@ -411,28 +465,32 @@ function HomePage({ handleLogout, user }) {
                 <li className="p-2 text-gray-500">No results found</li>
               )}
             </ul>
-
           </div>
         )}
-
-        <h2>Network</h2>
-        <div ref={cyContainerRef} style={{ height: '500px', width: '100%' }} />
       </div>
 
-      <div className="home-page-column home-page-right">
-        <h2>Details</h2>
-        {selectedNode ? (
-          <div>
-            {Object.entries(selectedNode).map(([key, value]) => (
-              <p key={key}><strong>{key}:</strong> {JSON.stringify(value)}</p>
-            ))}
-          </div>
-        ) : (
-          <p>Click a node to see details.</p>
-        )}
+        <div className="home-page-column home-page-right">
+          {editProfile ? (
+            <EditProfileForm
+              user={editableUser}
+              setUser={setEditableUser}
+              onCancel={() => setEditProfile(false)}
+              onSave={(updatedUser) => {
+                setEditProfile(false);
+                setEditableUser(updatedUser);
+              }}
+            />
+          ) : selectedNode ? (
+            <div>
+              <h2>Details</h2>
+              {Object.entries(selectedNode).map(([key, value]) => (
+                <p key={key}><strong>{key}:</strong> {JSON.stringify(value)}</p>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
-    </div>
-  );
+      );
 }
 
-export default HomePage;
+      export default HomePage;

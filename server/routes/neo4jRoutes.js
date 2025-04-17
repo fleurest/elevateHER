@@ -18,6 +18,21 @@ const personModel = new Person(driver);
 const personService = new PersonService(personModel);
 const personController = new PersonController(personService);
 const graph = new Graph(driver);
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+
+const isAuthenticated = (req, res, next) => {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.SESSION_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+};
 
 router.get('/session', (req, res) => {
   if (req.session && req.session.user) {
@@ -40,9 +55,9 @@ router.get('/nodes', async (req, res) => {
 
 // Athletes route
 router.get('/athletes', async (req, res) => {
-  const session = driver.session();
-
+  let session = null;
   try {
+    session = driver.session();
     const result = await session.run(
       'MATCH (a:Athlete) RETURN a.athleteId AS id, a.name AS name, a.profileImage AS image'
     );
@@ -58,7 +73,9 @@ router.get('/athletes', async (req, res) => {
     console.error('Athlete query error:', err);
     res.status(500).json({ error: 'Failed to fetch athletes' });
   } finally {
-    await session.close();
+    if (session) {
+      await session.close();
+    }
   }
 });
 
@@ -89,7 +106,7 @@ router.get('/graph/filtered', async (req, res) => {
 router.post('/register', async (req, res) => {
   const username = sanitizeUsername(req.body.username);
   const password = sanitizePassword(req.body.password);
-  const session = driver.session();
+  const session = null;
 
   if (username.length < 4) {
     return res.status(400).json({ error: 'Username must be at least 4 characters' });
@@ -103,9 +120,10 @@ router.post('/register', async (req, res) => {
   }
 
   try {
+    session = driver.session();
     // Check if user already exists
     const existing = await session.run(
-      'MATCH (p:Person {username: $username}) RETURN u',
+      'MATCH (p:Person {username: $username}) RETURN p',
       { username }
     );
 
@@ -127,24 +145,25 @@ router.post('/register', async (req, res) => {
     console.error('Registration error:', err);
     res.status(500).json({ error: 'Registration failed' });
   } finally {
-    await session.close();
+    if (session) {
+      await session.close();
+    }
   }
 });
 
-// Login route
 router.post('/login', async (req, res) => {
   console.log('>>> LOGIN route hit');
   console.log('>>> request body:', req.body);
   const username = sanitizeUsername(req.body.username);
   const password = sanitizePassword(req.body.password);
+  let session = null;
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Missing credentials' });
   }
 
-  const session = driver.session();
-
   try {
+    session = driver.session();
     const result = await session.run(
       'MATCH (p:Person {username: $username}) RETURN p.password AS hash',
       { username }
@@ -167,16 +186,14 @@ router.post('/login', async (req, res) => {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   } finally {
-    await session.close();
+    if (session) {
+      await session.close();
+    }
   }
 });
 
-router.get('/me', (req, res) => {
-  if (req.session?.user?.username) {
-    return res.json({ username: req.session.user.username });
-  } else {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+router.get('/me', isAuthenticated, (req, res) => {
+  res.json({ user: req.user });
 });
 
 router.get('/session', (req, res) => {
@@ -188,19 +205,61 @@ router.get('/session', (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.clearCookie('connect.sid');
-    res.status(200).json({ message: 'Logged out' });
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error destroying session:', err);
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.clearCookie('connect.sid'); // Clear the session cookie
+    res.json({ message: 'Logged out successfully' });
   });
 });
 
+router.post('/user/update', async (req, res) => {
+  const { username, email = '', location = '', bio = '' } = req.body;
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (p:Person {username: $username})
+      SET p.email = $email,
+          p.location = $location,
+          p.bio = $bio
+      RETURN p
+      `,
+      { username, email, location, bio }
+    );
+
+    const updatedProps = result.records[0]?.get('p').properties;
+    res.json(updatedProps);
+  } catch (err) {
+    console.error('Error updating profile:', err);
+    res.status(500).json({ error: 'Failed to update user profile' });
+  } finally {
+    await session.close();
+  }
+});
+
+router.get('/refresh', (req, res) => {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ error: 'No token found' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.SESSION_SECRET);
+    res.json({ username: decoded.username });
+  } catch (err) {
+    console.error('[SERVER] Token invalid:', err);
+    res.status(403).json({ error: 'Invalid or expired token' });
+  }
+});
 
 router.get('/user-likes/:username', async (req, res) => {
   const { username } = req.params;
 
   try {
     const liked = await personModel.getLikedPlayersByUser(username);
-
+    console.log('Liked players from Neo4j:', liked);
     const likedPlayers = liked.map(p => ({
       id: p.identity.toNumber(),
       name: p.properties.name,
@@ -215,7 +274,7 @@ router.get('/user-likes/:username', async (req, res) => {
   }
 });
 
-router.post('/user-likes', async (req, res) => {
+router.post('/user-likes', isAuthenticated, async (req, res) => {
   const { username, playerName } = req.body;
 
   if (!username || !playerName) {
@@ -223,8 +282,8 @@ router.post('/user-likes', async (req, res) => {
   }
 
   try {
-    await personModel.likePlayer(username, playerName);
-    res.status(200).json({ message: `${username} liked ${playerName}` });
+    await personModel.likePlayer(req.session.user.username, playerName);
+    res.status(200).json({ message: `${req.session.user.username} liked ${playerName}` });
   } catch (err) {
     console.error('Error creating LIKE relationship:', err);
     res.status(500).json({ error: 'Failed to like player' });
@@ -235,7 +294,7 @@ router.get('/user-friends/:username', async (req, res) => {
   const { username } = req.params;
 
   try {
-    const records = await graph.getAcceptedFriends(username); // <— make sure this exists
+    const records = await graph.getAcceptedFriends(username);
 
     const elements = [];
 
@@ -301,9 +360,9 @@ router.get('/search', async (req, res) => {
 });
 
 
-router.post('/add-player', (req, res) => personController.createOrUpdate(req, res));
+router.post('/add-player', isAuthenticated, (req, res) => personController.createOrUpdate(req, res));
 
-router.put('/player/:id', async (req, res) => {
+router.put('/player/:id', isAuthenticated, async (req, res) => {
   const { id } = req.params;
   const { name, sport, description } = req.body;
 
@@ -316,7 +375,7 @@ router.put('/player/:id', async (req, res) => {
   }
 });
 
-router.get('/search-users', async (req, res) => {
+router.get('/search-users', isAuthenticated, async (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'No query provided' });
 
@@ -330,11 +389,11 @@ router.get('/search-users', async (req, res) => {
 });
 
 // friend request
-router.post('/friend-request', async (req, res) => {
+router.post('/friend-request', isAuthenticated, async (req, res) => {
   const { fromUsername, toUsername } = req.body;
 
   try {
-    await personModel.sendFriendRequest(fromUsername, toUsername);
+    await personModel.sendFriendRequest(req.session.user.username, toUsername);
     res.json({ message: 'Friend request sent' });
   } catch (err) {
     console.error('Error sending friend request:', err);
@@ -367,7 +426,7 @@ router.get('/friends/pending-incoming/:username', async (req, res) => {
 });
 
 // outgoing friend requests
-router.get('/friends/pending-outgoing/:username', async (req, res) => {
+router.get('/friends/pending-outgoing/:username', isAuthenticated, async (req, res) => {
   try {
     const results = await personModel.getOutgoingFriendRequests(req.params.username);
     res.json({ outgoing: results });
@@ -378,7 +437,7 @@ router.get('/friends/pending-outgoing/:username', async (req, res) => {
 });
 
 // accepted friends
-router.get('/friends/accepted/:username', async (req, res) => {
+router.get('/friends/accepted/:username', isAuthenticated, async (req, res) => {
   try {
     const results = await personModel.getAcceptedFriends(req.params.username);
     res.json({ friends: results });
@@ -388,7 +447,7 @@ router.get('/friends/accepted/:username', async (req, res) => {
   }
 });
 
-router.get('/user-friends/:username', async (req, res) => {
+router.get('/user-friends/:username', isAuthenticated, async (req, res) => {
   const { username } = req.params;
   try {
     const records = await graph.getAcceptedFriends(username);

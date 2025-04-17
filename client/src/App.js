@@ -38,86 +38,85 @@ function AppContent() {
 
 
   const handleLogin = async (username, password) => {
-    try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password }),
+    });
 
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user);
-        setIsAuthenticated(true);
-        navigate('/home');
-      } else {
-        const errorData = await res.json();
-        console.error('Login failed:', errorData);
-      }
+    const raw = await res.text();
+    console.log('RAW RESPONSE:', raw);
+
+    try {
+      const data = JSON.parse(raw);
+      setUser(data.user);
+      setIsAuthenticated(true);
+      navigate('/home');
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('Failed to parse JSON:', err);
     }
+
   };
 
-    const handleLogout = async () => {
-      try {
-        await fetch('/api/logout', {
-          method: 'POST',
-          credentials: 'include',
-        });
-      } catch (err) {
-        console.error('Logout failed:', err);
-      }
-      setUser(null);
-      setIsAuthenticated(false);
-      navigate('/login');
-    };
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+    setUser(null);
+    setIsAuthenticated(false);
+    navigate('/login');
+  };
 
-    return (
-      <>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              isAuthenticated ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />
-            }
-          />
-          <Route
-            path="/login"
-            element={<Login onLogin={handleLogin} />}
-          />
-          <Route
-            path="/dashboard"
-            element={isAuthenticated ? <Dashboard handleLogout={handleLogout} /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/home"
-            element={isAuthenticated ? <Home handleLogout={handleLogout} user={user} /> : <Navigate to="/login" replace />} />
-          <Route
-            path="/profile"
-            element={
-              isAuthenticated && user ? (
-                <Profile handleLogout={handleLogout} username={user.username} />
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-          />
-          <Route path="/search" element={<Search />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+  return (
+    <>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />
+          }
+        />
+        <Route
+          path="/login"
+          element={<Login onLogin={handleLogin} />}
+        />
+        <Route
+          path="/dashboard"
+          element={isAuthenticated ? <Dashboard handleLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/home"
+          element={isAuthenticated ? <Home handleLogout={handleLogout} user={user} /> : <Navigate to="/login" replace />} />
+        <Route
+          path="/profile"
+          element={
+            isAuthenticated && user ? (
+              <Profile handleLogout={handleLogout} username={user.username} />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route path="/search" element={<Search />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
-      </>
-    );
-  }
+    </>
+  );
+}
 
-  function App() {
-    return (
-      <Router>
-        <AppContent />
-      </Router>
-    );
-  }
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  );
+}
 
-  export default App;
+export default App;

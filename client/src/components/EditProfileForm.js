@@ -1,43 +1,46 @@
 import React, { useState, useEffect } from 'react';
 
 const EditProfileForm = ({ user, setUser, onCancel, onSave }) => {
-  const [formData, setFormData] = useState(user);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [formData, setFormData] = useState({
+    username: user?.username || '',
+    email: user?.email || '',
+    location: user?.location || '',
+    bio: user?.bio || '',
+  });
 
   useEffect(() => {
     setFormData(user);
   }, [user]);
 
   const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const payload = {
-      username: formData.username,
-      email: formData.email || '',
-      location: formData.location || '',
-      bio: formData.bio || ''
-    };
+    const res = await fetch('/api/user/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(formData),
+    });
 
-    try {
-      const res = await fetch('/api/user/update', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        const updated = await res.json();
-        setUser(updated);
-        onSave();
-      } else {
-        console.error('Failed to update profile');
-      }
-    } catch (err) {
-      console.error('Error updating profile:', err);
+    if (res.ok) {
+      setSuccessMessage('Profile updated successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } else {
+      console.error('Failed to update');
     }
   };
 
@@ -66,11 +69,22 @@ const EditProfileForm = ({ user, setUser, onCancel, onSave }) => {
         </label>
       ))}
 
+      {successMessage && (
+        <div className="bg-green-100 text-green-800 px-4 py-2 rounded mb-4 text-sm">
+          {successMessage}
+        </div>
+      )}
+
       <div className="flex justify-between mt-4">
+
         <button type="submit" className="text-sm text-green-600 underline">
           Save
         </button>
-        <button type="button" className="text-sm text-red-600 underline" onClick={onCancel}>
+        <button
+          type="button"
+          className="text-sm text-red-600 underline"
+          onClick={handleCancel}
+        >
           Cancel
         </button>
       </div>

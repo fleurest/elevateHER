@@ -43,7 +43,7 @@ function HomePage({ handleLogout, user }) {
   const toggleProfile = () => {
     setShowProfile((prev) => {
       const next = !prev;
-  
+
       if (next) {
         setPrevFilter(filterType);
         setFilterType(null);
@@ -51,7 +51,7 @@ function HomePage({ handleLogout, user }) {
         setFilterType(prevFilter);
         setEditProfile(false);
       }
-  
+
       return next;
     });
   };
@@ -86,16 +86,21 @@ function HomePage({ handleLogout, user }) {
     fetchFriends();
   }, [user.username]);
 
-  const fetchSuggestedUsers = async () => {
+  const fetchFriendSuggestions = async () => {
     try {
       const res = await fetch('/api/top-users');
       const data = await res.json();
-      setSuggestedUsers(data);
+      setFriendResults(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Could not fetch suggested users:', err);
+      console.error('Could not fetch friend suggestions:', err);
+      setFriendResults([]);
     }
   };
-
+  
+  useEffect(() => {
+    fetchFriendSuggestions();
+  }, []);
+  
   const filterGraphToFriends = async () => {
     const res = await fetch(`/api/user-friends/${user.username}`);
     const data = await res.json();
@@ -289,6 +294,18 @@ function HomePage({ handleLogout, user }) {
     };
   }, [graphData, filterType, user?.username, showProfile]);
 
+  useEffect(() => {
+    fetch('/api/top-users')
+      .then(res => res.json())
+      .then(data => {
+        console.log('Top Users Response:', data);
+        setFriendResults(Array.isArray(data) ? data : []);
+      })
+      .catch(err => {
+        console.error('Error loading users', err);
+        setFriendResults([]);
+      });
+  }, []);
 
   return (
     <div className="home-page-layout">
@@ -309,7 +326,17 @@ function HomePage({ handleLogout, user }) {
               className="cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
-                setFilterType('Player');
+                const newShowMyPlayers = !showMyPlayers;
+                setShowMyPlayers(newShowMyPlayers);
+                setShowProfile(false);
+                if (newShowMyPlayers) {
+                  setFilterType('Player');
+                } else {
+                  setFilterType(null);
+                }
+
+                setSelectedNode(null);
+                setShowFriendsPanel(false);
               }}
             >
               My Players {showMyPlayers ? '▲' : '▼'}
@@ -317,17 +344,26 @@ function HomePage({ handleLogout, user }) {
           </ul>
         </div>
 
-
-
         <div className="explore-section">
           <h2>Explore</h2>
           <ul>
             <li
               className="cursor-pointer"
-              onClick={() => {
-                setShowFriendsPanel(!showFriendsPanel);
-                setShowFriendSearch(true);
-                filterGraphForFriends();
+              onClick={(e) => {
+                e.stopPropagation();
+
+                const newShowFriendsPanel = !showFriendsPanel;
+                setShowFriendsPanel(newShowFriendsPanel);
+                setShowProfile(false);
+                setShowMyPlayers(false);
+                setSelectedNode(null);
+
+                if (newShowFriendsPanel) {
+                  setFilterType('Friends');
+                  filterGraphForFriends();
+                } else {
+                  setFilterType(null);
+                }
               }}
             >
               Friends {showFriendsPanel ? '▲' : '▼'}
@@ -426,10 +462,16 @@ function HomePage({ handleLogout, user }) {
 
         {showFriendsPanel && (
           <div className="mt-2 pl-4">
-            <p className="text-sm mb-2">Search or view your friends here</p>            <ul>
-              {friends.map((friend, index) => (
-                <li key={index}>
-                  {friend.username || friend.name || friend.properties?.username || friend.properties?.name || 'Unknown'}
+            <p className="text-sm mb-2">Search or view your friends here</p><ul>
+              {friendResults.map((user) => (
+                <li key={user.id} className="flex justify-between items-center mb-2">
+                  <span>{user.username}</span>
+                  <button
+                    className="bg-blue-500 text-white px-2 py-1 rounded text-xs"
+                    onClick={() => handleFriendRequest(user.username)}
+                  >
+                    Request Friend
+                  </button>
                 </li>
               ))}
             </ul>
@@ -469,28 +511,28 @@ function HomePage({ handleLogout, user }) {
         )}
       </div>
 
-        <div className="home-page-column home-page-right">
-          {editProfile ? (
-            <EditProfileForm
-              user={editableUser}
-              setUser={setEditableUser}
-              onCancel={() => setEditProfile(false)}
-              onSave={(updatedUser) => {
-                setEditProfile(false);
-                setEditableUser(updatedUser);
-              }}
-            />
-          ) : selectedNode ? (
-            <div>
-              <h2>Details</h2>
-              {Object.entries(selectedNode).map(([key, value]) => (
-                <p key={key}><strong>{key}:</strong> {JSON.stringify(value)}</p>
-              ))}
-            </div>
-          ) : null}
-        </div>
+      <div className="home-page-column home-page-right">
+        {editProfile ? (
+          <EditProfileForm
+            user={editableUser}
+            setUser={setEditableUser}
+            onCancel={() => setEditProfile(false)}
+            onSave={(updatedUser) => {
+              setEditProfile(false);
+              setEditableUser(updatedUser);
+            }}
+          />
+        ) : selectedNode ? (
+          <div>
+            <h2>Details</h2>
+            {Object.entries(selectedNode).map(([key, value]) => (
+              <p key={key}><strong>{key}:</strong> {JSON.stringify(value)}</p>
+            ))}
+          </div>
+        ) : null}
       </div>
-      );
+    </div>
+  );
 }
 
-      export default HomePage;
+export default HomePage;

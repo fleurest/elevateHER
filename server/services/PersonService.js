@@ -47,6 +47,31 @@ class PersonService {
             roles: personRecord.roles || []
         };
     }    
+    async getTopUsers(limit = 10) {
+        const session = this.driver.session();
+        try {
+          const result = await session.run(
+            `
+            MATCH (p:Person)
+            WHERE 'user' IN p.roles
+            RETURN p
+            LIMIT $limit
+            `,
+            { limit: neo4j.int(limit) }
+          );
+      
+          return result.records.map(record => {
+            const node = record.get('p');
+            return {
+              id: node.identity.toString(),
+              ...node.properties
+            };
+          });
+        } finally {
+          await session.close();
+        }
+      }
+      
 }
 
 module.exports = PersonService;

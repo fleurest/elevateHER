@@ -516,4 +516,14 @@ router.get('/user-friends/:username', isAuthenticated, async (req, res) => {
   }
 });
 
+router.get('/top-users', async (req, res) => {
+  try {
+    const users = await personService.getTopUsers(10);
+    res.json(users);
+  } catch (error) {
+    console.error('[SERVER] Error fetching top users:', error);
+    res.status(500).json({ error: 'Failed to fetch top users' });
+  }
+});
+
 module.exports = router;

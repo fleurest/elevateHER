@@ -34,6 +34,23 @@ const isAuthenticated = (req, res, next) => {
   }
 };
 
+// admin user check
+const isAdmin = (req, res, next) => {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.SESSION_SECRET);
+    if (decoded.roles && decoded.roles.includes('admin')) {
+      req.user = decoded;
+      return next();
+    }
+    return res.status(403).json({ error: 'Admin access required' });
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+};
+
 router.get('/session', (req, res) => {
   if (req.session && req.session.user) {
     res.json({ user: req.session.user });
@@ -210,12 +227,16 @@ router.post('/logout', (req, res) => {
       console.error('Error destroying session:', err);
       return res.status(500).json({ error: 'Logout failed' });
     }
-    res.clearCookie('connect.sid'); // Clear the session cookie
-    res.json({ message: 'Logged out successfully' });
+    res.clearCookie('token', {
+      httpOnly: true,
+      sameSite: 'Strict',
+      secure: process.env.NODE_ENV === 'production',
+    });
+    res.json({ message: 'Logged out' });
   });
 });
 
-router.post('/user/update', async (req, res) => {
+router.post('/user/update', isAuthenticated, async (req, res) => {
   const { username, email = '', location = '', bio = '' } = req.body;
   const session = driver.session();
 
@@ -385,6 +406,21 @@ router.get('/search-users', isAuthenticated, async (req, res) => {
   } catch (err) {
     console.error('Search failed:', err);
     res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+router.delete('/person/:id', isAdmin, async (req, res) => {
+  const session = driver.session();
+  const id = parseInt(req.params.id);
+
+  try {
+    await session.run(`MATCH (p:Person) WHERE ID(p) = $id DETACH DELETE p`, { id });
+    res.json({ message: 'Person deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting person:', err);
+    res.status(500).json({ error: 'Failed to delete person' });
+  } finally {
+    await session.close();
   }
 });
 

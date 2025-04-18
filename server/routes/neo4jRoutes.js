@@ -15,7 +15,7 @@ const GraphService = require('../services/GraphService');
 const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
 const personModel = new Person(driver);
-const personService = new PersonService(personModel);
+const personService = new PersonService(personModel, driver);
 const personController = new PersonController(personService);
 const graph = new Graph(driver);
 const cookieParser = require('cookie-parser');
@@ -315,31 +315,8 @@ router.get('/user-friends/:username', async (req, res) => {
   const { username } = req.params;
 
   try {
-    const records = await graph.getAcceptedFriends(username);
-
-    const elements = [];
-
-    records.forEach(record => {
-      const u1 = record.get('u1');
-      const rel = record.get('r');
-      const u2 = record.get('u2');
-
-      elements.push(
-        { data: { id: u1.identity.toString(), label: u1.labels[0], ...u1.properties } },
-        { data: { id: u2.identity.toString(), label: u2.labels[0], ...u2.properties } },
-        {
-          data: {
-            id: rel.identity.toString(),
-            source: u1.identity.toString(),
-            target: u2.identity.toString(),
-            label: rel.type,
-            ...rel.properties
-          }
-        }
-      );
-    });
-
-    res.json(elements);
+    const friends = await personService.getFriendsForUser(username);
+    res.json(friends);
   } catch (err) {
     console.error('Error fetching accepted friends:', err);
     res.status(500).json({ error: 'Could not fetch friends' });
@@ -518,12 +495,23 @@ router.get('/user-friends/:username', isAuthenticated, async (req, res) => {
 
 router.get('/top-users', async (req, res) => {
   try {
-    const users = await personService.getTopUsers(10);
+    const users = await personController.getTopUsers.bind(personController);
     res.json(users);
   } catch (error) {
     console.error('[SERVER] Error fetching top users:', error);
     res.status(500).json({ error: 'Failed to fetch top users' });
   }
 });
+
+router.get('/top-friends/:username', async (req, res) => {
+  try {
+    const friends = await personService.getFriendsForUser(req.params.username);
+    res.json(friends);
+  } catch (error) {
+    console.error('Error fetching top friends:', error);
+    res.status(500).json({ error: 'Failed to get top friends' });
+  }
+});
+
 
 module.exports = router;

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sanitizeUsername, sanitizePassword } from '../utils/inputSanitizers';
-
+import logo from '../assets/logo-default-profile.png';
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
@@ -79,12 +79,9 @@ const Login = ({ onLogin }) => {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <div className="auth-logo-container">
-          <img
-            src="/favicon.png"
-            alt="ElevateHER Logo"
-            className="auth-logo"
-          />
+        <div className="logo-section">
+          <img src={logo} alt="Logo" className="small-logo"/></div>
+          <div className="auth-logo-container">
           <h2 className="auth-brand-text">ElevateHER</h2>
         </div>
         <input
@@ -130,7 +127,7 @@ const Login = ({ onLogin }) => {
           </button>
         ) : (
           <button
-            onClick = {handleLogin}
+            onClick={handleLogin}
             className="auth-button"
             disabled={!usernameValid || !passwordValid}
           >

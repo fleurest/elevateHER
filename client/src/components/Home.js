@@ -25,6 +25,9 @@ function HomePage({ handleLogout, user }) {
   const handleHideProfile = () => setShowProfile(false);
 
   const [showMyPlayers, setShowMyPlayers] = useState(false);
+  const [allPeople, setAllPeople] = useState([]);
+  const [showAllFriends, setShowAllFriends] = useState(false);
+  const [topFriends, setTopFriends] = useState([]);
   const [friends, setFriends] = useState([]);
   const [showFriendsPanel, setShowFriendsPanel] = useState(false);
   // search add friend
@@ -34,6 +37,7 @@ function HomePage({ handleLogout, user }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [suggestedUsers, setSuggestedUsers] = useState([]);
+  const [suggestedFriends, setSuggestedFriends] = useState([]);
   // show person on node click
   const [selectedPerson, setSelectedPerson] = useState(null);
   const navigate = useNavigate();
@@ -56,6 +60,16 @@ function HomePage({ handleLogout, user }) {
     });
   };
 
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`/api/all-users`);
+      const data = await res.json();
+      setAllPeople(data);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    }
+  };
+
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -72,21 +86,24 @@ function HomePage({ handleLogout, user }) {
     }
   }, [showProfile]);
 
+  const fetchFriends = async () => {
+    try {
+      const res = await fetch(`/api/user-friends/${user.username}`);
+      const data = await res.json();
+      setFriendResults(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Could not fetch friends:', err);
+      setFriendResults([]);
+    }
+  };
+
   useEffect(() => {
-    const fetchFriends = async () => {
-      try {
-        const res = await fetch(`/api/user-friends/${user.username}`);
-        const data = await res.json();
-        setFriends(data || []);
-      } catch (err) {
-        console.error('Could not fetch friends:', err);
-      }
-    };
+    if (showFriendsPanel) {
+      fetchFriends();
+    }
+  }, [showFriendsPanel]);
 
-    fetchFriends();
-  }, [user.username]);
-
-  const fetchFriendSuggestions = async () => {
+  const fetchSuggestedFriends = async () => {
     try {
       const res = await fetch('/api/top-users');
       const data = await res.json();
@@ -96,16 +113,38 @@ function HomePage({ handleLogout, user }) {
       setFriendResults([]);
     }
   };
-  
+
   useEffect(() => {
-    fetchFriendSuggestions();
+    fetchSuggestedFriends();
   }, []);
-  
+
   const filterGraphToFriends = async () => {
     const res = await fetch(`/api/user-friends/${user.username}`);
     const data = await res.json();
     setGraphElements(data);
   };
+
+  useEffect(() => {
+    const fetchTopFriends = async () => {
+      try {
+        const res = await fetch(`/api/top-friends/${user.username}`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setTopFriends(data);
+        } else {
+          console.warn('Expected array for top friends, got:', data);
+          setTopFriends([]);
+        }
+      } catch (err) {
+        console.error('Failed to load top friends', err);
+        setTopFriends([]);
+      }
+    };
+
+    if (user?.username) fetchTopFriends();
+  }, [user]);
+
+
 
   const filterGraphForFriends = async () => {
     try {
@@ -140,6 +179,29 @@ function HomePage({ handleLogout, user }) {
       setFriendResults([]);
     }
   };
+
+  const handleSendFriendRequest = async (username) => {
+    try {
+      const res = await fetch(`/api/send-friend-request/${user.username}/${username}`, { method: 'POST' });
+      const data = await res.json();
+      console.log('Friend request sent:', data);
+    } catch (err) {
+      console.error('Error sending friend request:', err);
+    }
+  };
+  useEffect(() => {
+    if (user?.username) {
+      fetchUsers();
+      fetchFriends();
+    }
+  }, [user]);
+
+
+  useEffect(() => {
+    console.log('User:', user.username);
+    console.log('Friends:', friends.map(f => f.username));
+    console.log('All users:', allPeople.map(p => ({ username: p.username, roles: p.roles })));
+  }, [allPeople, friends]);
 
   useEffect(() => {
     async function fetchGraph() {
@@ -351,22 +413,17 @@ function HomePage({ handleLogout, user }) {
               className="cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
-
-                const newShowFriendsPanel = !showFriendsPanel;
-                setShowFriendsPanel(newShowFriendsPanel);
+                const nextState = !showFriendsPanel;
+                setShowFriendsPanel(nextState);
                 setShowProfile(false);
                 setShowMyPlayers(false);
                 setSelectedNode(null);
-
-                if (newShowFriendsPanel) {
-                  setFilterType('Friends');
-                  filterGraphForFriends();
-                } else {
-                  setFilterType(null);
+                if (nextState) {
+                  fetchSuggestedFriends();
                 }
               }}
             >
-              Friends {showFriendsPanel ? '▲' : '▼'}
+              Friends {showAddFriendPanel ? '▲' : '▼'}
             </li>
             <li>Players <button onClick={() => setFilterType('Player')}>+</button></li>
             <li>Sports <button onClick={() => setFilterType('Sport')}>+</button></li>
@@ -401,7 +458,54 @@ function HomePage({ handleLogout, user }) {
             <Link to="/search" className="icon-link my-icon pages-icon" ></Link>
           </div>
         </div>
+        <div className="icon-bar-wrapper">
+          <div className="center-top-icons">
+            {user && (
+              <Link
+                to={`/profile/${user.username}`}
+                className="flex flex-col items-center mx-1 w-12"
+              >
+                <img
+                  src={user.profileImage || logo}
+                  alt={user.username}
+                  className="small-logo w-7 h-7 rounded-full object-cover"
+                />
+                <span className="text-[10px] mt-1 text-center truncate w-full">
+                  {user.username}
+                </span>
+              </Link>
+            )}
 
+            {Array.isArray(topFriends) && topFriends
+              .slice(0, showAllFriends ? 5 : 2)
+              .map((friend) => (
+                <Link
+                  to={`/profile/${friend.username}`}
+                  key={friend.username}
+                  className="flex flex-col items-center mx-1 w-12"
+                >
+                  <img
+                    src={friend.profileImage || logo}
+                    alt={friend.username}
+                    className="small-logo w-7 h-7 rounded-full object-cover"
+                  />
+                  <span className="text-[10px] mt-1 text-center truncate w-full">
+                    {friend.username}
+                  </span>
+                </Link>
+              ))}
+
+          </div>
+          {topFriends.length > 2 && (
+            <button
+              onClick={() => setShowAllFriends((prev) => !prev)}
+              className="text-[10px] text-gray-500 mt-1 ml-2 underline"
+            >
+              {showAllFriends ? '<' : '>'}
+            </button>
+          )}
+
+        </div>
         {showProfile ? (
           <div className="profile-panel">
             <h3>Profile Info</h3>
@@ -459,19 +563,13 @@ function HomePage({ handleLogout, user }) {
           >
           </div>
         )}
-
         {showFriendsPanel && (
           <div className="mt-2 pl-4">
             <p className="text-sm mb-2">Search or view your friends here</p><ul>
               {friendResults.map((user) => (
                 <li key={user.id} className="flex justify-between items-center mb-2">
                   <span>{user.username}</span>
-                  <button
-                    className="bg-blue-500 text-white px-2 py-1 rounded text-xs"
-                    onClick={() => handleFriendRequest(user.username)}
-                  >
-                    Request Friend
-                  </button>
+
                 </li>
               ))}
             </ul>
@@ -509,6 +607,37 @@ function HomePage({ handleLogout, user }) {
             </ul>
           </div>
         )}
+        {fetchSuggestedFriends.length > 0 && (
+          <div className="mt-4">
+            <ul className="list-disc pl-5">
+              {fetchSuggestedFriends.map((friend, index) => (
+                <li key={index}>{friend.username}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="mt-4">
+          <h3 className="text-md font-bold mb-2">Suggested Friends</h3>
+          <ul className="list-disc pl-4 space-y-1">
+            {suggestedFriends.map(person => (
+              <li key={person.username} className="flex justify-between items-center">
+                <span>{person.username}</span>
+                <button
+                  className="text-sm text-blue-600 underline"
+                  onClick={() => handleSendFriendRequest(person.username)}
+                >
+                  Send Friend Request
+                </button>
+              </li>
+            ))}
+            <ul className="list-disc pl-5">
+              {suggestedFriends.map((friend, index) => (
+                <li key={index}>{friend.username}</li>
+              ))}
+            </ul>
+          </ul>
+        </div>
       </div>
 
       <div className="home-page-column home-page-right">

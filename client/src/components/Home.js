@@ -31,6 +31,25 @@ function HomePage({ handleLogout, user }) {
   const [selectedPerson, setSelectedPerson] = useState(null);
   const navigate = useNavigate();
   const graphRef = useRef(null);
+  const [tomorrowEvents, setTomorrowEvents] = useState([]);
+  const [events, setEvents] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/calendar/events/tomorrow')
+      .then(res => res.json())
+      .then(data => setTomorrowEvents(data))
+      .catch(err => console.error('Error fetching events:', err));
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/calendar-events')
+      .then(res => res.json())
+      .then(data => {
+        console.log('Fetched events:', data);
+        setEvents(data);
+      })
+      .catch(err => console.error('Error fetching calendar events:', err));
+  }, []);
 
   useEffect(() => {
     const fetchFriends = async () => {
@@ -109,6 +128,7 @@ function HomePage({ handleLogout, user }) {
     }
     fetchGraph();
   }, []);
+
 
   useEffect(() => {
     if (!cyInstanceRef.current) return;
@@ -431,6 +451,35 @@ function HomePage({ handleLogout, user }) {
           <p>Click a node to see details.</p>
         )}
       </div>
+      {events && (
+        <div className="calendar-section">
+          <h2>Upcoming Events</h2>
+          <ul>
+            {Array.isArray(events) && events.map(event => (
+              <div key={event.id}>
+                <p>{event.summary}</p>
+                <p>{event.start?.dateTime || event.start?.date}</p>
+              </div>
+            ))}
+          </ul>
+        </div>
+      )}
+      {tomorrowEvents.length > 0 && (
+        <div className="mt-4 p-3 bg-white rounded shadow-md max-w-md">
+          <h3 className="text-lg font-semibold mb-2">Tomorrow's Events</h3>
+          <ul className="list-disc ml-5 text-sm">
+            {tomorrowEvents.map((event) => (
+              <li key={event.id}>
+                <strong>{event.summary}</strong>{' '}
+                {event.start.dateTime
+                  ? new Date(event.start.dateTime).toLocaleTimeString()
+                  : 'All day'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -11,6 +11,7 @@ const path = require('path');
 console.log('Looking for Graph at:', path.resolve(__dirname, '../models/Graph'));
 const Graph = require('../models/Graph');
 const GraphService = require('../services/GraphService');
+const { getCalendarEvents, listEvents } = require('../services/EventCalService');
 
 const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
@@ -18,6 +19,19 @@ const personModel = new Person(driver);
 const personService = new PersonService(personModel);
 const personController = new PersonController(personService);
 const graph = new Graph(driver);
+const { google } = require('googleapis');
+require('dotenv').config();
+
+const oAuth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI
+);
+
+oAuth2Client.setCredentials({
+  access_token: process.env.GOOGLE_ACCESS_TOKEN,
+  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+});
 
 router.get('/session', (req, res) => {
   if (req.session && req.session.user) {
@@ -329,6 +343,18 @@ router.get('/search-users', async (req, res) => {
   }
 });
 
+//events calendar
+router.get('/calendar-events', async (req, res) => {
+  try {
+    const calendarId = 'c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc@group.calendar.google.com';
+    const events = await listEvents(calendarId);
+    res.json(events);
+  } catch (err) {
+    console.error('Failed to fetch calendar events:', err);
+    res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});
+
 // friend request
 router.post('/friend-request', async (req, res) => {
   const { fromUsername, toUsername } = req.body;
@@ -418,6 +444,33 @@ router.get('/user-friends/:username', async (req, res) => {
   } catch (err) {
     console.error('Error fetching friends:', err);
     res.status(500).json({ error: 'Failed to fetch friends graph' });
+  }
+});
+
+router.get('/events/tomorrow', async (req, res) => {
+  try {
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+    const now = new Date();
+    const tomorrowStart = new Date(now);
+    tomorrowStart.setDate(now.getDate() + 1);
+    tomorrowStart.setHours(0, 0, 0, 0);
+
+    const tomorrowEnd = new Date(tomorrowStart);
+    tomorrowEnd.setHours(23, 59, 59, 999);
+
+    const result = await calendar.events.list({
+      calendarId: process.env.GOOGLE_CALENDAR_ID,
+      timeMin: tomorrowStart.toISOString(),
+      timeMax: tomorrowEnd.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    res.json(result.data.items);
+  } catch (err) {
+    console.error('Error fetching calendar events:', err);
+    res.status(500).json({ error: 'Failed to fetch events' });
   }
 });
 

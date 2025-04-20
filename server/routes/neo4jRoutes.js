@@ -11,7 +11,7 @@ const path = require('path');
 console.log('Looking for Graph at:', path.resolve(__dirname, '../models/Graph'));
 const Graph = require('../models/Graph');
 const GraphService = require('../services/GraphService');
-const { getCalendarEvents, listEvents } = require('../services/EventCalService');
+const { getCalendarEvents, listPastEvents, listUpcomingEvents } = require('../services/EventCalService');
 
 const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
@@ -374,7 +374,7 @@ router.delete('/person/:id', isAdmin, async (req, res) => {
 router.get('/calendar-events', async (req, res) => {
   try {
     const calendarId = 'c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc@group.calendar.google.com';
-    const events = await listEvents(calendarId);
+    const events = await listUpcomingEvents(calendarId);
     res.json(events);
   } catch (err) {
     console.error('Failed to fetch calendar events:', err);
@@ -494,31 +494,24 @@ router.get('/top-friends/:username', async (req, res) => {
   }
 });
 
-
-router.get('/events/tomorrow', async (req, res) => {
+router.get('/calendar-events', async (req, res) => {
   try {
-    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
-
-    const now = new Date();
-    const tomorrowStart = new Date(now);
-    tomorrowStart.setDate(now.getDate() + 1);
-    tomorrowStart.setHours(0, 0, 0, 0);
-
-    const tomorrowEnd = new Date(tomorrowStart);
-    tomorrowEnd.setHours(23, 59, 59, 999);
-
-    const result = await calendar.events.list({
-      calendarId: process.env.GOOGLE_CALENDAR_ID,
-      timeMin: tomorrowStart.toISOString(),
-      timeMax: tomorrowEnd.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
-
-    res.json(result.data.items);
+    const calendarId = 'c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc@group.calendar.google.com';
+    const events = await listUpcomingEvents(calendarId);
+    res.json(events);
   } catch (err) {
-    console.error('Error fetching calendar events:', err);
-    res.status(500).json({ error: 'Failed to fetch events' });
+    console.error('Failed to fetch calendar events:', err);
+    res.status(500).json({ error: 'Calendar fetch error' });
+  }
+});
+
+router.get('/past-events', async (req, res) => {
+  try {
+    const events = await listPastEvents();
+    res.json(events);
+  } catch (err) {
+    console.error('Failed to fetch past events:', err);
+    res.status(500).json({ error: 'Past event fetch error' });
   }
 });
 

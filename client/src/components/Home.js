@@ -21,6 +21,23 @@ function HomePage({ handleLogout, user }) {
   const [prevFilter, setPrevFilter] = useState(null);
   const [editProfile, setEditProfile] = useState(false);
 
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [pastEvents, setPastEvents] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/calendar-events')
+      .then(res => res.json())
+      .then(data => setUpcomingEvents(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Error fetching calendar events:', err));
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/past-events')
+      .then(res => res.json())
+      .then(data => setPastEvents(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Error fetching past events:', err));
+  }, []);
+
   const handleShowProfile = () => setShowProfile(true);
   const handleHideProfile = () => setShowProfile(false);
 
@@ -708,6 +725,41 @@ function HomePage({ handleLogout, user }) {
           </ul>
         </div>
       )}
+      <div className="flex flex-col md:flex-row gap-6 mt-6">
+        <div className="flex-1 bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-3">Upcoming Events</h2>
+          {upcomingEvents.length > 0 ? (
+            <ul className="text-sm">
+              {upcomingEvents.map(event => (
+                <li key={event.id} className="mb-2">
+                  <strong>{event.summary}</strong><br />
+                  {event.start?.dateTime || event.start?.date}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No upcoming events found.</p>
+          )}
+        </div>
+
+        <div className="flex-1 bg-white p-4 rounded shadow">
+          <h2 className="text-lg font-semibold mb-3">Past Events</h2>
+          {pastEvents.length > 0 ? (
+            <ul className="text-sm">
+              {pastEvents.map((event, index) => (
+                <li key={index} className="mb-2">
+                  <strong>{event.eventName || 'Unnamed Event'}</strong><br />
+                  {event.year ? Number(event.year.low ?? event.year) : 'Unknown Year'}<br />
+                  {event.location && <span>{event.location}</span>}<br />
+                  {event.eventType && <span className="italic">{event.eventType}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No past events available.</p>
+          )}
+        </div>
+      </div>
 
     </div>
   );

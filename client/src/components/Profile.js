@@ -22,25 +22,44 @@ function Profile({ username, handleLogout }) {
     const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
 
     const [likedPlays, setLikedPlays] = useState([]);
+    const [likedPlaysLoading, setLikedPlaysLoading] = useState(false);
+    const [likedPlaysError, setLikedPlaysError] = useState(null);
 
     // load the user’s top 5 liked plays
     useEffect(() => {
         async function fetchLikedPlays() {
+            if (!username) return;
+
+            setLikedPlaysLoading(true);
+            setLikedPlaysError(null);
+
             try {
                 const response = await fetch(`/api/user-likes/${username}`);
                 if (!response.ok) {
-                    throw new Error('Failed to fetch liked plays');
+                    let errorMessage = `Failed to fetch liked plays: ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData && errorData.error) {
+                            errorMessage += ` - ${errorData.error}`;
+                        }
+                    } catch (jsonError) {
+                        const errorText = await response.text();
+                        errorMessage += ` - ${errorText}`;
+                    }
+
+                    throw new Error(errorMessage);
                 }
                 const playsData = await response.json();
                 setLikedPlays(playsData);
-            } catch (err) {
-                console.error(err);
+            } catch (error) {
+                console.error('Error fetching liked plays:', error);
+                setLikedPlaysError(error.message);
+            } finally {
+                setLikedPlaysLoading(false);
             }
         }
 
-        if (username) {
-            fetchLikedPlays();
-        }
+        fetchLikedPlays();
     }, [username]);
 
     // initial profile info
@@ -165,20 +184,24 @@ function Profile({ username, handleLogout }) {
                 </div>
             </div>
             <div>
-        <h2>My Top 5 Plays</h2>
-        {likedPlays.length > 0 ? (
-          <ul>
-            {likedPlays.map((play) => (
-              <li key={play.id}>
-                <strong>{play.title}</strong>
-                {play.description ? <p>{play.description}</p> : null}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No players liked yet.</p>
-        )}
-      </div>
+                <h2>My Top 5 Plays</h2>
+                {likedPlaysLoading && <p>Loading liked plays...</p>} {/* Show loading message */}
+                {likedPlaysError && <p style={{ color: 'red' }}>{likedPlaysError}</p>} {/* Show error message */}
+                {!likedPlaysLoading && !likedPlaysError && (
+                    likedPlays.length > 0 ? (
+                        <ul>
+                            {likedPlays.map((play) => (
+                                <li key={play.id}>
+                                    <strong>{play.title}</strong>
+                                    {play.description ? <p>{play.description}</p> : null}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No players liked yet.</p>
+                    )
+                )}
+            </div>
         </div>
     );
 }

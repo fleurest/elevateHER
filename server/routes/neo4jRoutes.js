@@ -16,22 +16,9 @@ const { getCalendarEvents, listEvents } = require('../services/EventCalService')
 const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
 const personModel = new Person(driver);
-const personService = new PersonService(personModel);
+const personService = new PersonService(personModel, driver);
 const personController = new PersonController(personService);
 const graph = new Graph(driver);
-const { google } = require('googleapis');
-require('dotenv').config();
-
-const oAuth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
-
-oAuth2Client.setCredentials({
-  access_token: process.env.GOOGLE_ACCESS_TOKEN,
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-});
 
 router.get('/session', (req, res) => {
   if (req.session && req.session.user) {
@@ -54,9 +41,9 @@ router.get('/nodes', async (req, res) => {
 
 // Athletes route
 router.get('/athletes', async (req, res) => {
-  const session = driver.session();
-
+  let session = null;
   try {
+    session = driver.session();
     const result = await session.run(
       'MATCH (a:Athlete) RETURN a.athleteId AS id, a.name AS name, a.profileImage AS image'
     );
@@ -72,7 +59,9 @@ router.get('/athletes', async (req, res) => {
     console.error('Athlete query error:', err);
     res.status(500).json({ error: 'Failed to fetch athletes' });
   } finally {
-    await session.close();
+    if (session) {
+      await session.close();
+    }
   }
 });
 
@@ -103,7 +92,7 @@ router.get('/graph/filtered', async (req, res) => {
 router.post('/register', async (req, res) => {
   const username = sanitizeUsername(req.body.username);
   const password = sanitizePassword(req.body.password);
-  const session = driver.session();
+  const session = null;
 
   if (username.length < 4) {
     return res.status(400).json({ error: 'Username must be at least 4 characters' });
@@ -117,9 +106,10 @@ router.post('/register', async (req, res) => {
   }
 
   try {
+    session = driver.session();
     // Check if user already exists
     const existing = await session.run(
-      'MATCH (p:Person {username: $username}) RETURN u',
+      'MATCH (p:Person {username: $username}) RETURN p',
       { username }
     );
 
@@ -141,24 +131,25 @@ router.post('/register', async (req, res) => {
     console.error('Registration error:', err);
     res.status(500).json({ error: 'Registration failed' });
   } finally {
-    await session.close();
+    if (session) {
+      await session.close();
+    }
   }
 });
 
-// Login route
 router.post('/login', async (req, res) => {
   console.log('>>> LOGIN route hit');
   console.log('>>> request body:', req.body);
   const username = sanitizeUsername(req.body.username);
   const password = sanitizePassword(req.body.password);
+  let session = null;
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Missing credentials' });
   }
 
-  const session = driver.session();
-
   try {
+    session = driver.session();
     const result = await session.run(
       'MATCH (p:Person {username: $username}) RETURN p.password AS hash',
       { username }
@@ -181,16 +172,14 @@ router.post('/login', async (req, res) => {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   } finally {
-    await session.close();
+    if (session) {
+      await session.close();
+    }
   }
 });
 
-router.get('/me', (req, res) => {
-  if (req.session?.user?.username) {
-    return res.json({ username: req.session.user.username });
-  } else {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+router.get('/me', isAuthenticated, (req, res) => {
+  res.json({ user: req.user });
 });
 
 router.get('/session', (req, res) => {
@@ -202,19 +191,65 @@ router.get('/session', (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.clearCookie('connect.sid');
-    res.status(200).json({ message: 'Logged out' });
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error destroying session:', err);
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.clearCookie('token', {
+      httpOnly: true,
+      sameSite: 'Strict',
+      secure: process.env.NODE_ENV === 'production',
+    });
+    res.json({ message: 'Logged out' });
   });
 });
 
+router.post('/user/update', isAuthenticated, async (req, res) => {
+  const { username, email = '', location = '', bio = '' } = req.body;
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (p:Person {username: $username})
+      SET p.email = $email,
+          p.location = $location,
+          p.bio = $bio
+      RETURN p
+      `,
+      { username, email, location, bio }
+    );
+
+    const updatedProps = result.records[0]?.get('p').properties;
+    res.json(updatedProps);
+  } catch (err) {
+    console.error('Error updating profile:', err);
+    res.status(500).json({ error: 'Failed to update user profile' });
+  } finally {
+    await session.close();
+  }
+});
+
+router.get('/refresh', (req, res) => {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ error: 'No token found' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.SESSION_SECRET);
+    res.json({ username: decoded.username });
+  } catch (err) {
+    console.error('[SERVER] Token invalid:', err);
+    res.status(403).json({ error: 'Invalid or expired token' });
+  }
+});
 
 router.get('/user-likes/:username', async (req, res) => {
   const { username } = req.params;
 
   try {
     const liked = await personModel.getLikedPlayersByUser(username);
-
+    console.log('Liked players from Neo4j:', liked);
     const likedPlayers = liked.map(p => ({
       id: p.identity.toNumber(),
       name: p.properties.name,
@@ -229,7 +264,7 @@ router.get('/user-likes/:username', async (req, res) => {
   }
 });
 
-router.post('/user-likes', async (req, res) => {
+router.post('/user-likes', isAuthenticated, async (req, res) => {
   const { username, playerName } = req.body;
 
   if (!username || !playerName) {
@@ -237,8 +272,8 @@ router.post('/user-likes', async (req, res) => {
   }
 
   try {
-    await personModel.likePlayer(username, playerName);
-    res.status(200).json({ message: `${username} liked ${playerName}` });
+    await personModel.likePlayer(req.session.user.username, playerName);
+    res.status(200).json({ message: `${req.session.user.username} liked ${playerName}` });
   } catch (err) {
     console.error('Error creating LIKE relationship:', err);
     res.status(500).json({ error: 'Failed to like player' });
@@ -249,31 +284,8 @@ router.get('/user-friends/:username', async (req, res) => {
   const { username } = req.params;
 
   try {
-    const records = await graph.getAcceptedFriends(username); // <— make sure this exists
-
-    const elements = [];
-
-    records.forEach(record => {
-      const u1 = record.get('u1');
-      const rel = record.get('r');
-      const u2 = record.get('u2');
-
-      elements.push(
-        { data: { id: u1.identity.toString(), label: u1.labels[0], ...u1.properties } },
-        { data: { id: u2.identity.toString(), label: u2.labels[0], ...u2.properties } },
-        {
-          data: {
-            id: rel.identity.toString(),
-            source: u1.identity.toString(),
-            target: u2.identity.toString(),
-            label: rel.type,
-            ...rel.properties
-          }
-        }
-      );
-    });
-
-    res.json(elements);
+    const friends = await personService.getFriendsForUser(username);
+    res.json(friends);
   } catch (err) {
     console.error('Error fetching accepted friends:', err);
     res.status(500).json({ error: 'Could not fetch friends' });
@@ -315,9 +327,9 @@ router.get('/search', async (req, res) => {
 });
 
 
-router.post('/add-player', (req, res) => personController.createOrUpdate(req, res));
+router.post('/add-player', isAuthenticated, (req, res) => personController.createOrUpdate(req, res));
 
-router.put('/player/:id', async (req, res) => {
+router.put('/player/:id', isAuthenticated, async (req, res) => {
   const { id } = req.params;
   const { name, sport, description } = req.body;
 
@@ -330,7 +342,7 @@ router.put('/player/:id', async (req, res) => {
   }
 });
 
-router.get('/search-users', async (req, res) => {
+router.get('/search-users', isAuthenticated, async (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ error: 'No query provided' });
 
@@ -340,6 +352,21 @@ router.get('/search-users', async (req, res) => {
   } catch (err) {
     console.error('Search failed:', err);
     res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+router.delete('/person/:id', isAdmin, async (req, res) => {
+  const session = driver.session();
+  const id = parseInt(req.params.id);
+
+  try {
+    await session.run(`MATCH (p:Person) WHERE ID(p) = $id DETACH DELETE p`, { id });
+    res.json({ message: 'Person deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting person:', err);
+    res.status(500).json({ error: 'Failed to delete person' });
+  } finally {
+    await session.close();
   }
 });
 
@@ -356,11 +383,11 @@ router.get('/calendar-events', async (req, res) => {
 });
 
 // friend request
-router.post('/friend-request', async (req, res) => {
+router.post('/friend-request', isAuthenticated, async (req, res) => {
   const { fromUsername, toUsername } = req.body;
 
   try {
-    await personModel.sendFriendRequest(fromUsername, toUsername);
+    await personModel.sendFriendRequest(req.session.user.username, toUsername);
     res.json({ message: 'Friend request sent' });
   } catch (err) {
     console.error('Error sending friend request:', err);
@@ -393,7 +420,7 @@ router.get('/friends/pending-incoming/:username', async (req, res) => {
 });
 
 // outgoing friend requests
-router.get('/friends/pending-outgoing/:username', async (req, res) => {
+router.get('/friends/pending-outgoing/:username', isAuthenticated, async (req, res) => {
   try {
     const results = await personModel.getOutgoingFriendRequests(req.params.username);
     res.json({ outgoing: results });
@@ -404,7 +431,7 @@ router.get('/friends/pending-outgoing/:username', async (req, res) => {
 });
 
 // accepted friends
-router.get('/friends/accepted/:username', async (req, res) => {
+router.get('/friends/accepted/:username', isAuthenticated, async (req, res) => {
   try {
     const results = await personModel.getAcceptedFriends(req.params.username);
     res.json({ friends: results });
@@ -414,7 +441,7 @@ router.get('/friends/accepted/:username', async (req, res) => {
   }
 });
 
-router.get('/user-friends/:username', async (req, res) => {
+router.get('/user-friends/:username', isAuthenticated, async (req, res) => {
   const { username } = req.params;
   try {
     const records = await graph.getAcceptedFriends(username);
@@ -446,6 +473,27 @@ router.get('/user-friends/:username', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch friends graph' });
   }
 });
+
+router.get('/top-users', async (req, res) => {
+  try {
+    const users = await personController.getTopUsers.bind(personController);
+    res.json(users);
+  } catch (error) {
+    console.error('[SERVER] Error fetching top users:', error);
+    res.status(500).json({ error: 'Failed to fetch top users' });
+  }
+});
+
+router.get('/top-friends/:username', async (req, res) => {
+  try {
+    const friends = await personService.getFriendsForUser(req.params.username);
+    res.json(friends);
+  } catch (error) {
+    console.error('Error fetching top friends:', error);
+    res.status(500).json({ error: 'Failed to get top friends' });
+  }
+});
+
 
 router.get('/events/tomorrow', async (req, res) => {
   try {

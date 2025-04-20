@@ -3,7 +3,7 @@ import '../style.css';
 import HamburgerMenu from './HamburgerMenu';
 
 
-function Search() {
+function Search(user) {
     const [query, setQuery] = useState('');
     const [sport, setSport] = useState('');
 
@@ -143,10 +143,31 @@ function Search() {
                 sport: ''
             });
 
-            // also refresh search results
             if (method === 'PUT') {
                 handleSearch(new Event('submit'));
             }
+            if (rolesArr.includes('athlete') && data.person) {
+                try {
+                    const likeResponse = await fetch('/api/user-likes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            username: user.username,
+                            playerName: data.person.name
+                        })
+                    });
+                    const likeData = await likeResponse.json();
+                    if (!likeResponse.ok) {
+                        console.error('Failed to create LIKED relationship:', likeData.error);
+                    } else {
+                        console.log(likeData.message);
+                    }
+                } catch (likeError) {
+                    console.error('Error creating LIKED relationship:', likeError);
+                }
+            }
+    
+    
         } catch (err) {
             alert(err.message);
         }

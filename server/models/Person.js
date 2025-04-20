@@ -217,6 +217,27 @@ class Person {
         }
       }
 
+      async getSuggestedUsers(excludeUsername, limit = 10) {
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                `
+                MATCH (p:Person)
+                WHERE 'user' IN p.roles
+                  AND p.username <> $excludeUsername
+                  AND NOT EXISTS {
+                    MATCH (:Person {username: $excludeUsername})-[:FRIENDS_WITH]-(:Person {username: p.username})
+                  }
+                RETURN p
+                LIMIT $limit
+                `,
+                { excludeUsername, limit: neo4j.int(limit) }
+            );
+            return result.records.map(record => record.get('p').properties);
+        } finally {
+            await session.close();
+        }
+    }
 }
 
 module.exports = Person;

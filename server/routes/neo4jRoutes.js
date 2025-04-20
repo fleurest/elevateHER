@@ -18,7 +18,7 @@ const graphService = new GraphService(graphModel);
 const personModel = new Person(driver);
 const personService = new PersonService(personModel, driver);
 const personController = new PersonController(personService);
-const graph = new Graph(driver);
+const { isAuthenticated, isAdmin } = require('../authentication');
 
 router.get('/session', (req, res) => {
   if (req.session && req.session.user) {

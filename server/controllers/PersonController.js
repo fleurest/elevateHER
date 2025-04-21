@@ -30,16 +30,6 @@ class PersonController {
         }
     }
 
-    async getTopUsers(req, res) {
-        try {
-          const users = await this.personService.getTopUsers(10);
-          res.json(users);
-        } catch (err) {
-          console.error('[CONTROLLER] Error fetching top users:', err);
-          res.status(500).json({ error: 'Failed to fetch top users' });
-        }
-      }
-
       async getSuggestedUsers(req, res) {
         const { username } = req.params;
       

@@ -49,7 +49,7 @@ class PersonService {
             roles: personRecord.roles || []
         };
     }
-    async getTopUsers(limit = 10) {
+    async getTopUsers(limit = 5) {
         const session = this.driver.session();
         try {
             const result = await session.run(
@@ -114,6 +114,22 @@ class PersonService {
         }
     }
 
+    async getRandomPlayers(limit = 5) {
+        const session = this.driver.session();
+        try {
+          const result = await session.run(
+            `MATCH (p:Person)
+             WHERE 'athlete' IN p.roles
+             WITH p, rand() AS r
+             RETURN p ORDER BY r LIMIT $limit`,
+            { limit: neo4j.int(limit) }
+          );
+          return result.records.map(record => record.get('p').properties);
+        } finally {
+          await session.close();
+        }
+      }
+      
 
 }
 

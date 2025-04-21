@@ -13,6 +13,7 @@ function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     async function checkSession() {
@@ -48,6 +49,11 @@ function AppContent() {
     const raw = await res.text();
     console.log('RAW RESPONSE:', raw);
 
+    if (!res.ok) {
+      console.error('Login failed:', raw);
+      return;
+    }
+
     try {
       const data = JSON.parse(raw);
       setUser(data.user);
@@ -55,9 +61,10 @@ function AppContent() {
       navigate('/home');
     } catch (err) {
       console.error('Failed to parse JSON:', err);
+      setError('Unexpected server response');
     }
-
   };
+
 
   const handleLogout = async () => {
     try {

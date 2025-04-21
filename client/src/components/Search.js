@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../style.css';
 import HamburgerMenu from './HamburgerMenu';
-
 
 function Search(user) {
     const [query, setQuery] = useState('');
@@ -28,8 +27,32 @@ function Search(user) {
         sport: ''
     });
 
-    // event handlers
+    const [randomPlayers, setRandomPlayers] = useState([]);
 
+    useEffect(() => {
+        fetch('/api/athletes/random')
+          .then((res) => {
+            console.log('Fetch status:', res.status);
+            return res.text();
+          })
+          .then((text) => {
+            console.log('Raw response:', text);
+      
+            try {
+              const data = JSON.parse(text);
+              setRandomPlayers(data);
+            } catch (err) {
+              console.error('Failed to parse JSON:', err);
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to fetch random players:', err);
+          });
+      }, []);
+      
+      
+
+    // event handlers
     async function handleSearch(e) {
         e.preventDefault();
         setError('');
@@ -166,12 +189,38 @@ function Search(user) {
                     console.error('Error creating LIKED relationship:', likeError);
                 }
             }
-    
-    
+
+
         } catch (err) {
             alert(err.message);
         }
     }
+
+    const handleCreatePlayer = async (playerData) => {
+        try {
+            const response = await fetch('/api/players/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(playerData),
+            });
+
+            const text = await response.text();
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${text}`);
+            }
+
+            const data = JSON.parse(text);
+            console.log('Player created:', data);
+            alert(`Player ${data.player.name} created successfully!`);
+        } catch (err) {
+            console.error('Create player error:', err.message);
+            alert('Failed to create player.');
+        }
+    };
+
 
     // search form
     return (
@@ -250,6 +299,17 @@ function Search(user) {
                         Add "{query}" as a new person
                     </button>
                 </>
+            )}
+
+            {randomPlayers.length > 0 && (
+                <div className="mt-4">
+                    <h3 className="text-sm font-semibold">Explore Other Players</h3>
+                    <ul className="list-disc list-inside">
+                        {randomPlayers.map((player) => (
+                            <li key={player.username || player.name || index}>{player.name}</li>
+                        ))}
+                    </ul>
+                </div>
             )}
 
             {showForm && (

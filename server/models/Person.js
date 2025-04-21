@@ -1,4 +1,8 @@
 class Person {
+    constructor(driver) {
+        this.driver = driver;
+    }
+
     static queries = {
         createOrUpdate: `
             MERGE (p:Person {name: $name})
@@ -10,10 +14,6 @@ class Person {
             RETURN p
         `
     };
-
-    constructor(driver) {
-        this.driver = driver;
-    }
 
     async createOrUpdate({ name, sport }) {
         const session = this.driver.session();
@@ -137,7 +137,7 @@ class Person {
 
     // accept friend request
     async acceptFriendRequest(fromUsername, toUsername) {
-        const session = driver.session();
+        const session = this.driver.session();
 
         try {
             const query = `
@@ -152,7 +152,7 @@ class Person {
 
     // incoming pending requests
     async getIncomingFriendRequests(username) {
-        const session = driver.session();
+        const session = this.driver.session();
         try {
             const result = await session.run(`
         MATCH (other:Person)-[r:FRIENDS_WITH {status: "pending"}]->(me:Person {username: $username})
@@ -167,7 +167,7 @@ class Person {
 
     // outgoing pending requests
     async getOutgoingFriendRequests(username) {
-        const session = driver.session();
+        const session = this.driver.session();
         try {
             const result = await session.run(`
         MATCH (me:Person {username: $username})-[r:FRIENDS_WITH {status: "pending"}]->(other:Person)
@@ -182,7 +182,7 @@ class Person {
 
     // accepted friends
     async getAcceptedFriends(username) {
-        const session = driver.session();
+        const session = this.driver.session();
         try {
             const result = await session.run(`
         MATCH (me:Person {username: $username})-[r:FRIENDS_WITH {status: "accepted"}]->(other:Person)
@@ -195,6 +195,7 @@ class Person {
         }
     }
 
+    
     async searchUsersByName(query) {
         const session = driver.session();
         try {

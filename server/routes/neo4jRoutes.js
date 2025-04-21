@@ -29,15 +29,15 @@ router.get('/session', (req, res) => {
 });
 
 // nodes
-router.get('/nodes', async (req, res) => {
-  try {
-    const graph = await graphService.buildBasicGraph();
-    res.json(graph);
-  } catch (err) {
-    console.error('Query error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
+// router.get('/nodes', async (req, res) => {
+//   try {
+//     const graph = await graphService.buildBasicGraph();
+//     res.json(graph);
+//   } catch (err) {
+//     console.error('Query error:', err);
+//     res.status(500).json({ error: 'Internal Server Error' });
+//   }
+// });
 
 // Athletes route
 router.get('/athletes', async (req, res) => {
@@ -45,7 +45,7 @@ router.get('/athletes', async (req, res) => {
   try {
     session = driver.session();
     const result = await session.run(
-      'MATCH (a:Athlete) RETURN a.athleteId AS id, a.name AS name, a.profileImage AS image'
+      `MATCH (a:Person) WHERE 'athlete' IN a.roles RETURN a.uuid AS id, a.name AS name, a.profileImage AS image`
     );
 
     const athletes = result.records.map(record => ({
@@ -62,6 +62,40 @@ router.get('/athletes', async (req, res) => {
     if (session) {
       await session.close();
     }
+  }
+});
+
+router.post('/athlete/create', async (req, res) => {
+  try {
+    const { name, sport, nationality } = req.body;
+
+    if (!name || !sport || !nationality) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const session = driver.session();
+    const result = await session.run(
+      `
+      CREATE (p:Person:Athlete {
+        name: $name,
+        sport: $sport,
+        nationality: $nationality,
+        roles: ['athlete'],
+        gender: $gender,
+        profileImage: $profileImage,
+        birthDate: $birthDate
+      })
+      RETURN p
+      `,
+      { name, sport, nationality, gender, profileImage, birthDate }
+    );
+
+    const createdPlayer = result.records[0].get('p').properties;
+
+    res.json({ success: true, player: createdPlayer });
+  } catch (err) {
+    console.error('Error creating player:', err);
+    res.status(500).json({ error: 'Failed to create player' });
   }
 });
 
@@ -420,26 +454,30 @@ router.get('/friends/pending-incoming/:username', async (req, res) => {
 });
 
 // outgoing friend requests
-router.get('/friends/pending-outgoing/:username', isAuthenticated, async (req, res) => {
-  try {
-    const results = await personModel.getOutgoingFriendRequests(req.params.username);
-    res.json({ outgoing: results });
-  } catch (err) {
-    console.error('Error getting outgoing requests:', err);
-    res.status(500).json({ error: 'Failed to fetch outgoing requests' });
-  }
-});
+router.get('/friends/pending-outgoing/:username',
+  //isAuthenticated, 
+  async (req, res) => {
+    try {
+      const results = await personModel.getOutgoingFriendRequests(req.params.username);
+      res.json({ outgoing: results });
+    } catch (err) {
+      console.error('Error getting outgoing requests:', err);
+      res.status(500).json({ error: 'Failed to fetch outgoing requests' });
+    }
+  });
 
 // accepted friends
-router.get('/friends/accepted/:username', isAuthenticated, async (req, res) => {
-  try {
-    const results = await personModel.getAcceptedFriends(req.params.username);
-    res.json({ friends: results });
-  } catch (err) {
-    console.error('Error getting accepted friends:', err);
-    res.status(500).json({ error: 'Failed to fetch friends' });
-  }
-});
+router.get('/friends/accepted/:username',
+  // isAuthenticated, 
+  async (req, res) => {
+    try {
+      const results = await personModel.getAcceptedFriends(req.params.username);
+      res.json({ friends: results });
+    } catch (err) {
+      console.error('Error getting accepted friends:', err);
+      res.status(500).json({ error: 'Failed to fetch friends' });
+    }
+  });
 
 router.get('/user-friends/:username', isAuthenticated, async (req, res) => {
   const { username } = req.params;
@@ -476,7 +514,7 @@ router.get('/user-friends/:username', isAuthenticated, async (req, res) => {
 
 router.get('/top-users', async (req, res) => {
   try {
-    const users = await personController.getTopUsers.bind(personController);
+    const users = await personService.getTopUsers();
     res.json(users);
   } catch (error) {
     console.error('[SERVER] Error fetching top users:', error);
@@ -514,5 +552,24 @@ router.get('/past-events', async (req, res) => {
     res.status(500).json({ error: 'Past event fetch error' });
   }
 });
+
+router.get('/athlete/random', async (req, res) => {
+  try {
+    const session = driver.session();
+    const result = await session.run(`
+      MATCH (p:Person)
+      WHERE 'athlete' IN p.roles
+      WITH p, rand() AS r
+      RETURN p LIMIT 5
+    `);
+
+    const players = result.records.map(record => record.get('p').properties);
+    res.json(players);
+  } catch (err) {
+    console.error('Failed to fetch random players:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 module.exports = router;

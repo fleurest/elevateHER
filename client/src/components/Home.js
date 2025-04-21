@@ -24,6 +24,7 @@ function HomePage({ handleLogout, user }) {
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
 
+
   useEffect(() => {
     fetch('/api/calendar-events')
       .then(res => res.json())
@@ -79,8 +80,16 @@ function HomePage({ handleLogout, user }) {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`/api/all-users`);
-      const data = await res.json();
+      const res = await fetch(`/api/top-users`);
+
+      const text = await res.text(); //
+      console.log('Raw response from /api/top-users:', text);
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`);
+      }
+
+      const data = JSON.parse(text);
       setAllPeople(data);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -98,13 +107,6 @@ function HomePage({ handleLogout, user }) {
   }
   const [tomorrowEvents, setTomorrowEvents] = useState([]);
   const [events, setEvents] = useState([]);
-
-  useEffect(() => {
-    fetch('/api/calendar/events/tomorrow')
-      .then(res => res.json())
-      .then(data => setTomorrowEvents(data))
-      .catch(err => console.error('Error fetching events:', err));
-  }, []);
 
   useEffect(() => {
     fetch('/api/calendar-events')
@@ -142,13 +144,21 @@ function HomePage({ handleLogout, user }) {
   const fetchSuggestedFriends = async () => {
     try {
       const res = await fetch('/api/top-users');
-      const data = await res.json();
-      setFriendResults(Array.isArray(data) ? data : []);
+
+      const text = await res.text();
+      console.log('Raw response from /api/top-users', text);
+
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`);
+      }
+
+      const data = JSON.parse(text);
+      setSuggestedFriends(data);
     } catch (err) {
       console.error('Could not fetch friend suggestions:', err);
-      setFriendResults([]);
     }
   };
+
 
   useEffect(() => {
     fetchSuggestedFriends();
@@ -670,8 +680,7 @@ function HomePage({ handleLogout, user }) {
             ))}
             <ul className="list-disc pl-5">
               {suggestedFriends.map((friend, index) => (
-                <li key={index}>{friend.username}</li>
-              ))}
+                <li key={friend.id || friend.username || index}>{friend.username}</li>))}
             </ul>
           </ul>
         </div>
@@ -697,34 +706,6 @@ function HomePage({ handleLogout, user }) {
           </div>
         ) : null}
       </div>
-      {events && (
-        <div className="calendar-section">
-          <h2>Upcoming Events</h2>
-          <ul>
-            {Array.isArray(events) && events.map(event => (
-              <div key={event.id}>
-                <p>{event.summary}</p>
-                <p>{event.start?.dateTime || event.start?.date}</p>
-              </div>
-            ))}
-          </ul>
-        </div>
-      )}
-      {tomorrowEvents.length > 0 && (
-        <div className="mt-4 p-3 bg-white rounded shadow-md max-w-md">
-          <h3 className="text-lg font-semibold mb-2">Tomorrow's Events</h3>
-          <ul className="list-disc ml-5 text-sm">
-            {tomorrowEvents.map((event) => (
-              <li key={event.id}>
-                <strong>{event.summary}</strong>{' '}
-                {event.start.dateTime
-                  ? new Date(event.start.dateTime).toLocaleTimeString()
-                  : 'All day'}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
       <div className="flex flex-col md:flex-row gap-6 mt-6">
         <div className="flex-1 bg-white p-4 rounded shadow">
           <h2 className="text-lg font-semibold mb-3">Upcoming Events</h2>

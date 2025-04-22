@@ -82,38 +82,42 @@ function AppContent() {
 
   return (
     <>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />
-          }
-        />
-        <Route
-          path="/login"
-          element={<Login onLogin={handleLogin} />}
-        />
-        <Route
-          path="/dashboard"
-          element={isAuthenticated ? <Dashboard handleLogout={handleLogout} /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/home"
-          element={isAuthenticated ? <Home handleLogout={handleLogout} user={user} /> : <Navigate to="/login" replace />} />
-        <Route
-          path="/profile"
-          element={
-            isAuthenticated && user ? (
-              <Profile handleLogout={handleLogout} username={user.username} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route path="/search" element={<Search />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-
+      {isLoading ? (
+        <div>Loading...</div>
+      ) : (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />
+            }
+          />
+          <Route
+            path="/login"
+            element={<Login onLogin={handleLogin} />}
+          />
+          <Route
+            path="/dashboard"
+            element={isAuthenticated ? <Dashboard handleLogout={handleLogout} /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/home"
+            element={isAuthenticated ? <Home handleLogout={handleLogout} user={user} /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/profile"
+            element={
+              isAuthenticated && user ? (
+                <Profile handleLogout={handleLogout} username={user.username} />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route path="/search" element={<Search />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      )}
     </>
   );
 }

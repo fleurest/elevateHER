@@ -20,14 +20,6 @@ const personService = new PersonService(personModel, driver);
 const personController = new PersonController(personService);
 const { isAuthenticated, isAdmin } = require('../authentication');
 
-router.get('/session', (req, res) => {
-  if (req.session && req.session.user) {
-    res.json({ user: req.session.user });
-  } else {
-    res.status(401).json({ error: 'Not authenticated' });
-  }
-});
-
 // nodes
 // router.get('/nodes', async (req, res) => {
 //   try {
@@ -174,6 +166,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   console.log('>>> LOGIN route hit');
   console.log('>>> request body:', req.body);
+
   const username = sanitizeUsername(req.body.username);
   const password = sanitizePassword(req.body.password);
   let session = null;

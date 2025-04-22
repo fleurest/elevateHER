@@ -7,6 +7,7 @@ const { verifyConnection, driver } = require('./neo4j');
 const neo4jRoutes = require('./routes/neo4jRoutes');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const { redirect } = require('react-router-dom');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,13 +26,13 @@ app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  name: 'sessionId',
   cookie: {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax'
   },
-  name: 'sessionId'
 }));
 
 app.use('/api', neo4jRoutes);

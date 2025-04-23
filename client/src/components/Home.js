@@ -687,25 +687,6 @@ function HomePage({ handleLogout, user }) {
       </div>
 
       <div className="home-page-column home-page-right">
-        {editProfile ? (
-          <EditProfileForm
-            user={editableUser}
-            setUser={setEditableUser}
-            onCancel={() => setEditProfile(false)}
-            onSave={(updatedUser) => {
-              setEditProfile(false);
-              setEditableUser(updatedUser);
-            }}
-          />
-        ) : selectedNode ? (
-          <div>
-            <h2>Details</h2>
-            {Object.entries(selectedNode).map(([key, value]) => (
-              <p key={key}><strong>{key}:</strong> {JSON.stringify(value)}</p>
-            ))}
-          </div>
-        ) : null}
-      </div>
       <div className="flex flex-col md:flex-row gap-6 mt-6">
         <div className="flex-1 bg-white p-4 rounded shadow">
           <h2 className="text-lg font-semibold mb-3">Upcoming Events</h2>
@@ -721,6 +702,19 @@ function HomePage({ handleLogout, user }) {
           ) : (
             <p>No upcoming events found.</p>
           )}
+          <div className="calendar-container">
+
+            <iframe
+              src="https://calendar.google.com/calendar/embed?src=c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc%40group.calendar.google.com&ctz=America%2FNew_York"
+              style={{ border: 0 }}
+              width="100%"
+              height="600"
+              frameBorder="0"
+              scrolling="no"
+              title="Google Calendar"
+            ></iframe>
+
+          </div>
         </div>
 
         <div className="flex-1 bg-white p-4 rounded shadow">
@@ -742,6 +736,27 @@ function HomePage({ handleLogout, user }) {
         </div>
       </div>
 
+        {editProfile ? (
+          <EditProfileForm
+            user={editableUser}
+            setUser={setEditableUser}
+            onCancel={() => setEditProfile(false)}
+            onSave={(updatedUser) => {
+              setEditProfile(false);
+              setEditableUser(updatedUser);
+            }}
+          />
+        ) : selectedNode ? (
+          <div>
+            <h2>Details</h2>
+            {Object.entries(selectedNode).map(([key, value]) => (
+              <p key={key}><strong>{key}:</strong> {JSON.stringify(value)}</p>
+            ))}
+          </div>
+        ) : null}
+
+      </div>
+      
     </div>
   );
 }

@@ -59,9 +59,9 @@ router.get('/athletes', async (req, res) => {
 
 router.post('/athlete/create', async (req, res) => {
   try {
-    const { name, sport, nationality } = req.body;
+    const { name, sport, nationality, roles, gender, profileImage, birthDate } = req.body;
 
-    if (!name || !sport || !nationality) {
+    if (!name || !sport) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -79,7 +79,7 @@ router.post('/athlete/create', async (req, res) => {
       })
       RETURN p
       `,
-      { name, sport, nationality, gender, profileImage, birthDate }
+      { name, sport, nationality, roles, gender, profileImage, birthDate }
     );
 
     const createdPlayer = result.records[0].get('p').properties;
@@ -118,7 +118,6 @@ router.get('/graph/filtered', async (req, res) => {
 router.post('/register', async (req, res) => {
   const username = sanitizeUsername(req.body.username);
   const password = sanitizePassword(req.body.password);
-  const session = null;
 
   if (username.length < 4) {
     return res.status(400).json({ error: 'Username must be at least 4 characters' });
@@ -132,7 +131,7 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    session = driver.session();
+    let session = driver.session();
     // Check if user already exists
     const existing = await session.run(
       'MATCH (p:Person {username: $username}) RETURN p',
@@ -148,8 +147,8 @@ router.post('/register', async (req, res) => {
 
     // Create user
     await session.run(
-      'CREATE (p:Person {username: $username, password: $password, roles: "user"})',
-      { username, password: hash }
+      'CREATE (p:Person {username: $username, password: $password, roles: $roles})',
+      { username, password: hash, roles: "user" }
     );
 
     res.status(201).json({ message: 'User registered successfully' });

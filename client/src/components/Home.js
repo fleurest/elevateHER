@@ -4,7 +4,7 @@ import cytoscape from 'cytoscape';
 import HamburgerMenu from './HamburgerMenu';
 import logo from '../assets/logo-default-profile.png';
 import { Link } from 'react-router-dom';
-import EditProfileForm from '../components/EditProfileForm';
+import EditProfileForm from './EditProfileForm';
 
 import homeIcon from '../assets/icon_home.png';
 import playersIcon from '../assets/icon_player.png';

@@ -87,6 +87,7 @@ const Login = ({ onLogin }) => {
         <input
           type="text"
           placeholder="Username"
+          name="username"
           value={username}
           onChange={(e) => validateUsername(e.target.value)}
           className="auth-input auth-input-user"
@@ -94,6 +95,7 @@ const Login = ({ onLogin }) => {
         <input
           type={showPassword ? "text" : "password"}
           placeholder="Password"
+          name="password"
           value={password}
           onChange={(e) => {
             const input = e.target.value;
@@ -129,6 +131,7 @@ const Login = ({ onLogin }) => {
           <button
             onClick={handleLogin}
             className="auth-button"
+            type='submit'
             disabled={!usernameValid || !passwordValid}
           >
             Login

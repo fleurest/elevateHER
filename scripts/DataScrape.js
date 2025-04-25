@@ -1,5 +1,4 @@
-require('dotenv').config();
-
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const puppeteer = require('puppeteer');
 const axios = require('axios');
 
@@ -9,9 +8,23 @@ const API_BASE = 'http://localhost:3000/api';
 const loginAndGetCookies = async (page) => {
   await page.goto('http://localhost:3000/login', { waitUntil: 'networkidle2' });
 
-  await page.type('input[name=username]', process.env.API_USERNAME);
-  await page.type('input[name=password]', process.env.API_PASSWORD);
+  const username = process.env.API_USERNAME;
+  const password = process.env.API_PASSWORD;
+  console.log("USERNAME:", process.env.API_USERNAME);
+  console.log("PASSWORD:", process.env.API_PASSWORD ? '●●●●●●●' : 'undefined');
+
+  if (!username || !password) {
+    throw new Error("Missing API_USERNAME or API_PASSWORD in .env");
+  }
+
+  await page.type('input[name=username]', username);
+  await page.type('input[name=password]', password);
+
   await page.click('button[type=submit]');
+
+  if (!username || !password) {
+    throw new Error("Missing API_USERNAME or API_PASSWORD in .env");
+  }
 
   await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
@@ -53,59 +66,60 @@ const loginAndGetCookies = async (page) => {
         const athlete = await page.evaluate(() => {
           const nameElem = document.querySelector('h1, div.font-display, div[class*="font-display"]');
           const name = nameElem ? nameElem.textContent.trim() : null;
-        
+
           const imgElem = document.querySelector('img[src*="Headshot"]');
           const img = imgElem ? imgElem.src.trim() : null;
 
-            return {
-              name,
-              sport: 'Volleyball',
-              nationality: 'Unknown',
-              gender: 'Female',
-              roles: ['athlete'],
-              primaryRole: 'athlete',
-              birthDate: null,
-              profileImage: img || null
-            };
+          return {
+            name,
+            sport: 'Volleyball',
+            nationality: 'Unknown',
+            gender: 'Female',
+            roles: ['athlete'],
+            primaryRole: 'athlete',
+            birthDate: null,
+            profileImage: img || null
+          };
+        });
+
+        if (!athlete.name) {
+          console.warn('Skipping unknown athlete at:', athleteUrl);
+          continue;
+        }
+
+        try {
+          // Check for existing
+          const res = await axios.get(`${API_BASE}/search`, {
+            params: { query: athlete.name, sport: athlete.sport },
+            withCredentials: true
           });
 
-          if (!athlete.name) {
-            console.warn('Skipping unknown athlete at:', athleteUrl);
+          const exists = res.data?.players?.some(
+            p => p.name.toLowerCase() === athlete.name.toLowerCase()
+          );
+
+          if (exists) {
+            console.log(`Already exists: ${athlete.name}`);
             continue;
           }
 
-          try {
-            // Check for existing
-            const res = await axios.get(`${API_BASE}/search`, {
-              params: { query: athlete.name, sport: athlete.sport },
-              withCredentials: true
-            });
+          await axios.post(`${API_BASE}/athlete/create`, athlete, {
+            headers: { 'Content-Type': 'application/json' },
+            withCredentials: true
+          });
 
-            const exists = res.data?.players?.some(
-              p => p.name.toLowerCase() === athlete.name.toLowerCase()
-            );
-
-            if (exists) {
-              console.log(`Already exists: ${athlete.name}`);
-              continue;
-            }
-
-            await axios.post(`${API_BASE}/athlete/create`, athlete, {
-              headers: { 'Content-Type': 'application/json' },
-              withCredentials: true
-            });
-
-            console.log(`✅ Uploaded: ${athlete.name}`);
-          } catch (err) {
-            console.error(`❌ Failed to upload ${athlete.name}:`, err.response?.data || err.message);
-          }
+          console.log(`✅ Uploaded: ${athlete.name}`);
+        } catch (err) {
+          console.error(`❌ Failed to upload ${athlete.name}:`, err.response?.data || err.message);
         }
+      }
     }
 
-      console.log('Finished scraping LOVB athletes');
-    } catch (err) {
-      console.error('Script failed:', err.message);
-    } finally {
-      await browser.close();
-    }
-  }) ();
+    console.log('Finished scraping LOVB athletes');
+  } catch (err) {
+    console.error('Script failed:', err.message);
+    console.error(err.stack);
+  } finally {
+    await browser.close();
+  }
+})();

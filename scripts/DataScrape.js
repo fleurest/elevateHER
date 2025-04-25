@@ -54,6 +54,37 @@ const loginAndGetCookies = async (page) => {
       console.log(`Visiting team: ${teamUrl}`);
       await page.goto(teamUrl, { waitUntil: 'networkidle2' });
 
+      const teamMeta = await page.evaluate(() => {
+        const name = document.querySelector('h1')?.textContent?.trim() || null;
+        const description = document.querySelector('meta[name="description"]')?.content || '';
+        const image = document.querySelector('img[src*="Team"]')?.src || null;
+
+        return {
+          name,
+          alternateName: null,
+          sport: "Volleyball",
+          foundingDate: null,
+          location: "United States",
+          description,
+          roles: ["team"],
+          sameAs: window.location.href,
+          image,
+          imageLicense: "© League One Volleyball Inc. (LOVB)",
+          imageCopyright: "League One Volleyball Inc. (LOVB)"
+        };
+      });
+
+      // Upload team
+      try {
+        const teamRes = await axios.post(`${API_BASE}/team/upsert`, teamMeta, {
+          headers: { 'Content-Type': 'application/json' },
+          withCredentials: true
+        });
+        console.log(`Team uploaded: ${teamMeta.name}`);
+      } catch (err) {
+        console.error(`Failed to upload team '${teamMeta.name}':`, err.response?.data || err.message);
+      }
+
       const athleteUrls = await page.evaluate(() => {
         const links = Array.from(document.querySelectorAll('a[href*="/athletes/"]'));
         return Array.from(new Set(links.map(link => link.href)));
@@ -109,8 +140,19 @@ const loginAndGetCookies = async (page) => {
           });
 
           console.log(`✅ Uploaded: ${athlete.name}`);
+          await axios.post(`${API_BASE}/team/link-athlete`, {
+            athleteName: athlete.name,
+            teamName: teamMeta.name,
+            sport: teamMeta.sport,
+            sportLabel: "Sport"
+          }, {
+            headers: { 'Content-Type': 'application/json' },
+            withCredentials: true
+          });
+
+          console.log(`🔗 Linked ${athlete.name} to team '${teamMeta.name}' and sport '${teamMeta.sport}'`);
         } catch (err) {
-          console.error(`❌ Failed to upload ${athlete.name}:`, err.response?.data || err.message);
+          console.error(`❌ Failed to process ${athlete.name}:`, err.response?.data || err.message);
         }
       }
     }

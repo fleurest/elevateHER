@@ -12,11 +12,18 @@ console.log('Looking for Graph at:', path.resolve(__dirname, '../models/Graph'))
 const Graph = require('../models/Graph');
 const GraphService = require('../services/GraphService');
 const { getCalendarEvents, listPastEvents, listUpcomingEvents } = require('../services/EventCalService');
+const Organisation = require('../models/Organisation');
+const OrganisationService = require('../services/OrganisationService');
+const OrganisationController = require('../controllers/OrganisationController');
+const personModel = new Person(driver);
+const personService = new PersonService(personModel, driver);
+const organisationModel = new Organisation(driver);
+const organisationService = new OrganisationService(organisationModel);
+const organisationController = new OrganisationController(organisationService, personService);
 
 const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
-const personModel = new Person(driver);
-const personService = new PersonService(personModel, driver);
+
 const personController = new PersonController(personService);
 const { isAuthenticated, isAdmin } = require('../authentication');
 
@@ -90,6 +97,9 @@ router.post('/athlete/create', async (req, res) => {
     res.status(500).json({ error: 'Failed to create player' });
   }
 });
+
+router.post('/team/upsert', (req, res) => organisationController.upsert(req, res));
+router.post('/team/link-athlete', (req, res) => organisationController.link(req, res));
 
 // graph
 router.get('/graph', async (req, res) => {

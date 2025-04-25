@@ -117,19 +117,53 @@ class PersonService {
     async getRandomPlayers(limit = 5) {
         const session = this.driver.session();
         try {
-          const result = await session.run(
-            `MATCH (p:Person)
+            const result = await session.run(
+                `MATCH (p:Person)
              WHERE 'athlete' IN p.roles
              WITH p, rand() AS r
              RETURN p ORDER BY r LIMIT $limit`,
-            { limit: neo4j.int(limit) }
+                { limit: neo4j.int(limit) }
+            );
+            return result.records.map(record => record.get('p').properties);
+        } finally {
+            await session.close();
+        }
+    }
+    async linkAthleteToTeam(athleteName, teamName) {
+        const session = this.driver.session();
+        try {
+            await session.run(
+                `
+            MATCH (a:Person {name: $athleteName})
+            MATCH (t:Organization {name: $teamName})
+            MERGE (a)-[:PARTICIPATES_IN]->(t)
+            MERGE (s:Sport {name: "Volleyball", label: "Sport"})
+            MERGE (t)-[:PARTICIPATES_IN]->(s)
+            `,
+                { athleteName, teamName }
+            );
+        } finally {
+            await session.close();
+        }
+    }
+
+    async linkAthleteToTeam(athleteName, teamName, sport = "Volleyball", sportLabel = "Sport") {
+        const session = this.driver.session();
+        try {
+          await session.run(
+            `
+            MATCH (a:Person {name: $athleteName})
+            MATCH (t:Organisation {name: $teamName})
+            MERGE (a)-[:PARTICIPATES_IN]->(t)
+            MERGE (s:Sport {name: $sport, label: $sportLabel})
+            MERGE (t)-[:PARTICIPATES_IN]->(s)
+            `,
+            { athleteName, teamName, sport, sportLabel }
           );
-          return result.records.map(record => record.get('p').properties);
         } finally {
           await session.close();
         }
       }
-      
 
 }
 

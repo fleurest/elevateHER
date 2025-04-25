@@ -15,10 +15,39 @@ class Person {
         `
     };
 
-    async createOrUpdate({ name, sport }) {
+    async createOrUpdateAthlete({
+        name,
+        sport,
+        nationality,
+        gender,
+        profileImage,
+        birthDate
+    }) {
         const session = this.driver.session();
         try {
-            const result = await session.run(Person.queries.createOrUpdate, { name, sport });
+            const newRole = 'athlete';
+            const result = await session.run(
+                `
+                MERGE (p:Person {name: $name})
+                ON CREATE SET
+                  p:Athlete = true,
+                  p.roles = [$newRole],
+                  p.sport = $sport,
+                  p.nationality = $nationality,
+                  p.gender = $gender,
+                  p.profileImage = $profileImage,
+                  p.birthDate = $birthDate
+                ON MATCH SET
+                  p.sport         = CASE WHEN p.sport         <> $sport         THEN $sport         ELSE p.sport         END,
+                  p.nationality   = CASE WHEN p.nationality   <> $nationality   THEN $nationality   ELSE p.nationality   END,
+                  p.gender        = CASE WHEN p.gender        <> $gender        THEN $gender        ELSE p.gender        END,
+                  p.profileImage  = CASE WHEN p.profileImage  <> $profileImage  THEN $profileImage  ELSE p.profileImage  END,
+                  p.birthDate     = CASE WHEN p.birthDate     <> $birthDate     THEN $birthDate     ELSE p.birthDate     END,
+                  p.roles         = CASE WHEN NOT $newRole IN p.roles THEN p.roles + $newRole ELSE p.roles END
+                RETURN p
+                `,
+                { name, sport, nationality, gender, profileImage, birthDate, newRole }
+            );
             return result.records[0].get('p').properties;
         } finally {
             await session.close();
@@ -195,30 +224,30 @@ class Person {
         }
     }
 
-    
+
     async searchUsersByName(query) {
         const session = driver.session();
         try {
-          const cypher = `
+            const cypher = `
             MATCH (p:Person)
             WHERE toLower(p.name) CONTAINS toLower($query)
               AND "user" IN p.roles
             RETURN p
           `;
-          const result = await session.run(cypher, { query });
-          return result.records.map(record => {
-            const node = record.get('p');
-            return {
-              id: node.identity.toNumber(),
-              ...node.properties
-            };
-          });
+            const result = await session.run(cypher, { query });
+            return result.records.map(record => {
+                const node = record.get('p');
+                return {
+                    id: node.identity.toNumber(),
+                    ...node.properties
+                };
+            });
         } finally {
-          await session.close();
+            await session.close();
         }
-      }
+    }
 
-      async getSuggestedUsers(excludeUsername, limit = 10) {
+    async getSuggestedUsers(excludeUsername, limit = 10) {
         const session = this.driver.session();
         try {
             const result = await session.run(

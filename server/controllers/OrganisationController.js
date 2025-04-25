@@ -22,6 +22,17 @@ class OrganisationController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    async linkTeamToLeague(req, res) {
+        const { teamName, leagueName } = req.body;
+        try {
+          await this.organisationService.linkTeamToLeague(teamName, leagueName);
+          res.status(200).json({ message: `${teamName} linked to league ${leagueName}` });
+        } catch (error) {
+          res.status(500).json({ error: error.message });
+        }
+      }
+      
 }
 
 module.exports = OrganisationController;

@@ -75,15 +75,22 @@ router.post('/athlete/create', async (req, res) => {
     const session = driver.session();
     const result = await session.run(
       `
-      CREATE (p:Person:Athlete {
-        name: $name,
-        sport: $sport,
-        nationality: $nationality,
-        roles: ['athlete'],
-        gender: $gender,
-        profileImage: $profileImage,
-        birthDate: $birthDate
-      })
+      MERGE (p:Person {name: $name})
+      ON CREATE SET
+        p:Athlete,
+        p.sport = $sport,
+        p.nationality = $nationality,
+        p.roles = ['athlete'],
+        p.gender = $gender,
+        p.profileImage = $profileImage,
+        p.birthDate = $birthDate
+      ON MATCH SET
+        p.sport = CASE WHEN p.sport <> $sport THEN $sport ELSE p.sport END,
+        p.nationality = CASE WHEN p.nationality <> $nationality THEN $nationality ELSE p.nationality END,
+        p.gender = CASE WHEN p.gender <> $gender THEN $gender ELSE p.gender END,
+        p.profileImage = CASE WHEN p.profileImage <> $profileImage THEN $profileImage ELSE p.profileImage END,
+        p.birthDate = CASE WHEN p.birthDate <> $birthDate THEN $birthDate ELSE p.birthDate END,
+        p.roles = CASE WHEN NOT 'athlete' IN p.roles THEN p.roles + 'athlete' ELSE p.roles END
       RETURN p
       `,
       { name, sport, nationality, roles, gender, profileImage, birthDate }
@@ -100,6 +107,7 @@ router.post('/athlete/create', async (req, res) => {
 
 router.post('/team/upsert', (req, res) => organisationController.upsert(req, res));
 router.post('/team/link-athlete', (req, res) => organisationController.link(req, res));
+router.post('/team/link-league', (req, res) => organisationController.linkTeamToLeague(req, res));
 
 // graph
 router.get('/graph', async (req, res) => {

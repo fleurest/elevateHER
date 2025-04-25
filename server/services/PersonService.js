@@ -16,39 +16,29 @@ class PersonService {
     async createOrUpdatePerson(data) {
         this.validatePersonData(data);
 
-        const cleanedData = {
+        const cleaned = {
             name: data.name.trim(),
             sport: data.sport.trim(),
+            nationality: data.nationality || '',
+            gender: data.gender || '',
+            profileImage: data.profileImage || null,
+            birthDate: data.birthDate || null
         };
 
-        return await this.personModel.createOrUpdate(cleanedData);
+        return await this.personModel.createOrUpdateAthlete(cleaned);
     }
 
     async authenticatePerson(username, password) {
         const personRecord = await this.personModel.findByUser(username);
-        console.log('Retrieved personRecord:', personRecord);
-
-        if (!personRecord) {
-            console.log('No person found with that username.');
-            return { person: null, roles: [] };
-        }
+        if (!personRecord) return { person: null, roles: [] };
 
         const isValid = await bcrypt.compare(password, personRecord.password);
-        console.log('Password valid:', isValid);
+        if (!isValid) return { person: null, roles: [] };
 
-        if (!isValid) {
-            console.log('Password mismatch.');
-            return { person: null, roles: [] };
-        }
-
-        // Structure the person object (you can customize what you expose)
         const { password: _, ...sanitizedPerson } = personRecord;
-
-        return {
-            person: sanitizedPerson,
-            roles: personRecord.roles || []
-        };
+        return { person: sanitizedPerson, roles: personRecord.roles || [] };
     }
+
     async getTopUsers(limit = 5) {
         const session = this.driver.session();
         try {
@@ -129,25 +119,8 @@ class PersonService {
             await session.close();
         }
     }
-    async linkAthleteToTeam(athleteName, teamName) {
-        const session = this.driver.session();
-        try {
-            await session.run(
-                `
-            MATCH (a:Person {name: $athleteName})
-            MATCH (t:Organization {name: $teamName})
-            MERGE (a)-[:PARTICIPATES_IN]->(t)
-            MERGE (s:Sport {name: "Volleyball", label: "Sport"})
-            MERGE (t)-[:PARTICIPATES_IN]->(s)
-            `,
-                { athleteName, teamName }
-            );
-        } finally {
-            await session.close();
-        }
-    }
 
-    async linkAthleteToTeam(athleteName, teamName, sport = "Volleyball", sportLabel = "Sport") {
+    async linkAthleteToTeam(athleteName, teamName, sport = "unknown", sportLabel = "Sport") {
         const session = this.driver.session();
         try {
           await session.run(

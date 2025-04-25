@@ -46,6 +46,24 @@ class Organisation {
         await session.close();
       }
     }
+
+    async linkTeamToLeague(teamName, leagueName) {
+        const session = this.driver.session();
+        try {
+          await session.run(
+            `
+            MERGE (t:Organisation {name: $teamName})
+            MERGE (l:Organisation {name: $leagueName})
+            ON CREATE SET l.roles = ['league']
+            MERGE (t)-[:PARTICIPATES_IN]->(l)
+            `,
+            { teamName, leagueName }
+          );
+        } finally {
+          await session.close();
+        }
+      }
+      
   }
   
   module.exports = Organisation;

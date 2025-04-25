@@ -10,6 +10,11 @@ class OrganisationService {
     async linkAthleteToTeam(athleteName, teamName) {
       return this.organisationModel.linkAthleteToTeam(athleteName, teamName);
     }
+
+    async linkTeamToLeague(teamName, leagueName) {
+        return this.organisationModel.linkTeamToLeague(teamName, leagueName);
+      }
+      
   }
   
   module.exports = OrganisationService;

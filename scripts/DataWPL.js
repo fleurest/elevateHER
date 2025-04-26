@@ -8,7 +8,7 @@ const API_BASE = 'http://localhost:3000/api';
 (async () => {
     const cluster = await Cluster.launch({
         concurrency: Cluster.CONCURRENCY_PAGE,
-        maxConcurrency: 5,
+        maxConcurrency: 3,
         puppeteerOptions: { headless: true }
     });
 
@@ -68,59 +68,69 @@ const API_BASE = 'http://localhost:3000/api';
 
         } else if (type === 'player') {
             console.log(`Scraping player: ${url}`);
-            await page.goto(url, { waitUntil: 'domcontentloaded' });
-
-            await page.waitForSelector('#playerMore', { timeout: 15000 });
-
-            const player = await page.evaluate(() => {
-                const firstName = document.querySelector('#playerMore .first-name')?.textContent.trim() || '';
-                const lastName = document.querySelector('#playerMore .last-name')?.textContent.trim() || '';
-                const name = `${firstName} ${lastName}`.trim();
-
-                const position = document.querySelector('#playerMore .player-role .role')?.textContent.trim() || '';
-                const nationality = document.querySelector('#playerMore .player-country .country-name')?.textContent.trim() || '';
-                const dobText = document.querySelector('#playerMore .player-meta-item.born .player-meta-value')?.textContent.trim() || null;
-
-                const birthDate = dobText ? new Date(dobText).toISOString().split('T')[0] : null;
-                const profileImage = document.querySelector('#playerMore .player-thumbnail img')?.src || null;
-
-                return { name, birthDate, nationality, position, profileImage };
-            });
-
-            if (!player.name) return console.log(`Skipping player without name.`);
-
-            const payload = {
-                name: player.name,
-                sport: 'Cricket',
-                nationality: player.nationality,
-                gender: 'Female',
-                roles: ['athlete'],
-                primaryRole: 'athlete',
-                birthDate: player.birthDate,
-                profileImage: player.profileImage,
-                position: player.position
-            };
-
-            console.log('Uploading:', payload);
-
+            
+            let existingPlayer = null;
+        
             try {
-                const res = await axios.get(`${API_BASE}/search`, {
-                    params: { query: player.name, sport: 'Cricket' },
+                await page.goto(url, { waitUntil: 'domcontentloaded' });
+                await page.waitForSelector('#playerMore', { timeout: 15000 });
+        
+                const player = await page.evaluate(() => {
+                    const firstName = document.querySelector('#playerMore .first-name')?.textContent.trim() || '';
+                    const lastName = document.querySelector('#playerMore .last-name')?.textContent.trim() || '';
+                    const name = `${firstName} ${lastName}`.trim();
+                    const position = document.querySelector('#playerMore .player-role .role')?.textContent.trim() || '';
+                    const nationality = document.querySelector('#playerMore .player-country .country-name')?.textContent.trim() || '';
+                    const dobText = document.querySelector('#playerMore .player-meta-item.born .player-meta-value')?.textContent.trim() || null;
+                    const birthDate = dobText ? new Date(dobText).toISOString().split('T')[0] : null;
+                    const profileImage = document.querySelector('#playerMore .player-thumbnail img')?.src || null;
+                    return { name, birthDate, nationality, position, profileImage };
+                });
+        
+                if (!player.name) {
+                    console.log(`Skipping player with no name: ${url}`);
+                    return;
+                }
+        
+                const payload = {
+                    name: player.name,
+                    sport: 'Cricket',
+                    nationality: player.nationality || '',
+                    gender: 'Female',
+                    roles: ['athlete'],
+                    primaryRole: 'athlete',
+                    birthDate: player.birthDate,
+                    profileImage: player.profileImage,
+                    position: player.position
+                };
+        
+                console.log('Uploading:', payload);
+        
+                await new Promise(resolve => setTimeout(resolve, 500));
+        
+                try {
+                    const res = await axios.get(`${API_BASE}/search`, {
+                        params: { query: player.name, sport: 'Cricket' },
+                        withCredentials: true,
+                        timeout: 5000
+                    });
+                    existingPlayer = res.data?.players?.find(p => p.name.toLowerCase() === player.name.toLowerCase());
+                } catch (searchErr) {
+                    console.error(`Search failed for ${player.name}:`, searchErr.response?.status, searchErr.response?.data || searchErr.message);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+        
+                await axios.post(`${API_BASE}/athlete/create`, payload, {
+                    headers: { 'Content-Type': 'application/json' },
                     withCredentials: true
                 });
-
-                const exists = res.data?.players?.some(p => p.name.toLowerCase() === player.name.toLowerCase());
-
-                if (!exists) {
-                    await axios.post(`${API_BASE}/athlete/create`, payload, {
-                        headers: { 'Content-Type': 'application/json' },
-                        withCredentials: true
-                    });
+        
+                if (!existingPlayer) {
                     console.log(`Created athlete: ${player.name}`);
                 } else {
-                    console.log(`Athlete already exists: ${player.name}`);
+                    console.log(`Updated athlete if necessary: ${player.name}`);
                 }
-
+        
                 await axios.post(`${API_BASE}/team/link-athlete`, {
                     athleteName: player.name,
                     teamName: meta.teamName
@@ -128,9 +138,20 @@ const API_BASE = 'http://localhost:3000/api';
                     headers: { 'Content-Type': 'application/json' },
                     withCredentials: true
                 });
-
-                console.log(`🔗 Linked ${player.name} -> ${meta.teamName}`);
-
+    
+                console.log(`Linked ${player.name} -> ${meta.teamName}`);
+        
+                await axios.post(`${API_BASE}/link-to-sport`, {
+                    name: player.name,
+                    type: 'athlete',
+                    sportName: 'Cricket'
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    withCredentials: true
+                });
+        
+                console.log(`Linked athlete ${player.name} -> Cricket`);
+        
                 if (!linkedTeams.has(meta.teamName)) {
                     await axios.post(`${API_BASE}/team/link-league`, {
                         teamName: meta.teamName,
@@ -139,25 +160,27 @@ const API_BASE = 'http://localhost:3000/api';
                         headers: { 'Content-Type': 'application/json' },
                         withCredentials: true
                     });
+        
                     console.log(`Linked ${meta.teamName} -> Women's Premier League (Cricket)`);
-
-                    await axios.post(`${API_BASE}/team/link-sport`, {
-                        teamName: meta.teamName,
-                        sportName: "Cricket",
-                        sportLabel: "Sport"
+        
+                    await axios.post(`${API_BASE}/link-to-sport`, {
+                        name: meta.teamName,
+                        type: 'team',
+                        sportName: 'Cricket'
                     }, {
                         headers: { 'Content-Type': 'application/json' },
                         withCredentials: true
                     });
-                    console.log(`🔗 Linked ${meta.teamName} -> Cricket`);
-
+        
+                    console.log(`Linked ${meta.teamName} (team) -> Cricket`);
                     linkedTeams.add(meta.teamName);
                 }
+        
             } catch (err) {
-                console.error(`❌ Error for ${player.name}:`, err.response?.status, err.response?.data || err.message);
+                console.error(`❌ Error processing player ${meta.playerName}:`, err.response?.status, err.response?.data || err.message);
             }
-
         }
+        
     });
 
     await cluster.queue({

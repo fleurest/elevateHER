@@ -66,7 +66,7 @@ router.get('/athletes', async (req, res) => {
 
 router.post('/athlete/create', async (req, res) => {
   try {
-    const { name, sport, nationality, roles, gender, profileImage, birthDate } = req.body;
+    const { name, sport, nationality, roles = ['athlete'], gender, profileImage = null, birthDate = null, position = null } = req.body;
 
     if (!name || !sport) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -80,28 +80,29 @@ router.post('/athlete/create', async (req, res) => {
         p:Athlete,
         p.sport = $sport,
         p.nationality = $nationality,
-        p.roles = ['athlete'],
+        p.roles = $roles,
         p.gender = $gender,
         p.profileImage = $profileImage,
-        p.birthDate = $birthDate
+        p.birthDate = $birthDate,
+        p.position = $position
       ON MATCH SET
         p.sport = CASE WHEN p.sport <> $sport THEN $sport ELSE p.sport END,
         p.nationality = CASE WHEN p.nationality <> $nationality THEN $nationality ELSE p.nationality END,
         p.gender = CASE WHEN p.gender <> $gender THEN $gender ELSE p.gender END,
         p.profileImage = CASE WHEN p.profileImage <> $profileImage THEN $profileImage ELSE p.profileImage END,
         p.birthDate = CASE WHEN p.birthDate <> $birthDate THEN $birthDate ELSE p.birthDate END,
+        p.position = CASE WHEN coalesce(p.position, '') <> coalesce($position, '') THEN $position ELSE p.position END,
         p.roles = CASE WHEN NOT 'athlete' IN p.roles THEN p.roles + 'athlete' ELSE p.roles END
       RETURN p
       `,
-      { name, sport, nationality, roles, gender, profileImage, birthDate }
+      { name, sport, nationality, roles, gender, profileImage, birthDate, position }
     );
 
     const createdPlayer = result.records[0].get('p').properties;
-
     res.json({ success: true, player: createdPlayer });
   } catch (err) {
-    console.error('Error creating player:', err);
-    res.status(500).json({ error: 'Failed to create player' });
+    console.error('Error creating or updating player:', err);
+    res.status(500).json({ error: 'Failed to create or update player' });
   }
 });
 

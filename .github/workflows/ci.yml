@@ -1,0 +1,18 @@
+stages:
+  - test
+
+cache:
+  paths:
+    - node_modules/
+
+test:
+  image: node:18
+  stage: test
+  before_script:
+    - npm ci
+  script:
+    - npm run test:ci
+  artifacts:
+    paths:
+      - coverage/
+    expire_in: 1 week

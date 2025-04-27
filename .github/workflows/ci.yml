@@ -12,10 +12,13 @@ on:
 
 jobs:
   test:
+    name: Test on Node.js ${{ matrix.node-version }}
     runs-on: ubuntu-latest
+
     strategy:
+      fail-fast: false                
       matrix:
-        node-version: [16.x, 18.x]
+        node-version: ['16.x', '18.x']   
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -35,5 +38,5 @@ jobs:
       - name: Upload coverage report
         uses: actions/upload-artifact@v3
         with:
-          name: coverage-report
+          name: coverage-report-${{ matrix.node-version }}
           path: coverage/

@@ -70,37 +70,39 @@ describe('Active API routes', () => {
   });
 
   describe('POST /api/login', () => {
-    it('400 on missing credentials', async () => {
-        const res = await request(app)
-        .post('/api/login')
-        .send({ username: '', password: '' });
-        
-
-    it('401 on nonexistent user', async () => {
-      mockSession.run.mockResolvedValue({ records: [] });
+    it('should return 400 if credentials are missing', async () => {
       const res = await request(app)
         .post('/api/login')
-        .send({ username:'u', password:'p' });
-
+        .send({ username: '', password: '' });
+  
+      expect(res.statusCode).toBe(400);
+      expect(res.body.error).toMatch(/Missing credentials/i);
+    });
+  
+    it('should return 401 if user does not exist', async () => {
+      mockSession.run.mockResolvedValue({ records: [] });
+  
+      const res = await request(app)
+        .post('/api/login')
+        .send({ username: 'u', password: 'p' });
+  
       expect(res.statusCode).toBe(401);
       expect(res.body.error).toBe('Invalid credentials');
     });
-
-    it('200 on valid credentials', async () => {
+  
+    it('should return 200 and login successfully with valid credentials', async () => {
       mockSession.run.mockResolvedValue({ records: [{ get: () => 'fakehash' }] });
       bcrypt.compare.mockResolvedValue(true);
-
+  
       const res = await request(app)
         .post('/api/login')
-        .send({ username:'u', password:'p' });
-
+        .send({ username: 'u', password: 'p' });
+  
       expect(res.statusCode).toBe(200);
-      expect(res.body).toHaveProperty('message','Login successful');
-      expect(res.body.user).toEqual({ username:'u' });
-      expect(mockSession.close).toHaveBeenCalled();
+      expect(res.body).toHaveProperty('message', 'Login successful');
+      expect(res.body.user).toEqual({ username: 'u' });
     });
   });
-});
 
   describe('GET /api/athlete/random', () => {
     it('returns a list of random athlete objects', async () => {

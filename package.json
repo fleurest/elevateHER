@@ -9,9 +9,7 @@
     "start": "concurrently -k -n SERVER,CLIENT -c green,blue \"npm run start:server\" \"npm run start:client\"",
     "dev:clean": "sh scripts/dev-clean.sh",
     "build": "webpack --mode production",
-    "test": "jest",
-    "cypress:open": "start-server-and-test start http://localhost:3000 \"cypress open\"",
-    "cypress:run": "start-server-and-test start http://localhost:3000 \"cypress run\""
+    "test": "jest"
   },
   "dependencies": {
     "axios": "^1.8.4",
@@ -41,11 +39,12 @@
     "@babel/preset-react"
   ],
   "devDependencies": {
-    "@babel/core": "^7.24.0",
-    "@babel/preset-env": "^7.24.1",
+    "@babel/core": "^7.26.10",
+    "@babel/preset-env": "^7.26.9",
     "@babel/preset-react": "^7.26.3",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
+    "babel-jest": "^29.7.0",
     "babel-loader": "^8.2.5",
     "cross-env": "^7.0.3",
     "css-loader": "^6.10.0",

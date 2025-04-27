@@ -17,6 +17,7 @@ const OrganisationService = require('../services/OrganisationService');
 const OrganisationController = require('../controllers/OrganisationController');
 const personModel = new Person(driver);
 const personService = new PersonService(personModel, driver);
+const personController = new PersonController(personService);
 const organisationModel = new Organisation(driver);
 const organisationService = new OrganisationService(organisationModel);
 const organisationController = new OrganisationController(organisationService, personService);
@@ -24,7 +25,6 @@ const organisationController = new OrganisationController(organisationService, p
 const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
 
-const personController = new PersonController(personService);
 const { isAuthenticated, isAdmin } = require('../authentication');
 
 // nodes
@@ -115,6 +115,42 @@ router.post('/athlete/create', async (req, res) => {
 router.post('/team/upsert', (req, res) => organisationController.upsert(req, res));
 router.post('/team/link-athlete', (req, res) => organisationController.link(req, res));
 router.post('/team/link-league', (req, res) => organisationController.linkTeamToLeague(req, res));
+
+router.post('/link-to-sport', async (req, res) => {
+  const { name, type, sportName } = req.body;
+
+  if (!name || !sportName || !type) {
+    return res.status(400).json({ error: 'Missing required fields: name, type, or sportName' });
+  }
+
+  const session = driver.session();
+  try {
+    let matchQuery;
+    if (type === 'athlete') {
+      matchQuery = 'MATCH (n:Person {name: $name})';
+    } else if (type === 'team') {
+      matchQuery = 'MATCH (n:Organisation {name: $name})';
+    } else {
+      return res.status(400).json({ error: 'Invalid type provided. Must be \"athlete\" or \"team\".' });
+    }
+
+    const cypher = `
+      ${matchQuery}
+      MERGE (s:Sport {name: $sportName})
+      ON CREATE SET s.label = 'Sport'
+      MERGE (n)-[:PARTICIPATES_IN]->(s)
+    `;
+
+    await session.run(cypher, { name, sportName });
+
+    res.json({ message: `Linked ${type} ${name} to sport ${sportName}` });
+  } catch (err) {
+    console.error('Error linking to sport:', err);
+    res.status(500).json({ error: 'Failed to link to sport' });
+  } finally {
+    await session.close();
+  }
+});
 
 // graph
 router.get('/graph', async (req, res) => {
@@ -590,5 +626,29 @@ router.get('/athlete/random', async (req, res) => {
   }
 });
 
+router.post('/graph/knn/setup', async (req, res) => {
+  const { dim, iterations, topK } = req.body;
+  try {
+    await graphService.projectGraph();
+    await graphService.computeEmbeddings({ dim, iterations });
+    await graphService.writeKnn({ topK });
+    res.json({ message: 'kNN setup complete' });
+  } catch (err) {
+    console.error('kNN setup error:', err);
+    res.status(500).json({ error: 'Failed to setup kNN' });
+  }
+});
+
+router.get('/recommendations/:name', async (req, res) => {
+  const { name } = req.params;
+  const topK = parseInt(req.query.k) || 5;
+  try {
+    const recs = await graphService.getSimilar(name, topK);
+    res.json(recs);
+  } catch (err) {
+    console.error('Recommendations error:', err);
+    res.status(500).json({ error: 'Failed to fetch recommendations' });
+  }
+});
 
 module.exports = router;

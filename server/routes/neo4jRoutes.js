@@ -17,6 +17,7 @@ const OrganisationService = require('../services/OrganisationService');
 const OrganisationController = require('../controllers/OrganisationController');
 const personModel = new Person(driver);
 const personService = new PersonService(personModel, driver);
+const personController = new PersonController(personService);
 const organisationModel = new Organisation(driver);
 const organisationService = new OrganisationService(organisationModel);
 const organisationController = new OrganisationController(organisationService, personService);
@@ -24,7 +25,6 @@ const organisationController = new OrganisationController(organisationService, p
 const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
 
-const personController = new PersonController(personService);
 const { isAuthenticated, isAdmin } = require('../authentication');
 
 // nodes
@@ -617,5 +617,29 @@ router.get('/athlete/random', async (req, res) => {
   }
 });
 
+router.post('/graph/knn/setup', async (req, res) => {
+  const { dim, iterations, topK } = req.body;
+  try {
+    await graphService.projectGraph();
+    await graphService.computeEmbeddings({ dim, iterations });
+    await graphService.writeKnn({ topK });
+    res.json({ message: 'kNN setup complete' });
+  } catch (err) {
+    console.error('kNN setup error:', err);
+    res.status(500).json({ error: 'Failed to setup kNN' });
+  }
+});
+
+router.get('/recommendations/:name', async (req, res) => {
+  const { name } = req.params;
+  const topK = parseInt(req.query.k) || 5;
+  try {
+    const recs = await graphService.getSimilar(name, topK);
+    res.json(recs);
+  } catch (err) {
+    console.error('Recommendations error:', err);
+    res.status(500).json({ error: 'Failed to fetch recommendations' });
+  }
+});
 
 module.exports = router;

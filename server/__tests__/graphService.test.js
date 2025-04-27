@@ -1,4 +1,4 @@
-import GraphService from '../GraphService';
+import GraphService from '../services/GraphService';
 import { driver } from '../neo4j';
 
 jest.setTimeout(10000);

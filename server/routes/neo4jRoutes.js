@@ -65,6 +65,7 @@ router.get('/athletes', async (req, res) => {
 });
 
 router.post('/athlete/create', async (req, res) => {
+  const session = driver.session();
   try {
     const { name, sport, nationality, roles, gender, profileImage, birthDate } = req.body;
 
@@ -72,7 +73,6 @@ router.post('/athlete/create', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const session = driver.session();
     const result = await session.run(
       `
       MERGE (p:Person {name: $name})
@@ -96,14 +96,21 @@ router.post('/athlete/create', async (req, res) => {
       { name, sport, nationality, roles, gender, profileImage, birthDate }
     );
 
-    const createdPlayer = result.records[0].get('p').properties;
+    const createdPlayer = result.records[0]?.get('p')?.properties;
 
-    res.json({ success: true, player: createdPlayer });
+    if (!createdPlayer) {
+      return res.status(404).json({ error: 'Failed to create or retrieve player' });
+    }
+
+    res.status(200).json({ success: true, player: createdPlayer });
   } catch (err) {
     console.error('Error creating player:', err);
     res.status(500).json({ error: 'Failed to create player' });
+  } finally {
+    await session.close();
   }
 });
+
 
 router.post('/team/upsert', (req, res) => organisationController.upsert(req, res));
 router.post('/team/link-athlete', (req, res) => organisationController.link(req, res));
@@ -564,8 +571,8 @@ router.get('/past-events', async (req, res) => {
 });
 
 router.get('/athlete/random', async (req, res) => {
+  const session = driver.session();
   try {
-    const session = driver.session();
     const result = await session.run(`
       MATCH (p:Person)
       WHERE 'athlete' IN p.roles
@@ -578,6 +585,8 @@ router.get('/athlete/random', async (req, res) => {
   } catch (err) {
     console.error('Failed to fetch random players:', err);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await session.close();
   }
 });
 

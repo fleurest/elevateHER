@@ -1,19 +1,33 @@
 const request = require('supertest');
-const app = require('../index');
 const bcrypt = require('bcrypt');
 
-const mockSession = {
-  run: jest.fn(),
-  close: jest.fn(),
-};
-jest.mock('../neo4j', () => ({
-  driver: { session: () => mockSession }
-}));
+jest.mock('neo4j-driver', () => {
+  const mockRun = jest.fn();
+  const mockClose = jest.fn();
+  const mockSession = {
+    run: mockRun,
+    close: mockClose,
+  };
+  const mockDriver = {
+    session: jest.fn(() => mockSession),
+  };
+  return {
+    driver: jest.fn(() => mockDriver),
+    auth: { basic: jest.fn() },
+    __esModule: true,
+    mockSession,
+    mockRun,
+    mockClose,
+  };
+});
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
   hash: jest.fn()
 }));
+
+const app = require('../index');
+const { mockSession, mockRun } = require('neo4j-driver');
 
 describe('Active API routes', () => {
   beforeEach(() => {

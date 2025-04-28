@@ -3,16 +3,22 @@ jest.setTimeout(10000);
 const recordProps = { eventName: 'Ev', year: 2020, location: 'X' };
 
 jest.mock('googleapis', () => {
-  const mockGoogleCalendarList = jest.fn();
-
-  return {
-    google: {
-      calendar: () => ({
-        events: { list: mockGoogleCalendarList }
-      })
-    }
-  };
-});
+    return {
+      google: {
+        auth: {
+          OAuth2: jest.fn().mockImplementation(() => ({
+            setCredentials: jest.fn(),
+            getAccessToken: jest.fn().mockResolvedValue('mock-access-token')
+          })),
+        },
+        calendar: jest.fn().mockReturnValue({
+          events: {
+            list: jest.fn().mockResolvedValue({ data: { items: [] } })
+          }
+        })
+      }
+    };
+  });  
 
 jest.mock('neo4j-driver', () => {
   const mockSession = {

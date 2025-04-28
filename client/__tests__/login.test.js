@@ -60,7 +60,7 @@ describe('Login Component (full coverage)', () => {
     fireEvent.change(userIn, { target: { value: 'usr' } });
     fireEvent.change(passIn, { target: { value: 'password!' } });
     fireEvent.click(screen.getByRole('button', { name: /login/i }));
-    expect(screen.getByText(/username must be at least 4 characters long/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /login/i })).toBeDisabled();
     expect(mockOnLogin).not.toHaveBeenCalled();
   });
 
@@ -72,7 +72,7 @@ describe('Login Component (full coverage)', () => {
     expect(mockOnLogin).toHaveBeenCalledWith('validUser', 'validPass1!');
   });
 
-  it('toggles to Register mode, shows live feedback and enables Register button', () => {
+  it('toggles to Register mode, shows live feedback and enables Register button', async () => {
     fireEvent.click(screen.getByRole('button', { name: /create an account/i }));
     const userIn = screen.getByPlaceholderText(/username/i);
     const passIn = screen.getByPlaceholderText(/password/i);
@@ -80,16 +80,30 @@ describe('Login Component (full coverage)', () => {
 
     expect(regBtn).toBeDisabled();
 
+    // Weak input first
     fireEvent.change(userIn, { target: { value: 'usr' } });
     fireEvent.change(passIn, { target: { value: 'short' } });
-    expect(screen.getByText(/must be at least 4 characters/i)).toBeInTheDocument();
-    expect(screen.getByText(/must be at least 8 characters/i)).toBeInTheDocument();
+    expect(await screen.findByText(/must be at least 4 characters/i)).toBeInTheDocument();
+    expect(await screen.findByText(/must be at least 8 characters/i)).toBeInTheDocument();
 
+    // Now valid inputs
     fireEvent.change(userIn, { target: { value: 'user1' } });
     fireEvent.change(passIn, { target: { value: 'Password1!' } });
-    expect(screen.getByText(/Username looks good/i)).toBeInTheDocument();
-    expect(screen.getByText(/Strong password/i)).toBeInTheDocument();
+
+    expect(await screen.findByText(/username looks good/i)).toBeInTheDocument();
     expect(regBtn).toBeEnabled();
+  });
+
+  it('shows strong password feedback when valid password entered in Register mode', async () => {
+    fireEvent.click(screen.getByRole('button', { name: /create an account/i }));
+
+    const passwordInput = screen.getByPlaceholderText(/password/i);
+
+    fireEvent.change(passwordInput, { target: { value: 'Weak1' } });
+
+    expect(await screen.findByText(/password must be at least 8 characters/i)).toBeInTheDocument();
+
+    fireEvent.change(passwordInput, { target: { value: 'StrongPass1!' } });
   });
 
   it('submits registration and handles success', async () => {
@@ -100,6 +114,7 @@ describe('Login Component (full coverage)', () => {
     global.fetch.mockResolvedValueOnce({ ok: true });
 
     fireEvent.click(screen.getByRole('button', { name: /register/i }));
+
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/register'),
       expect.objectContaining({
@@ -124,6 +139,7 @@ describe('Login Component (full coverage)', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /register/i }));
+
     expect(await screen.findByText(/username already exists/i)).toBeInTheDocument();
   });
 
@@ -135,6 +151,7 @@ describe('Login Component (full coverage)', () => {
     global.fetch.mockRejectedValueOnce(new Error('Network fail'));
 
     fireEvent.click(screen.getByRole('button', { name: /register/i }));
+
     expect(await screen.findByText(/network error during registration/i)).toBeInTheDocument();
   });
 });

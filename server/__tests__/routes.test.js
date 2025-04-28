@@ -1,6 +1,6 @@
 const request = require('supertest');
-const app     = require('../index');
-const bcrypt  = require('bcrypt');
+const app = require('../index');
+const bcrypt = require('bcrypt');
 
 const mockSession = {
   run: jest.fn(),
@@ -24,13 +24,13 @@ describe('Active API routes', () => {
     it('returns an array of athletes', async () => {
       mockSession.run.mockResolvedValue({
         records: [
-          { get: key => (key==='id'?'1': key==='name'?'Alice':'img.png') }
+          { get: key => (key === 'id' ? '1' : key === 'name' ? 'Alice' : 'img.png') }
         ]
       });
 
       const res = await request(app).get('/api/athletes');
       expect(res.statusCode).toBe(200);
-      expect(res.body).toEqual([{ id:'1', name:'Alice', image:'img.png' }]);
+      expect(res.body).toEqual([{ id: '1', name: 'Alice', image: 'img.png' }]);
       expect(mockSession.close).toHaveBeenCalled();
     });
   });
@@ -45,7 +45,7 @@ describe('Active API routes', () => {
     it('200 and returns player on valid input', async () => {
       mockSession.run.mockResolvedValue({
         records: [
-          { get: () => ({ properties: { name:'Bob', sport:'Soccer' } }) }
+          { get: () => ({ properties: { name: 'Bob', sport: 'Soccer' } }) }
         ]
       });
 
@@ -64,7 +64,7 @@ describe('Active API routes', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.body).toHaveProperty('success', true);
-      expect(res.body.player).toMatchObject({ name:'Bob', sport:'Soccer' });
+      expect(res.body.player).toMatchObject({ name: 'Bob', sport: 'Soccer' });
       expect(mockSession.close).toHaveBeenCalled();
     });
   });
@@ -74,30 +74,30 @@ describe('Active API routes', () => {
       const res = await request(app)
         .post('/api/login')
         .send({ username: '', password: '' });
-  
+
       expect(res.statusCode).toBe(400);
       expect(res.body.error).toMatch(/Missing credentials/i);
     });
-  
+
     it('should return 401 if user does not exist', async () => {
       mockSession.run.mockResolvedValue({ records: [] });
-  
+
       const res = await request(app)
         .post('/api/login')
         .send({ username: 'u', password: 'p' });
-  
+
       expect(res.statusCode).toBe(401);
       expect(res.body.error).toBe('Invalid credentials');
     });
-  
+
     it('should return 200 and login successfully with valid credentials', async () => {
       mockSession.run.mockResolvedValue({ records: [{ get: () => 'fakehash' }] });
       bcrypt.compare.mockResolvedValue(true);
-  
+
       const res = await request(app)
         .post('/api/login')
         .send({ username: 'u', password: 'p' });
-  
+
       expect(res.statusCode).toBe(200);
       expect(res.body).toHaveProperty('message', 'Login successful');
       expect(res.body.user).toEqual({ username: 'u' });
@@ -108,13 +108,13 @@ describe('Active API routes', () => {
     it('returns a list of random athlete objects', async () => {
       mockSession.run.mockResolvedValue({
         records: [
-          { get: () => ({ properties:{ name:'C' } }) }
+          { get: () => ({ properties: { name: 'C' } }) }
         ]
       });
 
       const res = await request(app).get('/api/athlete/random');
       expect(res.statusCode).toBe(200);
-      expect(res.body).toEqual([{ name:'C' }]);
+      expect(res.body).toEqual([{ name: 'C' }]);
       expect(mockSession.run).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (p:Person)')
       );

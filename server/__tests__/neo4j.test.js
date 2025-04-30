@@ -10,7 +10,7 @@ describe('Neo4j Driver Connection', () => {
   it('should connect to Neo4j successfully', async () => {
     const session = driver.session();
     const result = await session.run('RETURN 1 AS number');
-    const number = result.records[0].get('number').toNumber(); // ✅ Fix here
+    const number = result.records[0].get('number').toNumber();
     expect(number).toBe(1);
     await session.close();
   });

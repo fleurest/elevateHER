@@ -17,6 +17,7 @@ const OrganisationService = require('../services/OrganisationService');
 const OrganisationController = require('../controllers/OrganisationController');
 const personModel = new Person(driver);
 const personService = new PersonService(personModel, driver);
+const personController = new PersonController(personService);
 const organisationModel = new Organisation(driver);
 const organisationService = new OrganisationService(organisationModel);
 const organisationController = new OrganisationController(organisationService, personService);
@@ -24,7 +25,6 @@ const organisationController = new OrganisationController(organisationService, p
 const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
 
-const personController = new PersonController(personService);
 const { isAuthenticated, isAdmin } = require('../authentication');
 
 // nodes
@@ -65,6 +65,7 @@ router.get('/athletes', async (req, res) => {
 });
 
 router.post('/athlete/create', async (req, res) => {
+  const session = driver.session();
   try {
     const { name, sport, nationality, roles = ['athlete'], gender, profileImage = null, birthDate = null, position = null } = req.body;
 
@@ -72,7 +73,6 @@ router.post('/athlete/create', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const session = driver.session();
     const result = await session.run(
       `
       MERGE (p:Person {name: $name})
@@ -98,13 +98,20 @@ router.post('/athlete/create', async (req, res) => {
       { name, sport, nationality, roles, gender, profileImage, birthDate, position }
     );
 
-    const createdPlayer = result.records[0].get('p').properties;
-    res.json({ success: true, player: createdPlayer });
+    const createdPlayer = result.records[0]?.get('p')?.properties;
+
+    if (!createdPlayer) {
+      return res.status(404).json({ error: 'Failed to create or retrieve player' });
+    }
+    res.status(200).json({ success: true, player: createdPlayer });
   } catch (err) {
     console.error('Error creating or updating player:', err);
     res.status(500).json({ error: 'Failed to create or update player' });
+  } finally {
+    await session.close();
   }
 });
+
 
 router.post('/team/upsert', (req, res) => organisationController.upsert(req, res));
 router.post('/team/link-athlete', (req, res) => organisationController.link(req, res));
@@ -601,8 +608,8 @@ router.get('/past-events', async (req, res) => {
 });
 
 router.get('/athlete/random', async (req, res) => {
+  const session = driver.session();
   try {
-    const session = driver.session();
     const result = await session.run(`
       MATCH (p:Person)
       WHERE 'athlete' IN p.roles
@@ -615,8 +622,34 @@ router.get('/athlete/random', async (req, res) => {
   } catch (err) {
     console.error('Failed to fetch random players:', err);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await session.close();
   }
 });
 
+router.post('/graph/knn/setup', async (req, res) => {
+  const { dim, iterations, topK } = req.body;
+  try {
+    await graphService.projectGraph();
+    await graphService.computeEmbeddings({ dim, iterations });
+    await graphService.writeKnn({ topK });
+    res.json({ message: 'kNN setup complete' });
+  } catch (err) {
+    console.error('kNN setup error:', err);
+    res.status(500).json({ error: 'Failed to setup kNN' });
+  }
+});
+
+router.get('/recommendations/:name', async (req, res) => {
+  const { name } = req.params;
+  const topK = parseInt(req.query.k) || 5;
+  try {
+    const recs = await graphService.getSimilar(name, topK);
+    res.json(recs);
+  } catch (err) {
+    console.error('Recommendations error:', err);
+    res.status(500).json({ error: 'Failed to fetch recommendations' });
+  }
+});
 
 module.exports = router;

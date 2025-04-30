@@ -1,30 +1,11 @@
+const fs = require('fs');
+const path = require('path');
+
 class GraphService {
   constructor(graphModel) {
     this.graphModel = graphModel;
     this.driver = graphModel.driver;
     this.graphName = 'peopleKinSport';
-  }
-
-  async projectGraph() {
-    const session = this.driver.session();
-    try {
-      await session.run(`CALL gds.graph.drop($name, false)`, { name: this.graphName });
-    } catch (_) {
-    }
-    await session.run(
-      `CALL gds.graph.project(
-         $name,
-         'Person',
-         {
-           PARTICIPATES_IN: {
-             type: 'PARTICIPATES_IN',
-             orientation: 'UNDIRECTED'
-           }
-         }
-      )`,
-      { name: this.graphName }
-    );
-    await session.close();
   }
 
   async computeEmbeddings({ dim = 16, iterations = 10 } = {}) {
@@ -121,6 +102,62 @@ class GraphService {
     });
     return { nodes: Array.from(nodesMap.values()), edges };
   }
+
+  async getPageRankScoresFromProperty() {
+    const session = this.driver.session();
+    const result = await session.run(
+      `MATCH (p:Person)
+       WHERE exists(p.pagerank)
+       RETURN p.name AS name, p.pagerank AS score
+       ORDER BY score DESC
+       LIMIT 20`
+    );
+    await session.close();
+    return result.records.map(r => ({
+      name: r.get('name'),
+      score: r.get('score')
+    }));
+  }
+
+  async detectCommunities() {
+    const session = this.driver.session();
+    const result = await session.run(
+      `CALL gds.louvain.stream($name)
+       YIELD nodeId, communityId
+       RETURN gds.util.asNode(nodeId).name AS name, communityId
+       ORDER BY communityId`,
+      { name: this.graphName }
+    );
+    await session.close();
+    return result.records.map(r => ({
+      name: r.get('name'),
+      communityId: r.get('communityId')
+    }));
+  }
+
+  async exportEdgesToCSV(filePath = path.join(__dirname, '../../scripts/data/edges.csv')) {
+    const session = this.driver.session();
+
+    try {
+      const result = await session.run(`
+        MATCH (a:Person)-[:FRIENDS_WITH|PARTICIPATES_IN]-(b:Person)
+        RETURN a.name AS source, b.name AS target
+      `);
+
+      const rows = result.records.map(r => `${r.get('source')},${r.get('target')}`);
+      const content = ['source,target', ...rows].join('\n');
+
+      fs.writeFileSync(filePath, content, 'utf8');
+      console.log(`Exported edges to ${filePath}`);
+      return { success: true, path: filePath };
+    } catch (err) {
+      console.error('Failed to export edges to CSV:', err);
+      throw err;
+    } finally {
+      await session.close();
+    }
+  }
+
 }
 
 module.exports = GraphService;

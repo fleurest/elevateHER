@@ -417,18 +417,38 @@ router.get('/search', async (req, res) => {
 
 router.post('/add-player', isAuthenticated, (req, res) => personController.createOrUpdate(req, res));
 
-router.put('/player/:id', isAuthenticated, async (req, res) => {
-  const { id } = req.params;
+router.put('/player/uuid/:uuid', isAuthenticated, async (req, res) => {
+  const { uuid } = req.params;
   const { name, sport, description } = req.body;
 
+  const session = driver.session();
+
   try {
-    const updatedPerson = await personModel.updateById(id, { name, sport, description });
+    const result = await session.run(
+      `
+      MATCH (p:Person {uuid: $uuid})
+      SET p.name = $name,
+          p.sport = $sport,
+          p.description = $description
+      RETURN p
+      `,
+      { uuid, name, sport, description }
+    );
+
+    const updatedPerson = result.records[0]?.get('p')?.properties;
+    if (!updatedPerson) {
+      return res.status(404).json({ error: 'Person not found' });
+    }
+
     res.status(200).json({ message: 'Player updated', person: updatedPerson });
   } catch (err) {
-    console.error('Error updating person:', err);
+    console.error('Error updating person by UUID:', err);
     res.status(500).json({ error: 'Failed to update player' });
+  } finally {
+    await session.close();
   }
 });
+
 
 router.get('/search-users', isAuthenticated, async (req, res) => {
   const { query } = req.query;
@@ -443,16 +463,19 @@ router.get('/search-users', isAuthenticated, async (req, res) => {
   }
 });
 
-router.delete('/person/:id', isAdmin, async (req, res) => {
+router.delete('/person/uuid/:uuid', isAdmin, async (req, res) => {
+  const { uuid } = req.params;
   const session = driver.session();
-  const id = parseInt(req.params.id);
 
   try {
-    await session.run(`MATCH (p:Person) WHERE ID(p) = $id DETACH DELETE p`, { id });
-    res.json({ message: 'Person deleted successfully' });
+    await session.run(
+      `MATCH (p:Person {uuid: $uuid}) DETACH DELETE p`,
+      { uuid }
+    );
+    res.status(200).json({ message: 'Person deleted successfully' });
   } catch (err) {
-    console.error('Error deleting person:', err);
-    res.status(500).json({ error: 'Failed to delete person' });
+    console.error('Error deleting person by UUID:', err);
+    res.status(500).json({ error: 'Failed to delete player' });
   } finally {
     await session.close();
   }

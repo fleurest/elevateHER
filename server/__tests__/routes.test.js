@@ -89,9 +89,19 @@ describe('Active API routes', () => {
       expect(res.statusCode).toBe(401);
       expect(res.body.error).toBe('Invalid credentials');
     });
+  });
 
     it('should return 200 and login successfully with valid credentials', async () => {
-      mockSession.run.mockResolvedValue({ records: [{ get: () => 'fakehash' }] });
+      mockSession.run.mockResolvedValue({
+        records: [
+          {
+            get: (key) => {
+              if (key === 'password') return 'fakehash';
+              return null;
+            }
+          }
+        ]
+      });
       bcrypt.compare.mockResolvedValue(true);
 
       const res = await request(app)
@@ -102,22 +112,29 @@ describe('Active API routes', () => {
       expect(res.body).toHaveProperty('message', 'Login successful');
       expect(res.body.user).toEqual({ username: 'u' });
     });
-  });
 
-  describe('GET /api/athlete/random', () => {
-    it('returns a list of random athlete objects', async () => {
-      mockSession.run.mockResolvedValue({
-        records: [
-          { get: () => ({ properties: { name: 'C' } }) }
-        ]
+    describe('GET /api/athlete/random', () => {
+      it('returns a list of random athlete objects', async () => {
+        mockSession.run.mockResolvedValue({
+          records: [
+            {
+              get: (key) => {
+                if (key === 'p') {
+                  return { properties: { name: 'C' } };
+                }
+                return null;
+              }
+            }
+          ]
+        });
+
+        const res = await request(app).get('/api/athlete/random');
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toEqual([{ name: 'C' }]);
+        expect(mockSession.run).toHaveBeenCalledWith(
+          expect.stringContaining('MATCH (p:Person)')
+        );
       });
-
-      const res = await request(app).get('/api/athlete/random');
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toEqual([{ name: 'C' }]);
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (p:Person)')
-      );
     });
+
   });
-});

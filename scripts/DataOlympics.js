@@ -11,7 +11,7 @@ const ATHLETE_CSV = path.join(DOWNLOAD_DIR, 'athlete_events.csv');
 const NOC_CSV = path.join(DOWNLOAD_DIR, 'noc_regions.csv');
 const KAGGLE_CONFIG_DIR = path.resolve(__dirname, '.kaggle');
 const API_BASE = 'http://localhost:3000/api';
-const CONCURRENCY = 10;
+const CONCURRENCY = 5;
 
 (async () => {
   try {
@@ -72,7 +72,7 @@ const CONCURRENCY = 10;
             const teamName = `Team ${athlete.nationality}`;
             await axios.post(`${API_BASE}/team/link-athlete`, {
               athleteName: athlete.name,
-              teamName,
+              teamName: `Team ${athlete.nationality}`,
               sport: athlete.sport,
               sportLabel: 'Sport'
             }, {

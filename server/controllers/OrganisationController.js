@@ -16,7 +16,7 @@ class OrganisationController {
     async link(req, res) {
         const { athleteName, teamName } = req.body;
         try {
-            await this.personService.linkAthleteToTeam(athleteName, teamName);
+            await this.personService.linkAthleteToTeam(name, teamName, sport, "Sport");
             res.status(200).json({ message: `${athleteName} linked to team ${teamName}` });
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -25,14 +25,20 @@ class OrganisationController {
 
     async linkTeamToLeague(req, res) {
         const { teamName, leagueName } = req.body;
-        try {
-          await this.organisationService.linkTeamToLeague(teamName, leagueName);
-          res.status(200).json({ message: `${teamName} linked to league ${leagueName}` });
-        } catch (error) {
-          res.status(500).json({ error: error.message });
+
+        if (!teamName || !leagueName) {
+            return res.status(400).json({ error: 'teamName and leagueName are required' });
         }
-      }
-      
+
+        try {
+            await this.organisationService.linkTeamToLeague(teamName, leagueName);
+            res.status(200).json({ message: `${teamName} linked to league ${leagueName}` });
+        } catch (err) {
+            console.error('[linkTeamToLeague] Error:', err);
+            res.status(500).json({ error: `Failed to link ${teamName} to league ${leagueName}` });
+        }
+    }
+
 }
 
 module.exports = OrganisationController;

@@ -7,9 +7,9 @@ class OrganisationService {
       return this.organisationModel.upsertTeam(data);
     }
   
-    async linkAthleteToTeam(athleteName, teamName) {
-      return this.organisationModel.linkAthleteToTeam(athleteName, teamName);
-    }
+    async linkAthleteToTeam(athleteName, teamName, sport, sportLabel) {
+        return this.organisationModel.linkAthleteToTeam(athleteName, teamName, sport, sportLabel);
+      }      
 
     async linkTeamToLeague(teamName, leagueName) {
         return this.organisationModel.linkTeamToLeague(teamName, leagueName);

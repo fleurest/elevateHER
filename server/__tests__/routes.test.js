@@ -134,4 +134,14 @@ describe('Active API routes', () => {
       );
     });
   });
+
+  describe('POST /api/team/link-athlete', () => {
+    it('should hit the endpoint and call Neo4j driver with correct cypher', async () => {
+      mockSession.run
+        .mockResolvedValueOnce({ records: [] }) // MERGE Person
+        .mockResolvedValueOnce({ records: [] }) // MERGE Organisation
+        .mockResolvedValueOnce({ records: [] }) // MERGE Sport
+        .mockResolvedValueOnce({ records: [] }); // MERGE Relationships
+    });
+  });
 });

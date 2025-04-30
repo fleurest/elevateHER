@@ -123,21 +123,25 @@ class PersonService {
     async linkAthleteToTeam(athleteName, teamName, sport = "unknown", sportLabel = "Sport") {
         const session = this.driver.session();
         try {
-          await session.run(
-            `
-            MATCH (a:Person {name: $athleteName})
-            MATCH (t:Organisation {name: $teamName})
-            MERGE (a)-[:PARTICIPATES_IN]->(t)
-            MERGE (s:Sport {name: $sport, label: $sportLabel})
-            MERGE (t)-[:PARTICIPATES_IN]->(s)
-            `,
-            { athleteName, teamName, sport, sportLabel }
-          );
-        } finally {
-          await session.close();
-        }
-      }
+            await session.run(
+                `
+                MERGE (a:Person {name: $athleteName})
+                MERGE (t:Organisation {normalizedName: toLower(REPLACE($teamName, ' ', '-'))})
+                  ON CREATE SET t.name = $teamName,
+                                t.roles = ['team'],
+                                t.description = 'Auto-created from athlete pipeline'
+                MERGE (s:Sport {name: $sport})
+                  ON CREATE SET s.label = $sportLabel
+                MERGE (a)-[:PARTICIPATES_IN]->(t)
+                MERGE (t)-[:PARTICIPATES_IN]->(s)
+                `,
+                { athleteName, teamName, sport, sportLabel }
+            );
 
+        } finally {
+            await session.close();
+        }
+    }
 }
 
 module.exports = PersonService;

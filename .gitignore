@@ -5,3 +5,10 @@ dist/
 cypher/
 server/services/credentials.json
 coverage/
+
+# Kaggle credentials
+.kaggle/
+scripts/.kaggle/
+
+# Auto-downloaded datasets
+scripts/data/

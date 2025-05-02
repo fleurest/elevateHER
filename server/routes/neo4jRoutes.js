@@ -468,14 +468,27 @@ router.delete('/person/uuid/:uuid', isAdmin, async (req, res) => {
   const session = driver.session();
 
   try {
+    const personCheck = await session.run(
+      `MATCH (p:Person {uuid: $uuid}) RETURN p.name AS name`,
+      { uuid }
+    );
+
+    if (personCheck.records.length === 0) {
+      return res.status(404).json({ error: 'Person not found.' });
+    }
+
+    const personName = personCheck.records[0].get('name');
+
     await session.run(
       `MATCH (p:Person {uuid: $uuid}) DETACH DELETE p`,
       { uuid }
     );
-    res.status(200).json({ message: 'Person deleted successfully' });
+    // GDPR-compliant logging
+    console.log(`[GDPR] Data erased for UUID: ${uuid}, Name: ${personName}, Timestamp: ${new Date().toISOString()}`);
+    res.status(200).json({ message: 'Person data erased successfully for GDPR compliance.', uuid });
   } catch (err) {
     console.error('Error deleting person by UUID:', err);
-    res.status(500).json({ error: 'Failed to delete player' });
+    res.status(500).json({ error: 'Failed to delete person' });
   } finally {
     await session.close();
   }

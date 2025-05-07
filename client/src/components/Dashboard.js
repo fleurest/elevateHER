@@ -3,20 +3,16 @@ import cytoscape from 'cytoscape';
 import coseBilkent from 'cytoscape-cose-bilkent';
 import HamburgerMenu from './HamburgerMenu';
 
-// Import icon asset
 import iconPlayer from '../assets/icon_player.png';
 
-// Register layout extension
 cytoscape.use(coseBilkent);
 
-// Mode definitions
 const modeOptions = [
   { id: 'menu_dynamic', title: 'Dynamic mode allows you to add individuals and view their shared connections.', src: iconPlayer, alt: 'Dynamic Mode', label: 'Dynamic', mode: 'dynamic' },
   { id: 'menu_similar', title: 'Similar mode groups individuals by shared attributes.', src: iconPlayer, alt: 'Similar Mode', label: 'Similar', mode: 'similar' },
   { id: 'menu_fixed', title: 'Fixed mode pins most connected individuals for clarity.', src: iconPlayer, alt: 'Fixed Mode', label: 'Fixed', mode: 'fixed' }
 ];
 
-// Mode menu component
 const ModeMenu = ({ currentMode, onSelect }) => (
   <>
     {modeOptions.map(({ id, title, src, alt, label, mode }, idx) => (
@@ -50,7 +46,6 @@ const ModeMenu = ({ currentMode, onSelect }) => (
   </>
 );
 
-// PopUp component
 const PopUp = ({ person, position }) => {
   if (!person || !position) return null;
   const { name, role, sport, nationality, birthDate, image } = person;
@@ -77,17 +72,16 @@ const PopUp = ({ person, position }) => {
       />
       <span style={{ position: 'absolute', left: 80, top: 0, fontWeight: 'bold' }}>{name}</span>
       <div style={{ fontSize: '10px', width: '138px', marginLeft: '80px', marginTop: '22px' }}>
-        {role && <>Role: {role}<br/></>}
-        {sport && <>Sport: {sport}<br/></>}
-        {nationality && <>Nationality: {nationality}<br/></>}
-        {birthDate && <>Born: {birthDate}<br/></>}
+        {role && <>Role: {role}<br /></>}
+        {sport && <>Sport: {sport}<br /></>}
+        {nationality && <>Nationality: {nationality}<br /></>}
+        {birthDate && <>Born: {birthDate}<br /></>}
         <a href={wikiUrl} target="_blank" rel="noopener noreferrer">From Wikipedia</a>
       </div>
     </div>
   );
 };
 
-// Dashboard component
 const Dashboard = ({ handleLogout }) => {
   const [mode, setMode] = useState('dynamic');
   const [pageRanks, setPageRanks] = useState([]);
@@ -101,10 +95,8 @@ const Dashboard = ({ handleLogout }) => {
   const cyContainerRef = useRef(null);
   const cyRef = useRef(null);
 
-  // Format birthDate
-  const fmt = d => (d && typeof d === 'object') ? `${d.year}-${String(d.month).padStart(2,'0')}-${String(d.day).padStart(2,'0')}` : '';
+  const fmt = d => (d && typeof d === 'object') ? `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}` : '';
 
-  // Fetch all athletes for dynamic mode sidebar
   useEffect(() => {
     fetch('http://localhost:3001/api/athletes')
       .then(res => res.json())
@@ -112,7 +104,6 @@ const Dashboard = ({ handleLogout }) => {
       .catch(console.error);
   }, []);
 
-  // Core graph draw
   const drawGraph = data => {
     if (cyRef.current) cyRef.current.destroy();
     const cy = cytoscape({
@@ -125,13 +116,11 @@ const Dashboard = ({ handleLogout }) => {
       layout: { name: 'cose-bilkent', animate: true }
     });
 
-    // Fixed mode: lock top connectors
     if (mode === 'fixed') {
       const topFive = cy.nodes().sort((a, b) => b.degree() - a.degree()).slice(0, 5);
       topFive.forEach(n => n.lock());
     }
 
-    // Node interactions
     cy.on('tap', 'node', evt => {
       const n = evt.target;
       const d = n.data();
@@ -169,7 +158,6 @@ const Dashboard = ({ handleLogout }) => {
       }
     });
 
-    // URL param handling
     const params = new URLSearchParams(window.location.search);
     const personParam = params.get('person');
     if (personParam) {
@@ -181,13 +169,10 @@ const Dashboard = ({ handleLogout }) => {
     cyRef.current = cy;
   };
 
-  // Handle mode changes
   useEffect(() => {
     if (mode === 'dynamic') {
-      // Clear graph for dynamic build
       drawGraph({ nodes: [], edges: [] });
     } else if (mode === 'similar') {
-      // Similar mode: load all and filter by root attributes
       const params = new URLSearchParams(window.location.search);
       const personParam = params.get('person');
       if (personParam) {
@@ -219,7 +204,6 @@ const Dashboard = ({ handleLogout }) => {
         drawGraph({ nodes: [], edges: [] });
       }
     } else {
-      // Fixed or default: load full graph
       fetch('http://localhost:3001/api/graph')
         .then(res => res.json())
         .then(drawGraph)
@@ -230,7 +214,6 @@ const Dashboard = ({ handleLogout }) => {
     };
   }, [mode]);
 
-  // Handlers for PageRank & Communities
   const handlePageRank = async () => {
     try {
       const res = await fetch('http://localhost:3001/api/graph/pagerank');
@@ -262,7 +245,97 @@ const Dashboard = ({ handleLogout }) => {
     }
   };
 
-  // Dynamic mode: filtered list and add node
+  const downloadFile = (content, fileName, mimeType) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCSV = () => {
+    if (!cyRef.current) return;
+    const nodes = cyRef.current.nodes().map(n => n.data());
+    const edges = cyRef.current.edges().map(e => e.data());
+
+    const nodesHeader = ['id', 'label'];
+    const nodesRows = nodes.map(n =>
+      [
+        JSON.stringify(n.id),
+        JSON.stringify(n.label || '')
+      ].join(',')
+    );
+    const nodesCsv = [nodesHeader.join(','), ...nodesRows].join('\n');
+    downloadFile(nodesCsv, 'nodes.csv', 'text/csv');
+
+    if (edges.length) {
+      const edgesHeader = ['id', 'source', 'target', 'label'];
+      const edgesRows = edges.map(e =>
+        [
+          JSON.stringify(e.id),
+          JSON.stringify(e.source),
+          JSON.stringify(e.target),
+          JSON.stringify(e.label || '')
+        ].join(',')
+      );
+      const edgesCsv = [edgesHeader.join(','), ...edgesRows].join('\n');
+      downloadFile(edgesCsv, 'edges.csv', 'text/csv');
+    } else {
+      console.info('No relationships found; only nodes.csv was downloaded.');
+    }
+
+  };
+
+  const exportJSON = () => {
+    if (!cyRef.current) return;
+    const elements = cyRef.current.elements().map(ele => ({
+      group: ele.group(),
+      data: ele.data()
+    }));
+    const json = JSON.stringify({ elements }, null, 2);
+    downloadFile(json, 'graph.json', 'application/json');
+  };
+
+  const exportGEXF = () => {
+    if (!cyRef.current) return;
+    const nodes = cyRef.current.nodes().map(n => n.data());
+    const edges = cyRef.current.edges().map(e => e.data());
+
+    const xmlHeader = '<?xml version="1.0" encoding="UTF-8"?>';
+    const gexfOpen = '<gexf xmlns="http://www.gexf.net/1.2draft" version="1.2">';
+    const graphOpen = '<graph mode="static" defaultedgetype="directed">';
+
+    const nodesXml = [
+      '<nodes>',
+      ...nodes.map(n =>
+        `<node id="${n.id}" label="${(n.label || '').replace(/"/g, '&quot;')}" />`
+      ),
+      '</nodes>'
+    ].join('');
+
+    let edgesXml = '';
+    if (edges.length) {
+      edgesXml = [
+        '<edges>',
+        ...edges.map(e =>
+          `<edge id="${e.id}" source="${e.source}" target="${e.target}" label="${(e.label || '').replace(/"/g, '&quot;')}" />`
+        ),
+        '</edges>'
+      ].join('');
+    } else {
+      console.info('No relationships found; exporting nodes-only GEXF.');
+    }
+
+    const gexfClose = '</graph></gexf>';
+    const fullGexf = xmlHeader + gexfOpen + graphOpen + nodesXml + edgesXml + gexfClose;
+
+    downloadFile(fullGexf, 'graph.gexf', 'application/xml');
+  };
+
   const filteredAthletes = athletes.filter(a =>
     (a.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())
   );
@@ -307,13 +380,21 @@ const Dashboard = ({ handleLogout }) => {
         <button onClick={handlePageRank}>PageRank</button>
         <button onClick={handleCommunities} style={{ marginLeft: '10px' }}>Communities</button>
       </div>
-
+      <button onClick={exportCSV} style={{ marginLeft: '10px' }}>
+        Export CSV
+      </button>
+      <button onClick={exportJSON} style={{ marginLeft: '10px' }}>
+        Export JSON
+      </button>
+      <button onClick={exportGEXF} style={{ marginLeft: '10px' }}>
+        Export GEXF
+      </button>
       {hoverData && hoverPosition && (
         <div style={{ position: 'fixed', top: hoverPosition.y, left: hoverPosition.x, backgroundColor: 'rgba(255,255,255,0.9)', padding: '8px', border: '1px solid #ccc', borderRadius: '6px', zIndex: 1003, fontSize: '12px', pointerEvents: 'none' }}>
-          <strong>{hoverData.name}</strong><br/>
-          {hoverData.role && <>Role: {hoverData.role}<br/></>}
-          {hoverData.sport && <>Sport: {hoverData.sport}<br/></>}
-          {hoverData.nationality && <>Nationality: {hoverData.nationality}<br/></>}
+          <strong>{hoverData.name}</strong><br />
+          {hoverData.role && <>Role: {hoverData.role}<br /></>}
+          {hoverData.sport && <>Sport: {hoverData.sport}<br /></>}
+          {hoverData.nationality && <>Nationality: {hoverData.nationality}<br /></>}
           {hoverData.birthDate && <>Born: {hoverData.birthDate}</>}
         </div>
       )}

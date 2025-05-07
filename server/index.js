@@ -8,6 +8,7 @@ const neo4jRoutes = require('./routes/neo4jRoutes');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const { redirect } = require('react-router-dom');
+const passport = require('./utils/passport');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,10 +35,18 @@ app.use(session({
     sameSite: 'lax'
   },
 }));
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use('/api', neo4jRoutes);
 
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
+
+app.use(express.static(path.join(__dirname, '../client/build')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
+});
 
 app.post('/api/login', async (req, res) => {
   console.log('>>> LOGIN route hit');
@@ -70,7 +79,6 @@ app.post('/api/login', async (req, res) => {
         id: person.id,
         username: person.username,
         email: person.email,
-        //  ...
       };
       req.session.loggedIn = true;
       console.log('Session after login', req.session);

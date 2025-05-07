@@ -362,15 +362,16 @@ const Dashboard = ({ handleLogout }) => {
             onChange={e => setSearchTerm(e.target.value)}
             style={{ width: '100%', marginBottom: '10px', padding: '5px' }}
           />
-          {filteredAthletes.map(a => (
+          {filteredAthletes.map((a, index) => (
             <div
-              key={a.name}
+              key={`${a.name}-${index}`}
               onClick={() => addNode(a)}
               style={{ padding: '5px', borderBottom: '1px solid #eee', cursor: 'pointer' }}
             >
               {a.name}
             </div>
           ))}
+
         </div>
       )}
 

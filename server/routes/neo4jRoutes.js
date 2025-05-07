@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { driver } = require('../neo4j');
 const bcrypt = require('bcrypt');
+const axios = require('axios');
 const saltRounds = 10;
-const { sanitizeUsername, sanitizePassword } = require('../utils/inputSanitizers');
+const { sanitizeEmail, sanitizeUsername, sanitizePassword } = require('../utils/inputSanitizers');
 const Person = require('../models/Person');
 const PersonService = require('../services/PersonService');
 const PersonController = require('../controllers/PersonController');
@@ -26,6 +27,9 @@ const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
 
 const { isAuthenticated, isAdmin } = require('../authentication');
+
+const passport = require('../utils/passport');
+const { validateRegistration, validateLogin } = require('../utils/validators');
 
 // nodes
 // router.get('/nodes', async (req, res) => {
@@ -233,40 +237,31 @@ router.post('/graph/filtered', async (req, res) => {
 
 
 // register route
-router.post('/register', async (req, res) => {
-  const username = sanitizeUsername(req.body.username);
-  const password = sanitizePassword(req.body.password);
+router.post('/register', validateRegistration, async (req, res) => {
+  const { username, email, password } = req.body;
+  const user = sanitizeUsername(username);
+  const mail = sanitizeEmail(email);
+  const pass = sanitizePassword(password);
 
-  if (username.length < 4) {
-    return res.status(400).json({ error: 'Username must be at least 4 characters' });
-  }
-
-  const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};':"\\|,.<>\/?]).{8,}$/;
-  if (!passwordRegex.test(password)) {
-    return res.status(400).json({
-      error: 'Password must be at least 8 characters and include a letter, number, and symbol'
-    });
-  }
-
+  let session;
   try {
-    let session = driver.session();
-    // Check if user already exists
+    session = driver.session();
+    // Check if email already exists
     const existing = await session.run(
-      'MATCH (p:Person {username: $username}) RETURN p',
-      { username }
+      'MATCH (p:Person {email: $email}) RETURN p',
+      { email: mail }
     );
-
     if (existing.records.length > 0) {
-      return res.status(400).json({ error: 'Username already exists' });
+      return res.status(400).json({ error: 'Email already registered' });
     }
 
     // Hash password
-    const hash = await bcrypt.hash(password, saltRounds);
+    const hashed = await bcrypt.hash(pass, saltRounds);
 
-    // Create user
+    // Create user node
     await session.run(
-      'CREATE (p:Person {username: $username, password: $password, roles: $roles})',
-      { username, password: hash, roles: "user" }
+      `CREATE (p:Person {email: $email, username: $username, password: $password, roles: ['user']})`,
+      { email: mail, username: user, password: hashed }
     );
 
     res.status(201).json({ message: 'User registered successfully' });
@@ -274,56 +269,52 @@ router.post('/register', async (req, res) => {
     console.error('Registration error:', err);
     res.status(500).json({ error: 'Registration failed' });
   } finally {
-    if (session) {
-      await session.close();
-    }
+    if (session) await session.close();
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', validateLogin, async (req, res) => {
   console.log('>>> LOGIN route hit');
   console.log('>>> request body:', req.body);
 
-  const username = sanitizeUsername(req.body.username);
+  const identifier = sanitizeEmail(req.body.email);
   const password = sanitizePassword(req.body.password);
-  let session = null;
 
-  if (!username || !password) {
+  if (!identifier || !password) {
     return res.status(400).json({ error: 'Missing credentials' });
   }
 
+  let session;
   try {
     session = driver.session();
     const result = await session.run(
-      'MATCH (p:Person {username: $username}) RETURN p.password AS hash',
-      { username }
+      'MATCH (p:Person {email: $id}) RETURN p.password AS hash',
+      { id: identifier }
     );
-
-    if (result.records.length === 0) {
+    if (!result.records.length) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-
     const hash = result.records[0].get('hash');
     const match = await bcrypt.compare(password, hash);
-
-    if (match) {
-      req.session.user = { username };
-      res.status(200).json({ message: 'Login successful', user: { username } });
-    } else {
-      res.status(401).json({ error: 'Invalid credentials' });
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
+    // session
+    req.session.user = { identifier };
+    res.status(200).json({ message: 'Login successful', user: { identifier } });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   } finally {
-    if (session) {
-      await session.close();
-    }
+    session?.close();
   }
 });
 
-router.get('/me', isAuthenticated, (req, res) => {
-  res.json({ user: req.user });
+router.get('/me', (req, res) => {
+  if (req.isAuthenticated?.()) {
+    return res.json({ user: req.user });
+  }
+  return res.status(401).json({ error: 'Not authenticated' });
 });
 
 router.get('/session', (req, res) => {
@@ -553,12 +544,23 @@ router.delete('/person/uuid/:uuid', isAdmin, async (req, res) => {
 //events calendar
 router.get('/calendar-events', async (req, res) => {
   try {
-    const calendarId = 'c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc@group.calendar.google.com';
-    const events = await listUpcomingEvents(calendarId);
+    const calendarId = process.env.GOOGLE_CALENDAR_ID;
+    const apiKey = process.env.GOOGLE_API_KEY;
+    const timeMin = new Date().toISOString();
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}&timeMin=${timeMin}&singleEvents=true&orderBy=startTime`;
+    const response = await axios.get(url);
+
+    const events = response.data.items.map(event => ({
+      summary: event.summary,
+      start: event.start.dateTime || event.start.date,
+      end: event.end.dateTime || event.end.date,
+    }));
+
     res.json(events);
   } catch (err) {
     console.error('Failed to fetch calendar events:', err);
-    res.status(500).json({ error: 'Failed to fetch events' });
+    res.status(500).json({ error: 'Calendar fetch error' });
   }
 });
 
@@ -775,5 +777,22 @@ router.get('/graph/communities', async (req, res) => {
     res.status(500).json({ error: 'Failed to load communities' });
   }
 });
+
+router.get('/auth/google', passport.authenticate('google', {
+  scope: ['profile', 'email']
+}));
+
+router.get(
+  '/auth/google/callback',
+  passport.authenticate('google', {
+    failureRedirect: '/login',
+    session: true
+  }),
+  (req, res) => {
+    console.log('✅ Google login success:', req.user);
+    res.redirect('http://localhost:3000/home');
+  }
+);
+
 
 module.exports = router;

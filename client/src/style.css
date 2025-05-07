@@ -425,3 +425,12 @@
   max-width: 100%;
   aspect-ratio: 4 / 3;
 }
+
+.google-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.google-button svg {
+  vertical-align: middle;
+}

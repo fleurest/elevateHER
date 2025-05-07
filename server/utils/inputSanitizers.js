@@ -1,13 +1,11 @@
-// allows alphanumeric, underscore, dash, dot, and @
-function sanitizeUsername(value) {
-  return value.replace(/[^\w.@-]/g, '');
-}
+import validator from 'validator';
 
-function sanitizePassword(value) {
-  return value.replace(/[\x00-\x1F\x7F]/g, '');
+export function sanitizeUsername(value) {
+  return (value || '').trim().replace(/[^\w\s.-]/g, '');
 }
-
-module.exports = {
-  sanitizeUsername,
-  sanitizePassword,
-};
+export function sanitizeEmail(value) {
+  return validator.normalizeEmail(value || '', { gmail_remove_dots: false }) || '';
+}
+export function sanitizePassword(value) {
+  return (value || '').trim();
+}

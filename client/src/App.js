@@ -12,13 +12,13 @@ function AppContent() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     async function checkSession() {
       try {
-        const res = await fetch('/api/session', { credentials: 'include' });
+        const res = await fetch('/api/me', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
@@ -31,19 +31,19 @@ function AppContent() {
         console.error('Session check failed', err);
         setIsAuthenticated(false);
       } finally {
-        setIsLoading(false); //
+        setLoading(false);
       }
     }
     checkSession();
   }, []);
 
 
-  const handleLogin = async (username, password) => {
+  const handleLogin = async (username, email, password) => {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, email, password }),
     });
 
     const raw = await res.text();
@@ -65,7 +65,6 @@ function AppContent() {
     }
   };
 
-
   const handleLogout = async () => {
     try {
       await fetch('/api/logout', {
@@ -82,7 +81,7 @@ function AppContent() {
 
   return (
     <>
-      {isLoading ? (
+      {loading ? (
         <div>Loading...</div>
       ) : (
         <Routes>
@@ -102,7 +101,13 @@ function AppContent() {
           />
           <Route
             path="/home"
-            element={isAuthenticated ? <Home handleLogout={handleLogout} user={user} /> : <Navigate to="/login" replace />}
+            element={
+              loading
+                ? <div>Loading...</div>
+                : user
+                  ? <Home handleLogout={handleLogout} user={user} />
+                  : <Navigate to="/login" replace />
+            }
           />
           <Route
             path="/profile"

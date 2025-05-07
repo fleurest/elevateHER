@@ -1,10 +1,11 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { sanitizeUsername, sanitizePassword } from '../utils/inputSanitizers';
+import { sanitizeUsername, sanitizePassword } from '../../../server/utils/inputSanitizers';
 import logo from '../assets/logo-default-profile.png';
+import { FaGoogle } from 'react-icons/fa';
 
 const Login = ({ onLogin }) => {
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,20 +19,16 @@ const Login = ({ onLogin }) => {
 
   const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
-  const sanitizeInput = (value) => {
-    if (typeof value !== 'string') value = String(value);
-    return value.replace(/[\x00-\x1F\x7F]/g, '');
-  };
-
-
   const validateUsername = (value) => {
-    const sanitizedValue = sanitizeUsername(value);
+    const cleaned = value.replace(/@/g, ''); // strip @
+    const sanitizedValue = sanitizeUsername(cleaned);
     setUsername(sanitizedValue);
     setUsernameTouched(true);
     setUsernameValid(sanitizedValue.length >= 4);
   };
 
   const validatePassword = (value) => {
+    setPasswordTouched(true);
     if (value.length >= 8) {
       setPasswordValid(true);
       setError('');
@@ -43,25 +40,27 @@ const Login = ({ onLogin }) => {
 
   const handleLogin = async () => {
     setError('');
-
-    if (username.length < 4) {
-      setError('Username must be at least 4 characters long');
-      return;
+    if (!email || !passwordValid) {
+      return setError('Valid email and password required');
     }
-    onLogin(username, password);
+
+    onLogin({ email, password });
   };
 
   const handleRegister = async () => {
     setError('');
-    if (username.length < 4) {
-      setError('Username must be at least 4 characters long');
-      return;
+    if (!email || email.length < 5) {
+      return setError('Email is required');
     }
+    if (username.length < 4) {
+      return setError('Username must be at least 4 characters');
+    }
+
     try {
       const response = await fetch('http://localhost:3001/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, username, password }),
       });
 
       if (response.ok) {
@@ -80,18 +79,35 @@ const Login = ({ onLogin }) => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="logo-section">
-          <img src={logo} alt="Logo" className="small-logo"/></div>
-          <div className="auth-logo-container">
+          <img src={logo} alt="Logo" className="small-logo" />
+        </div>
+        <div className="auth-logo-container">
           <h2 className="auth-brand-text">ElevateHER</h2>
         </div>
+
+        {/* Email field */}
         <input
-          type="text"
-          placeholder="Username"
-          name="username"
-          value={username}
-          onChange={(e) => validateUsername(e.target.value)}
-          className="auth-input auth-input-user"
+          type="email"
+          placeholder="Email"
+          name="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="auth-input"
         />
+
+        {/* Username shown only during registration */}
+        {isRegistering && (
+          <input
+            type="text"
+            placeholder="Username"
+            name="username"
+            value={username}
+            onChange={(e) => validateUsername(e.target.value)}
+            className="auth-input auth-input-user"
+          />
+        )}
+
+        {/* Password field */}
         <input
           type={showPassword ? "text" : "password"}
           placeholder="Password"
@@ -101,15 +117,16 @@ const Login = ({ onLogin }) => {
             const input = e.target.value;
             setPassword(input);
             validatePassword(input);
-          }} className="auth-input"
+          }}
+          className="auth-input"
         />
 
+        {/* Feedback */}
         {isRegistering && usernameTouched && (
           <p className={`auth-feedback ${usernameValid ? 'valid' : 'invalid'}`}>
             {usernameValid ? '✅ Username looks good' : '❌ Must be at least 4 characters'}
           </p>
         )}
-
         {isRegistering && passwordTouched && (
           <p className={`auth-feedback ${passwordValid ? 'valid' : 'invalid'}`}>
             {passwordValid
@@ -118,7 +135,17 @@ const Login = ({ onLogin }) => {
           </p>
         )}
 
+        {/* Google login */}
+        <button
+          type="button"
+          onClick={() => window.location.href = 'http://localhost:3001/api/auth/google'}
+          className="auth-button-alt flex items-center justify-center"
+        >
+          <span>Sign in with Google</span>
+          <FaGoogle className="h-5 w-5 ml-2" />
+        </button>
 
+        {/* Auth submit */}
         {isRegistering ? (
           <button
             onClick={handleRegister}
@@ -131,18 +158,21 @@ const Login = ({ onLogin }) => {
           <button
             onClick={handleLogin}
             className="auth-button"
-            type='submit'
-            disabled={!usernameValid || !passwordValid}
+            type="button"
+            disabled={!passwordValid || !email}
           >
             Login
           </button>
         )}
+
+        {/* Toggle form */}
         <button
           onClick={() => setIsRegistering(!isRegistering)}
           className="auth-switch-link"
         >
           {isRegistering ? '← Back to Login' : 'Create an account →'}
         </button>
+
         {error && <div className="auth-error">{error}</div>}
       </div>
     </div>

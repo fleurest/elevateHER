@@ -277,41 +277,50 @@ router.post('/register', validateRegistration, async (req, res) => {
 });
 
 router.post('/login', validateLogin, async (req, res) => {
-  console.log('>>> LOGIN route hit');
-  console.log('>>> request body:', req.body);
-
-  const identifier = sanitizeEmail(req.body.email);
-  const password = sanitizePassword(req.body.password);
-
-  if (!identifier || !password) {
-    return res.status(400).json({ error: 'Missing credentials' });
-  }
-
-  let session;
-  try {
-    session = driver.session();
-    const result = await session.run(
-      'MATCH (p:Person {email: $id}) RETURN p.password AS hash',
-      { id: identifier }
-    );
-    if (!result.records.length) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    console.log('>>> LOGIN route hit');
+    console.log('>>> request body:', req.body);
+  
+    const identifier = sanitizeEmail(req.body.email);
+    const password = sanitizePassword(req.body.password);
+  
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Missing credentials' });
     }
-    const hash = result.records[0].get('hash');
-    const match = await bcrypt.compare(password, hash);
-    if (!match) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+  
+    let session;
+    try {
+      session = driver.session();
+      const result = await session.run(
+        'MATCH (p:Person {email: $id}) RETURN p.password AS hash',
+        { id: identifier }
+      );
+  
+      if (!result.records.length) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+  
+      const hash = result.records[0].get('hash');
+  
+      if (!hash) {
+        return res.status(400).json({ error: 'Account has no password set. Try Google login.' });
+      }
+  
+      const match = await bcrypt.compare(password, hash);
+  
+      if (!match) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+  
+      req.session.user = { identifier };
+      res.status(200).json({ message: 'Login successful', user: { identifier } });
+    } catch (err) {
+      console.error('Login error:', err);
+      res.status(500).json({ error: 'Login failed' });
+    } finally {
+      session?.close();
     }
-    // session
-    req.session.user = { identifier };
-    res.status(200).json({ message: 'Login successful', user: { identifier } });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed' });
-  } finally {
-    session?.close();
-  }
-});
+  });
+  
 
 router.get('/me', (req, res) => {
   if (req.session?.user) {
@@ -793,7 +802,13 @@ router.get(
     session: true
   }),
   (req, res) => {
-    console.log('✅ Google login success:', req.user);
+    console.log('Google login success:', req.user);
+  
+    req.session.user = {
+      identifier: req.user.email,
+      username: req.user.username || req.user.displayName
+    };
+  
     res.redirect('http://localhost:3000/home');
   }
 );

@@ -9,7 +9,9 @@ class Organisation {
             const result = await session.run(
                 `
             MERGE (t:Organisation {normalizedName: toLower(REPLACE($name, ' ', '-'))})
-            SET t.alternateName = $alternateName,
+            SET t.name = $name,
+                t.normalizedName = toLower(REPLACE($name, ' ', '-')),
+                t.alternateName = $alternateName,
                 t.sport = $sport,
                 t.foundingDate = $foundingDate,
                 t.location = $location,
@@ -32,6 +34,7 @@ class Organisation {
             await session.close();
         }
     }
+
 
     async linkAthleteToTeam(athleteName, teamName, sport = "unknown", sportLabel = "Sport") {
         const session = this.driver.session();
@@ -63,19 +66,25 @@ class Organisation {
     async linkTeamToLeague(teamName, leagueName) {
         const session = this.driver.session();
         try {
-            await session.run(
-                `
-            MERGE (t:Organisation {name: $teamName})
+          const normalizedTeamName = teamName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      
+          await session.run(
+            `
+            MATCH (t:Organisation {normalizedName: $normalizedTeamName})
             MERGE (l:Organisation {name: $leagueName})
             ON CREATE SET l.roles = ['league']
             MERGE (t)-[:PARTICIPATES_IN]->(l)
             `,
-                { teamName, leagueName }
-            );
+            {
+              normalizedTeamName,
+              leagueName
+            }
+          );
         } finally {
-            await session.close();
+          await session.close();
         }
-    }
+      }
+      
 
 }
 

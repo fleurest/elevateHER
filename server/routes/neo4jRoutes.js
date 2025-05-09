@@ -74,8 +74,11 @@ router.post('/athlete/create', async (req, res) => {
     const { name, sport, nationality, roles = ['athlete'], gender, profileImage = null, birthDate = null, position = null } = req.body;
 
     if (!name || !sport) {
+      console.warn('Missing required fields:', { name, sport });
       return res.status(400).json({ error: 'Missing required fields' });
     }
+
+    console.log(`Creating/updating athlete: ${name}`);
 
     const result = await session.run(
       `
@@ -109,7 +112,7 @@ router.post('/athlete/create', async (req, res) => {
     }
     res.status(200).json({ success: true, player: createdPlayer });
   } catch (err) {
-    console.error('Error creating or updating player:', err);
+    console.error('Error creating or updating player:', err.stack || err.message || err);
     res.status(500).json({ error: 'Failed to create or update player' });
   } finally {
     await session.close();
@@ -311,11 +314,12 @@ router.post('/login', validateLogin, async (req, res) => {
 });
 
 router.get('/me', (req, res) => {
-  if (req.isAuthenticated?.()) {
-    return res.json({ user: req.user });
+  if (req.session?.user) {
+    return res.json({ user: req.session.user });
   }
   return res.status(401).json({ error: 'Not authenticated' });
 });
+
 
 router.get('/session', (req, res) => {
   if (req.session?.user?.username) {

@@ -38,22 +38,22 @@ function AppContent() {
   }, []);
 
 
-  const handleLogin = async (username, email, password) => {
+  const handleLogin = async ({ email, password }) => {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ username, email, password }),
+      body: JSON.stringify({ email, password }),
     });
-
+  
     const raw = await res.text();
     console.log('RAW RESPONSE:', raw);
-
+  
     if (!res.ok) {
       console.error('Login failed:', raw);
       return;
     }
-
+  
     try {
       const data = JSON.parse(raw);
       setUser(data.user);
@@ -63,7 +63,7 @@ function AppContent() {
       console.error('Failed to parse JSON:', err);
       setError('Unexpected server response');
     }
-  };
+  };  
 
   const handleLogout = async () => {
     try {

@@ -3,7 +3,7 @@ const { Cluster } = require('puppeteer-cluster');
 const axios = require('axios');
 
 const BASE = 'https://www.wplt20.com';
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
 
 (async () => {
     const cluster = await Cluster.launch({
@@ -177,7 +177,7 @@ const API_BASE = 'http://localhost:3000/api';
                 }
         
             } catch (err) {
-                console.error(`❌ Error processing player ${meta.playerName}:`, err.response?.status, err.response?.data || err.message);
+                console.error(`❌ Error linking player to sport ${meta.playerName}:`, err.response?.status, err.response?.data || err.message);
             }
         }
         

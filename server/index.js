@@ -1,26 +1,51 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const session = require('express-session');
 const { verifyConnection, driver } = require('./neo4j');
 const neo4jRoutes = require('./routes/neo4jRoutes');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
-const { redirect } = require('react-router-dom');
 const passport = require('./utils/passport');
+const fs = require('fs');
+const https = require('https');
+const http = require('http');
+const helmet = require('helmet');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// middleware
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH || path.join(__dirname, '..', 'certs', 'localhost-key.pem');
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH || path.join(__dirname, '..', 'certs', 'localhost.pem');
+
+const useHttps = fs.existsSync(SSL_KEY_PATH) && fs.existsSync(SSL_CERT_PATH);
+
+// Security middleware
+app.use(helmet());
+app.enable('trust proxy');
+
+// redirect HTTP to HTTPS
+if (useHttps && process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (!req.secure) {
+      return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+    }
+    next();
+  });
+}
+
+const clientOrigin = process.env.CLIENT_ORIGIN || (useHttps ? 'https://localhost:3000' : 'http://localhost:3000');
+
+// CORS
 app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
+  origin: clientOrigin,
+  credentials: true,
+  exposedHeaders: ['set-cookie']
 }));
 
+// parsing & cookies
 app.use(express.json());
-
 app.use(cookieParser());
 
 app.use(session({
@@ -31,19 +56,31 @@ app.use(session({
   cookie: {
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
-    secure: false,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax'
   },
 }));
+
+// passport
 app.use(passport.initialize());
 app.use(passport.session());
 
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+app.get(
+  '/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login', session: true }),
+  (req, res) => {
+    console.log('Google login success:', req.user);
+    res.redirect(clientOrigin);
+  }
+);
+
+// api routes
 app.use('/api', neo4jRoutes);
 
+// assets
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
-
 app.use(express.static(path.join(__dirname, '../client/build')));
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
@@ -104,39 +141,48 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.get('/api/auth/session', (req, res) => {
-  console.log('Session data: ', req.session);
-  if (req.session.loggedIn) {
-    res.json({ user: req.session.user, loggedIn: req.session.loggedIn });
-  } else {
-    res.status(401).json({ message: 'Not authenticated' });
+  if (req.isAuthenticated()) {
+    return res.json({ user: req.user });
   }
+  res.status(401).json({ error: 'Not authenticated' });
 });
 
 app.post('/api/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('Error destroying session:', err);
-      res.status(500).json({ message: 'Logout failed' });
-    } else {
-      res.clearCookie('sessionId');
-      res.json({ message: 'Logout successful' });
-    }
+  req.logout(() => {
+    res.clearCookie('sessionId');
+    res.json({ success: true });
   });
 });
 
-// Start server ONLY if not in test environment
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, async () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    try {
-      await verifyConnection();
-    } catch (error) {
-      console.error("Failed to connect to Neo4j", error);
+  if (useHttps) {
+    const sslOptions = {
+      key: fs.readFileSync(SSL_KEY_PATH),
+      cert: fs.readFileSync(SSL_CERT_PATH),
+    };
+    https.createServer(sslOptions, app).listen(PORT, async () => {
+      console.log(`HTTPS Server running at https://localhost:${PORT}`);
+      try {
+        await verifyConnection();
+      } catch (error) {
+        console.error('Failed to connect to Neo4j', error);
+      }
+    });
+    if (process.env.NODE_ENV === 'production') {
+      http.createServer((req, res) => {
+        res.writeHead(301, { Location: `https://${req.headers.host}${req.url}` });
+        res.end();
+      }).listen(80, () => console.log('HTTP redirecting to HTTPS on port 80'));
     }
-  });
+  } else {
+    console.warn('SSL certificates not found, running HTTP server');
+    app.listen(PORT, async () => {
+      console.log(`HTTP Server running at http://localhost:${PORT}`);
+      try { await verifyConnection(); } catch (error) { console.error('Neo4j connection error', error); }
+    });
+  }
 }
 
-// Clean exit
 process.on('SIGINT', async () => {
   await driver.close();
   console.log('Neo4j driver closed. Exiting.');

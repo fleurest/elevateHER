@@ -699,56 +699,56 @@ function HomePage({ handleLogout, user, setUser }) {
           </ul>
         </div>
       </div>
-
       <div className="home-page-column home-page-right">
-      <div className="flex flex-col md:flex-row gap-6 mt-6">
-        <div className="flex-1 bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-3">Upcoming Events</h2>
-          {upcomingEvents.length > 0 ? (
-            <ul className="text-sm">
-              {upcomingEvents.map(event => (
-                <li key={event.id} className="mb-2">
-                  <strong>{event.summary}</strong><br />
-                  {event.start?.dateTime || event.start?.date}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No upcoming events found.</p>
-          )}
-          <div className="calendar-container">
+        {!editProfile && (
+          <div className="flex flex-col md:flex-row gap-6 mt-6">
+            <div className="flex-1 bg-white p-4 rounded shadow">
+              <h2 className="text-lg font-semibold mb-3">Upcoming Events</h2>
+              {upcomingEvents.length > 0 ? (
+                <ul className="text-sm">
+                  {upcomingEvents.map(event => (
+                    <li key={event.id} className="mb-2">
+                      <strong>{event.summary}</strong><br />
+                      {event.start?.dateTime || event.start?.date}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No upcoming events found.</p>
+              )}
+              <div className="calendar-container">
+                <iframe
+                  src="https://calendar.google.com/calendar/embed?src=c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc%40group.calendar.google.com&ctz=America%2FNew_York"
+                  style={{ border: 0 }}
+                  width="100%"
+                  height="600"
+                  frameBorder="0"
+                  scrolling="no"
+                  title="Google Calendar"
+                ></iframe>
+              </div>
+            </div>
 
-            <iframe
-              src="https://calendar.google.com/calendar/embed?src=c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc%40group.calendar.google.com&ctz=America%2FNew_York"
-              style={{ border: 0 }}
-              width="100%"
-              height="600"
-              frameBorder="0"
-              scrolling="no"
-              title="Google Calendar"
-            ></iframe>
-
+            <div className="flex-1 bg-white p-4 rounded shadow">
+              <h2 className="text-lg font-semibold mb-3">Past Events</h2>
+              {pastEvents.length > 0 ? (
+                <ul className="text-sm">
+                  {pastEvents.map((event, index) => (
+                    <li key={index} className="mb-2">
+                      <strong>{event.eventName || 'Unnamed Event'}</strong><br />
+                      {event.year ? Number(event.year.low ?? event.year) : 'Unknown Year'}<br />
+                      {event.location && <span>{event.location}</span>}<br />
+                      {event.eventType && <span className="italic">{event.eventType}</span>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No past events available.</p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="flex-1 bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-3">Past Events</h2>
-          {pastEvents.length > 0 ? (
-            <ul className="text-sm">
-              {pastEvents.map((event, index) => (
-                <li key={index} className="mb-2">
-                  <strong>{event.eventName || 'Unnamed Event'}</strong><br />
-                  {event.year ? Number(event.year.low ?? event.year) : 'Unknown Year'}<br />
-                  {event.location && <span>{event.location}</span>}<br />
-                  {event.eventType && <span className="italic">{event.eventType}</span>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No past events available.</p>
-          )}
-        </div>
-      </div>
 
         {editProfile ? (
           <EditProfileForm
@@ -771,7 +771,7 @@ function HomePage({ handleLogout, user, setUser }) {
         ) : null}
 
       </div>
-      
+
     </div>
   );
 }

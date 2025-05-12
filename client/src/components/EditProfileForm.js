@@ -47,27 +47,38 @@ const EditProfileForm = ({ user, setUser, onCancel, onSave }) => {
   return (
     <form onSubmit={handleSubmit} className="p-4 border rounded shadow bg-white">
       <h2 className="text-lg font-semibold mb-4">Edit Profile</h2>
-      {['username', 'email', 'location', 'bio'].map((field) => (
-        <label key={field} className="block mb-3">
-          <span className="block text-sm font-medium text-gray-700">
-            {field.charAt(0).toUpperCase() + field.slice(1)}:
-          </span>
-          {field === 'bio' ? (
-            <textarea
-              value={formData[field] || ''}
-              onChange={(e) => handleChange(field, e.target.value)}
-              className="w-full border px-2 py-1 rounded"
-            />
-          ) : (
-            <input
-              type="text"
-              value={formData[field] || ''}
-              onChange={(e) => handleChange(field, e.target.value)}
-              className="w-full border px-2 py-1 rounded"
-            />
-          )}
-        </label>
-      ))}
+      {['username', 'email', 'location', 'bio'].map((field) => {
+        const inputId = `edit-${field}`;
+        const labelText = field.charAt(0).toUpperCase() + field.slice(1);
+
+        return (
+          <div key={field} className="block mb-3">
+            <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
+              {labelText}:
+            </label>
+
+            {field !== 'bio' ? (
+              <input
+                id={inputId}
+                name={field}
+                type={field === 'email' ? 'email' : 'text'}
+                value={formData[field] || ''}
+                onChange={(e) => handleChange(field, e.target.value)}
+                className="w-full border px-2 py-1 rounded"
+              />
+            ) : (
+              <textarea
+                id={inputId}
+                name={field}
+                value={formData[field] || ''}
+                onChange={(e) => handleChange(field, e.target.value)}
+                className="w-full border px-2 py-1 rounded"
+              />
+            )}
+          </div>
+        );
+      })}
+
 
       {successMessage && (
         <div className="bg-green-100 text-green-800 px-4 py-2 rounded mb-4 text-sm">

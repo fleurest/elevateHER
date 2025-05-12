@@ -15,7 +15,6 @@ class PersonService {
 
     async createOrUpdatePerson(data) {
         this.validatePersonData(data);
-
         const cleaned = {
             name: data.name.trim(),
             sport: data.sport.trim(),
@@ -24,8 +23,19 @@ class PersonService {
             profileImage: data.profileImage || null,
             birthDate: data.birthDate || null
         };
-
         return await this.personModel.createOrUpdateAthlete(cleaned);
+    }
+
+    async updateGoogleIdByEmail(email, googleId) {
+        const session = this.driver.session();
+        try {
+            await session.run(
+                'MATCH (p:Person {email:$email}) SET p.googleId = $googleId',
+                { email, googleId }
+            );
+        } finally {
+            await session.close();
+        }
     }
 
     async authenticatePerson(username, password) {
@@ -43,19 +53,101 @@ class PersonService {
         const session = this.driver.session();
         try {
             const result = await session.run(
-                `
-                MATCH (p:Person)
-                WHERE p.roles IS NOT NULL AND 'user' IN p.roles
-                RETURN p
-                ORDER BY p.name
-                LIMIT $limit
-            `,
+                `MATCH (p:Person)
+             WHERE p.roles IS NOT NULL AND 'user' IN p.roles
+             RETURN p
+             ORDER BY p.name
+             LIMIT $limit`,
                 { limit: neo4j.int(limit) }
             );
-            return result.records.map(record => record.get('p').properties);
+            return result.records.map(r => r.get('p').properties);
         } catch (error) {
             console.error('[SERVICE] Error fetching top users:', error);
             return [];
+        } finally {
+            await session.close();
+        }
+    }
+
+    async usernameExists(username) {
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                'MATCH (p:Person {username:$username}) RETURN count(p) AS cnt',
+                { username }
+            );
+            return result.records[0].get('cnt').toNumber() > 0;
+        } finally {
+            await session.close();
+        }
+    }
+
+    async findByGoogleId(googleId) {
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                'MATCH (p:Person {googleId:$googleId}) RETURN p',
+                { googleId }
+            );
+            if (!result.records.length) return null;
+            return result.records[0].get('p').properties;
+        } finally {
+            await session.close();
+        }
+    }
+
+    async findByEmail(email) {
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                'MATCH (p:Person {email:$email}) RETURN p',
+                { email }
+            );
+            if (!result.records.length) return null;
+            return result.records[0].get('p').properties;
+        } finally {
+            await session.close();
+        }
+    }
+
+    async generateUsernameFromEmail(email) {
+        const { sanitizeUsername } = require('../inputSanitizers');
+        const prefix = sanitizeUsername(email.split('@')[0].toLowerCase());
+        let username = prefix;
+        let counter = 0;
+        while (await this.usernameExists(username)) {
+            counter += 1;
+            username = `${prefix}${counter}`;
+        }
+        return username;
+    }
+
+    async createUser({
+        username: maybeUsername,
+        email,
+        passwordHash = null,
+        googleId = null,
+        name = null,
+        roles = ['user'],
+    }) {
+        const username = maybeUsername || await this.generateUsernameFromEmail(email);
+
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                `CREATE (p:Person {
+               uuid:         randomUUID(),
+               username:     $username,
+               email:        $email,
+               name:         $name,
+               passwordHash: $passwordHash,
+               googleId:     $googleId,
+               roles:        $roles,
+               createdAt:    datetime()
+             }) RETURN p`,
+                { username, email, name, passwordHash, googleId, roles }
+            );
+            return result.records[0].get('p').properties;
         } finally {
             await session.close();
         }

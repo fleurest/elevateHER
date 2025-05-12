@@ -19,7 +19,8 @@ const PORT = process.env.PORT || 3001;
 const SSL_KEY_PATH = process.env.SSL_KEY_PATH || path.join(__dirname, '..', 'certs', 'localhost-key.pem');
 const SSL_CERT_PATH = process.env.SSL_CERT_PATH || path.join(__dirname, '..', 'certs', 'localhost.pem');
 
-const useHttps = fs.existsSync(SSL_KEY_PATH) && fs.existsSync(SSL_CERT_PATH);
+const useHttps = fs.existsSync(process.env.SSL_KEY_PATH) && fs.existsSync(process.env.SSL_CERT_PATH);
+const clientOrigin = process.env.CLIENT_ORIGIN || (useHttps ? 'https://localhost:3000' : 'http://localhost:3000');
 
 // Security middleware
 app.use(helmet());
@@ -34,8 +35,6 @@ if (useHttps && process.env.NODE_ENV === 'production') {
     next();
   });
 }
-
-const clientOrigin = process.env.CLIENT_ORIGIN || (useHttps ? 'https://localhost:3000' : 'http://localhost:3000');
 
 // CORS
 app.use(cors({

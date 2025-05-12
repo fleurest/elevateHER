@@ -11,7 +11,7 @@ import playersIcon from '../assets/icon_player.png';
 import eventsIcon from '../assets/icon_events.png';
 import pagesIcon from '../assets/icon_pages.png';
 
-function HomePage({ handleLogout, user }) {
+function HomePage({ handleLogout, user, setUser }) {
   const [graphData, setGraphData] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [filterType, setFilterType] = useState(null);
@@ -20,10 +20,25 @@ function HomePage({ handleLogout, user }) {
   const [showProfile, setShowProfile] = useState(false);
   const [prevFilter, setPrevFilter] = useState(null);
   const [editProfile, setEditProfile] = useState(false);
+  const [editableUser, setEditableUser] = useState(user);
 
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
 
+  useEffect(() => {
+    if (!user?.username) {
+      fetch('${API_BASE}/auth/session', { credentials: 'include' })
+        .then(res => {
+          if (!res.ok) throw new Error('Not authenticated');
+          return res.json();
+        })
+        .then(({ user: sessionUser }) => {
+          setUser(sessionUser);
+          setEditableUser(sessionUser);
+        })
+        .catch(() => navigate('/login'));
+    }
+  }, [user, setUser, navigate]);
 
   useEffect(() => {
     fetch('/api/calendar-events')
@@ -60,7 +75,6 @@ function HomePage({ handleLogout, user }) {
   const [selectedPerson, setSelectedPerson] = useState(null);
   const navigate = useNavigate();
   const graphRef = useRef(null);
-  const [editableUser, setEditableUser] = useState(user);
 
   const toggleProfile = () => {
     setShowProfile((prev) => {
@@ -744,6 +758,7 @@ function HomePage({ handleLogout, user }) {
             onSave={(updatedUser) => {
               setEditProfile(false);
               setEditableUser(updatedUser);
+              setUser(updatedUser);
             }}
           />
         ) : selectedNode ? (

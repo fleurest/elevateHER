@@ -66,8 +66,9 @@ const PopUp = ({ person, position }) => {
       }}
     >
       <img
-        src={image || iconPlayer}
+        src={image}
         alt={name}
+        onError={(e) => { e.target.onerror = null; e.target.src = iconPlayer; }}
         style={{ height: '75px', width: '75px', position: 'absolute', left: 0, top: 0 }}
       />
       <span style={{ position: 'absolute', left: 80, top: 0, fontWeight: 'bold' }}>{name}</span>
@@ -95,8 +96,22 @@ const Dashboard = ({ handleLogout }) => {
   const cyContainerRef = useRef(null);
   const cyRef = useRef(null);
 
-  const fmt = d => (d && typeof d === 'object') ? `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}` : '';
-
+  const fmt = d => {
+    if (!d) return '';
+    if (typeof d.toString === 'function') {
+      const str = d.toString();
+      if (!str.includes('[object')) {
+        return str;
+      }
+    }
+    if (d.year != null && d.month != null && d.day != null) {
+      const year = typeof d.year.toNumber === 'function' ? d.year.toNumber() : d.year;
+      const month = typeof d.month.toNumber === 'function' ? d.month.toNumber() : d.month;
+      const day = typeof d.day.toNumber === 'function' ? d.day.toNumber() : d.day;
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    return '';
+  };
   useEffect(() => {
     fetch('http://localhost:3001/api/athletes')
       .then(res => res.json())
@@ -108,7 +123,21 @@ const Dashboard = ({ handleLogout }) => {
     if (cyRef.current) cyRef.current.destroy();
     const cy = cytoscape({
       container: cyContainerRef.current,
-      elements: [...(data.nodes || []), ...(data.edges || [])],
+      elements: [
+        ...(data.nodes || []).map(n => {
+          // uses stored profileImage
+          let img = n.data.image || n.data.profileImage;
+          // defaults to Wikipedia
+          if (!img) {
+            const wikiName = n.data.label.replace(/ /g, '_');
+            img = `https://en.wikipedia.org/wiki/Special:FilePath/${wikiName}.jpg`;
+          }
+          n.data.image = img;
+          return n;
+        }),
+        
+        ...(data.edges || [])
+      ],
       style: [
         { selector: 'node', style: { 'background-color': '#fff', 'background-image': 'data(image)', 'background-fit': 'cover', 'border-width': 3, 'border-color': '#0074D9', label: 'data(label)', fontSize: 10, width: 50, height: 50 } },
         { selector: 'edge', style: { width: 2, 'line-color': '#ccc', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } }
@@ -132,7 +161,7 @@ const Dashboard = ({ handleLogout }) => {
       cy.zoom({ level: 2, position: n.position() });
       window.history.pushState({}, '', `?person=${encodeURIComponent(d.label.replace(/ /g, '_'))}`);
       const p = n.renderedPosition();
-      setPopupData({ name: d.label, role: d.primaryRole, sport: d.sport, nationality: d.nationality, birthDate: fmt(d.birthDate), image: d.image });
+      setPopupData({ name: d.label, role: d.primaryRole, sport: d.sport, nationality: d.nationality, image: d.image });
       setPopupPosition({ x: p.x + 20, y: p.y + 20 });
     });
     cy.on('mouseover', 'node', evt => {
@@ -143,7 +172,8 @@ const Dashboard = ({ handleLogout }) => {
       n.removeClass('faded');
       n.connectedEdges().removeClass('faded');
       n.connectedEdges().connectedNodes().removeClass('faded');
-      setHoverData({ name: d.label, role: d.primaryRole, sport: d.sport, nationality: d.nationality, birthDate: fmt(d.birthDate) });
+      const bd = fmt(d.birthDate);
+      setHoverData({ name: d.label, role: d.primaryRole, sport: d.sport, nationality: d.nationality});
       setHoverPosition({ x: p.x + 20, y: p.y + 20 });
     });
     cy.on('mouseout', 'node', () => {

@@ -430,6 +430,9 @@ function HomePage({ handleLogout, user, setUser }) {
       });
   }, []);
 
+  const toggleFilter = type =>
+    setFilterType(prev => (prev === type ? null : type));
+
   return (
     <div className="home-page-layout">
       <div className="home-page-column home-page-left">
@@ -486,9 +489,19 @@ function HomePage({ handleLogout, user, setUser }) {
             >
               Friends {showAddFriendPanel ? '▲' : '▼'}
             </li>
-            <li>Players <button onClick={() => setFilterType('Player')}>+</button></li>
-            <li>Sports <button onClick={() => setFilterType('Sport')}>+</button></li>
-            <li>Events <button onClick={() => setFilterType('Event')}>+</button></li>
+            <li>Players {showMyPlayers ? '▲' : '▼'}</li>
+            <li
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+              onClick={() => toggleFilter('Sport')}
+            >
+              Sports {filterType === 'Sport' ? '▲' : '▼'}
+            </li>
+            <li
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+              onClick={() => toggleFilter('Event')}
+            >
+              Events {filterType === 'Event' ? '▲' : '▼'}
+            </li>
             <li className="reset-filter" onClick={() => setFilterType(null)}>Reset Filter</li>
           </ul>
         </div>

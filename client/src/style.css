@@ -28,6 +28,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -287,6 +288,7 @@
   background-color: var(--light-purple);
   color: var(--grey);
 }
+
 .logo-section {
   padding: 8px;
   display: flex;
@@ -369,6 +371,7 @@
   -webkit-mask-size: contain;
   mask-size: contain;
 }
+
 .icon-bar-wrapper {
   display: flex;
   justify-content: center;
@@ -431,6 +434,12 @@
   align-items: center;
   justify-content: center;
 }
+
 .google-button svg {
   vertical-align: middle;
+}
+
+.auth-card input,
+.auth-card button {
+  box-sizing: border-box;
 }

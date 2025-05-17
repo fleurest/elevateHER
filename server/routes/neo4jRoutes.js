@@ -798,10 +798,11 @@ router.get('/auth/google', passport.authenticate('google', {
 router.get(
   '/auth/google/callback',
   passport.authenticate('google', {
-    failureRedirect: '/login',
+    failureRedirect: `${process.env.BASE_PATH}/login`,
     session: true
   }),
   (req, res) => {
+    
     console.log('Google login success:', req.user);
   
     req.session.user = {
@@ -809,7 +810,7 @@ router.get(
       username: req.user.username || req.user.displayName
     };
   
-    res.redirect('http://localhost:3000/home');
+    res.redirect(`${process.env.BASE_PATH}/home`);
   }
 );
 

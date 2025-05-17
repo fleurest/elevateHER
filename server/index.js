@@ -53,6 +53,7 @@ app.use(session({
   saveUninitialized: false,
   name: 'sessionId',
   cookie: {
+    path: process.env.BASE_PATH || '/',
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -67,10 +68,10 @@ app.use(passport.session());
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 app.get(
   '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login', session: true }),
+  passport.authenticate('google', { successRedirect:`${process.env.BASE_PATH}/home`, failureRedirect:`${process.env.BASE_PATH}/login` }),
   (req, res) => {
     console.log('Google login success:', req.user);
-    res.redirect(clientOrigin);
+    res.redirect(`${process.env.BASE_PATH}/home`);
   }
 );
 
@@ -79,9 +80,9 @@ app.use('/api', neo4jRoutes);
 
 // assets
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
-app.use(express.static(path.join(__dirname, '../client/build')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build/index.html'));
+app.use(process.env.BASE_PATH, express.static(path.join(__dirname, '../client/build')));
+app.get(`${process.env.BASE_PATH}/*`, (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
 app.post('/api/login', async (req, res) => {

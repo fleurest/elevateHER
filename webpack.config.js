@@ -1,11 +1,14 @@
 const path = require('path');
+const Dotenv = require('dotenv-webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const webpack = require('webpack');
 
 module.exports = {
   entry: './client/src/index.js',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.[contenthash].js',
+    publicPath: process.env.BASE_PATH || '/',
     clean: true,
   },
   devtool: 'source-map',
@@ -13,11 +16,11 @@ module.exports = {
     rules: [
       {
         test: /\.(png|jpe?g|gif|svg)$/i,
-        type: 'asset/resource'
+        type: 'asset/resource',
       },
       {
         test: /\.(js|jsx)$/,
-        include: /client\/src/,
+        include: path.resolve(__dirname, 'client/src'),
         exclude: /node_modules/,
         use: {
           loader: 'babel-loader',
@@ -38,34 +41,47 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.jsx'],
   },
-  plugins: [
-    new HtmlWebpackPlugin({
-      template: './client/public/index.html',
-    }),
-  ],
   devServer: {
-    port: 3000,
+    port: process.env.PORT || process.env.DEV_PORT || 3000,
+    historyApiFallback: {
+      index: (process.env.BASE_PATH || '/') + 'index.html',
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: process.env.API_BASE,
+        secure: false,
         changeOrigin: true,
+        cookieDomainRewrite: { '*': '' },
+        withCredentials: true,
       },
-      '/images': 'http://localhost:3001',
     },
     static: {
-      directory: path.join(__dirname, 'dist'),
+      publicPath: process.env.BASE_PATH || '/',
+      directory: path.resolve(__dirname, 'client/public'),
     },
     open: true,
     hot: true,
-    historyApiFallback: true,
     client: {
       overlay: true,
       webSocketURL: {
         hostname: 'localhost',
-        port: 3000,
+        port: process.env.PORT || process.env.DEV_PORT || 3000,
         protocol: 'ws',
       },
     },
   },
-  mode: 'development',
+  plugins: [
+    new Dotenv({ systemvars: true, silent: true }),
+    new webpack.DefinePlugin({
+      'process.env.API_BASE': JSON.stringify(process.env.API_BASE || 'http://localhost:3001/api'),
+      'process.env.BASE_PATH': JSON.stringify(process.env.BASE_PATH || '/'),
+      'process.env.DEFAULT_IMAGE_URL': JSON.stringify(process.env.DEFAULT_IMAGE_URL || 'http://localhost:3000/images/logo-default-profile.png'),
+    }),
+    new HtmlWebpackPlugin({
+      template: path.resolve(__dirname, 'client/public/index.html'),
+      filename: 'index.html',
+      publicPath: process.env.BASE_PATH || '/',
+    }),
+  ],
+  mode: process.env.NODE_ENV || 'development',
 };

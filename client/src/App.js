@@ -103,11 +103,13 @@ function AppContent() {
           <Route
             path="/home"
             element={
-              loading
-                ? <div>Loading...</div>
-                : user
-                  ? <Home handleLogout={handleLogout} user={user} />
-                  : <Navigate to="/login" replace />
+              loading ? (
+                <div>Loading...</div>
+              ) : isAuthenticated && user ? (
+                <Home handleLogout={handleLogout} user={user} />
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
           <Route
@@ -130,7 +132,7 @@ function AppContent() {
 
 function App() {
   return (
-    <Router basename={process.env.BASE_PATH}>
+    <Router basename={process.env.BASE_PATH || '/'}>
       <AppContent />
     </Router>
   );

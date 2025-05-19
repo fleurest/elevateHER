@@ -2,6 +2,7 @@ const path = require('path');
 const Dotenv = require('dotenv-webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const webpack = require('webpack');
+const basePath = process.env.BASE_PATH || '/';
 
 module.exports = {
   entry: './client/src/index.js',
@@ -80,7 +81,7 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, 'client/public/index.html'),
       filename: 'index.html',
-      publicPath: process.env.BASE_PATH || '/',
+      publicPath: basePath,
     }),
   ],
   mode: process.env.NODE_ENV || 'development',

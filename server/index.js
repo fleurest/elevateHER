@@ -66,14 +66,28 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-app.get(
-  '/auth/google/callback',
-  passport.authenticate('google', { successRedirect:`${process.env.BASE_PATH}/home`, failureRedirect:`${process.env.BASE_PATH}/login` }),
-  (req, res) => {
-    console.log('Google login success:', req.user);
-    res.redirect(`${process.env.BASE_PATH}/home`);
+app.get('/auth/google/callback',
+  passport.authenticate('google', {
+    failureRedirect: process.env.FRONTEND_LOGIN_URL || 'http://localhost:3000/login',
+    session: true
+  }),
+  (req, res, next) => {
+    console.log('[SERVER] Google login success:', req.user);
+
+    req.login(req.user, (err) => {
+      if (err) {
+        console.error('Login error after Google auth:', err);
+        return res.redirect(process.env.FRONTEND_LOGIN_URL || 'http://localhost:3000/login');
+      }
+
+      console.log('[SERVER] Session after login:', req.session);
+
+      return res.redirect(process.env.FRONTEND_HOME_URL || 'http://localhost:3000/home');
+    });
   }
 );
+
+
 
 // api routes
 app.use('/api', neo4jRoutes);

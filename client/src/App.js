@@ -7,7 +7,7 @@ import HamburgerMenu from './components/HamburgerMenu';
 import Home from './components/Home';
 import Profile from './components/Profile';
 import Search from './components/Search';
-import { BASE_PATH } from './config';
+const BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 function AppContent() {
   const navigate = useNavigate();
@@ -19,18 +19,28 @@ function AppContent() {
   useEffect(() => {
     async function checkSession() {
       try {
-        const res = await fetch('/api/me', { credentials: 'include' });
-        if (res.ok) {
+        const res = await fetch(`${BASE_URL}/api/session`, { credentials: 'include' });
+
+        const contentType = res.headers.get('content-type');
+
+        if (!res.ok) {
+          console.warn("Session check failed with status:", res.status);
+          setIsAuthenticated(false);
+          setUser(null);
+          return;
+        }
+
+        if (contentType && contentType.includes('application/json')) {
           const data = await res.json();
           setUser(data.user);
           setIsAuthenticated(true);
         } else {
-          setIsAuthenticated(false);
-          setUser(null);
+          throw new Error("Invalid response format");
         }
       } catch (err) {
-        console.error('Session check failed', err);
+        console.error("Session check failed", err);
         setIsAuthenticated(false);
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -38,9 +48,8 @@ function AppContent() {
     checkSession();
   }, []);
 
-
   const handleLogin = async ({ email, password }) => {
-    const res = await fetch('/api/login', {
+    const res = await fetch(`${BASE_URL}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -68,7 +77,7 @@ function AppContent() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/logout', {
+      await fetch(`${BASE_URL}/api/logout`, {
         method: 'POST',
         credentials: 'include',
       });

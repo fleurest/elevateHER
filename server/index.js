@@ -106,15 +106,15 @@ app.post('/api/login', async (req, res) => {
   const password = sanitizePassword(req.body.password);
   let session = null;
 
-  if (!username || !password) {
+  if (!email || !password) {
     return res.status(400).json({ error: 'Missing credentials' });
   }
 
   try {
     session = driver.session();
     const result = await session.run(
-      'MATCH (p:Person {username: $username}) RETURN p',
-      { username }
+      'MATCH (p:Person {email: $email}) RETURN p',
+      { email }
     );
 
     if (result.records.length === 0) {
@@ -126,12 +126,23 @@ app.post('/api/login', async (req, res) => {
     const match = await bcrypt.compare(password, hash);
 
     if (match) {
-      req.session.user = {
-        id: person.id,
-        username: person.username,
-        email: person.email,
-      };
-      req.session.loggedIn = true;
+      req.login(person, (err) => {
+        if (err) {
+          console.error('Passport login error:', err);
+          return res.status(500).json({ error: 'Login failed' });
+        }
+
+        res.json({
+          message: 'Login successful',
+          user: {
+            id: person.id,
+            username: person.username,
+            email: person.email,
+          },
+        });
+      });
+
+
       console.log('Session after login', req.session);
       res.json({
         message: 'Login successful',

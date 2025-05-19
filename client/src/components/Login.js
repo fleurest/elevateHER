@@ -57,7 +57,7 @@ const Login = ({ onLogin }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/register', {
+      const response = await fetch(`${process.env.BASE_PATH}/api/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, username, password }),
@@ -138,7 +138,7 @@ const Login = ({ onLogin }) => {
         {/* Google login */}
         <button
           type="button"
-          onClick={() => window.location.href = 'http://localhost:3001/api/auth/google'}
+          onClick={() => window.location.href = `${process.env.BASE_PATH}/api/auth/google`}
           className="auth-button-alt flex items-center justify-center"
         >
           <span>Sign in with Google </span>

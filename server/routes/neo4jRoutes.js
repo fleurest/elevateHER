@@ -320,25 +320,18 @@ router.post('/login', validateLogin, async (req, res) => {
       session?.close();
     }
   });
-  
-
-router.get('/me', (req, res) => {
-  console.log('[API] req.session:', req.session);
-  console.log('[API] req.user:', req.user);
-  if (req.user) {
-    return res.json({ user: req.user });
-  }
-  return res.status(401).json({ error: 'Not authenticated' });
-});
 
 
 router.get('/session', (req, res) => {
-  if (req.session?.user?.username) {
-    return res.status(200).json({ authenticated: true, user: req.session.user });
+  const user = req.user || req.session?.user;
+
+  if (user?.username || user?.email) {
+    return res.status(200).json({ authenticated: true, user });
   } else {
     return res.status(401).json({ authenticated: false });
   }
 });
+
 
 router.post('/logout', (req, res) => {
   req.session.destroy((err) => {
@@ -378,19 +371,6 @@ router.post('/user/update', isAuthenticated, async (req, res) => {
     res.status(500).json({ error: 'Failed to update user profile' });
   } finally {
     await session.close();
-  }
-});
-
-router.get('/refresh', (req, res) => {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ error: 'No token found' });
-
-  try {
-    const decoded = jwt.verify(token, process.env.SESSION_SECRET);
-    res.json({ username: decoded.username });
-  } catch (err) {
-    console.error('[SERVER] Token invalid:', err);
-    res.status(403).json({ error: 'Invalid or expired token' });
   }
 });
 

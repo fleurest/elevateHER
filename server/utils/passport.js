@@ -12,26 +12,19 @@ passport.serializeUser((user, done) => {
 });
 
 passport.deserializeUser(async (email, done) => {
+    const session = driver.session();
     try {
-      const session = driver.session();
       const result = await session.run(
         'MATCH (p:Person {email: $email}) RETURN p',
         { email }
       );
-      await session.close();
-      
       const record = result.records[0];
-      if (!record) {
-        console.warn('[deserializeUser] No user found for email:', email);
-        return done(null, null);
-      }
-  
-      const user = record.get('p').properties;
-      console.log('[deserializeUser] Found user:', user);
-      return done(null, user);
+      if (!record) return done(null, false);
+      return done(null, record.get('p').properties);
     } catch (err) {
-      console.error('[deserializeUser] Error:', err);
-      return done(err);
+      done(err);
+    } finally {
+      await session.close();
     }
   });
   

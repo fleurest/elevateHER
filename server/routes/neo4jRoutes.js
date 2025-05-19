@@ -323,8 +323,10 @@ router.post('/login', validateLogin, async (req, res) => {
   
 
 router.get('/me', (req, res) => {
-  if (req.session?.user) {
-    return res.json({ user: req.session.user });
+  console.log('[API] req.session:', req.session);
+  console.log('[API] req.user:', req.user);
+  if (req.user) {
+    return res.json({ user: req.user });
   }
   return res.status(401).json({ error: 'Not authenticated' });
 });
@@ -798,18 +800,24 @@ router.get('/auth/google', passport.authenticate('google', {
 router.get(
   '/auth/google/callback',
   passport.authenticate('google', {
-    failureRedirect: '/login',
+    failureRedirect: `${process.env.BASE_PATH}/login`,
     session: true
   }),
   (req, res) => {
+    
     console.log('Google login success:', req.user);
   
-    req.session.user = {
-      identifier: req.user.email,
-      username: req.user.username || req.user.displayName
-    };
-  
-    res.redirect('http://localhost:3000/home');
+    req.login(req.user, (err) => {
+      if (err) {
+        console.error('Login error:', err);
+        return res.redirect(process.env.FRONTEND_LOGIN_URL || '/login');
+      }
+
+      console.log('Session after login:', req.session);
+
+      const base = process.env.BASE_PATH?.replace(/\/+$/, '') || '';
+      res.redirect(process.env.FRONTEND_HOME_URL || 'http://localhost:3000/home');
+    });
   }
 );
 

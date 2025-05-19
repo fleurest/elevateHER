@@ -53,6 +53,7 @@ app.use(session({
   saveUninitialized: false,
   name: 'sessionId',
   cookie: {
+    path: process.env.BASE_PATH || '/',
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -65,23 +66,37 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-app.get(
-  '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login', session: true }),
-  (req, res) => {
-    console.log('Google login success:', req.user);
-    res.redirect(clientOrigin);
+app.get('/auth/google/callback',
+  passport.authenticate('google', {
+    failureRedirect: process.env.FRONTEND_LOGIN_URL || 'http://localhost:3000/login',
+    session: true
+  }),
+  (req, res, next) => {
+    console.log('[SERVER] Google login success:', req.user);
+
+    req.login(req.user, (err) => {
+      if (err) {
+        console.error('Login error after Google auth:', err);
+        return res.redirect(process.env.FRONTEND_LOGIN_URL || 'http://localhost:3000/login');
+      }
+
+      console.log('[SERVER] Session after login:', req.session);
+
+      return res.redirect(process.env.FRONTEND_HOME_URL || 'http://localhost:3000/home');
+    });
   }
 );
+
+
 
 // api routes
 app.use('/api', neo4jRoutes);
 
 // assets
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
-app.use(express.static(path.join(__dirname, '../client/build')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build/index.html'));
+app.use(process.env.BASE_PATH, express.static(path.join(__dirname, '../client/build')));
+app.get(`${process.env.BASE_PATH}/*`, (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
 app.post('/api/login', async (req, res) => {

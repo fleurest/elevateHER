@@ -1,3 +1,4 @@
+const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { driver } = require('../neo4j');
@@ -18,12 +19,22 @@ passport.deserializeUser(async (email, done) => {
         { email }
       );
       await session.close();
+      
       const record = result.records[0];
-      done(null, record?.get('p').properties || null);
+      if (!record) {
+        console.warn('[deserializeUser] No user found for email:', email);
+        return done(null, null);
+      }
+  
+      const user = record.get('p').properties;
+      console.log('[deserializeUser] Found user:', user);
+      return done(null, user);
     } catch (err) {
-      done(err);
+      console.error('[deserializeUser] Error:', err);
+      return done(err);
     }
   });
+  
 
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,

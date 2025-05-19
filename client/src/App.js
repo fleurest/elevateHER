@@ -7,6 +7,7 @@ import HamburgerMenu from './components/HamburgerMenu';
 import Home from './components/Home';
 import Profile from './components/Profile';
 import Search from './components/Search';
+import { BASE_PATH } from './config';
 
 function AppContent() {
   const navigate = useNavigate();
@@ -45,15 +46,15 @@ function AppContent() {
       credentials: 'include',
       body: JSON.stringify({ email, password }),
     });
-  
+
     const raw = await res.text();
     console.log('RAW RESPONSE:', raw);
-  
+
     if (!res.ok) {
       console.error('Login failed:', raw);
       return;
     }
-  
+
     try {
       const data = JSON.parse(raw);
       setUser(data.user);
@@ -63,7 +64,7 @@ function AppContent() {
       console.error('Failed to parse JSON:', err);
       setError('Unexpected server response');
     }
-  };  
+  };
 
   const handleLogout = async () => {
     try {
@@ -102,11 +103,13 @@ function AppContent() {
           <Route
             path="/home"
             element={
-              loading
-                ? <div>Loading...</div>
-                : user
-                  ? <Home handleLogout={handleLogout} user={user} />
-                  : <Navigate to="/login" replace />
+              loading ? (
+                <div>Loading...</div>
+              ) : isAuthenticated && user ? (
+                <Home handleLogout={handleLogout} user={user} />
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
           <Route
@@ -129,7 +132,7 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
+    <Router basename={process.env.BASE_PATH || '/'}>
       <AppContent />
     </Router>
   );

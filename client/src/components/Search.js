@@ -78,7 +78,7 @@ function Search({ user }) {
         } else if (entityType === 'organisation') {
             url = '/api/team/upsert';
         } else if (entityType === 'sport') {
-            url = '/api/link-to-sport';
+            url = '/api/sport';
             payload = { name: merged.name, type: 'athlete', sportName: merged.sport };
         } else if (entityType === 'event') {
             url = '/api/events/create';

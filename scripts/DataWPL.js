@@ -141,7 +141,7 @@ const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
     
                 console.log(`Linked ${player.name} -> ${meta.teamName}`);
         
-                await axios.post(`${API_BASE}/link-to-sport`, {
+                await axios.post(`${API_BASE}/sport`, {
                     name: player.name,
                     type: 'athlete',
                     sportName: 'Cricket'
@@ -163,7 +163,7 @@ const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
         
                     console.log(`Linked ${meta.teamName} -> Women's Premier League (Cricket)`);
         
-                    await axios.post(`${API_BASE}/link-to-sport`, {
+                    await axios.post(`${API_BASE}/sport`, {
                         name: meta.teamName,
                         type: 'team',
                         sportName: 'Cricket'

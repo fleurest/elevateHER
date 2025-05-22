@@ -16,10 +16,11 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+
   useEffect(() => {
     async function checkSession() {
       try {
-        const res = await fetch('/api/me', { credentials: 'include' });
+        const res = await fetch(`${process.env.API_BASE}/api/me`, { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
@@ -79,6 +80,11 @@ function AppContent() {
     setIsAuthenticated(false);
     navigate('/login');
   };
+
+  console.log('*** loading -->', loading)
+  console.log('*** isAuthenticated -->', isAuthenticated)
+  console.log('*** user -->', user)
+
 
   return (
     <>

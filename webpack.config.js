@@ -74,7 +74,7 @@ module.exports = {
   plugins: [
     new Dotenv({ systemvars: true, silent: true }),
     new webpack.DefinePlugin({
-      'process.env.API_BASE': JSON.stringify(process.env.API_BASE || 'http://localhost:3001/api'),
+      'process.env.API_BASE': JSON.stringify(process.env.API_BASE),
       'process.env.BASE_PATH': JSON.stringify(process.env.BASE_PATH || '/'),
       'process.env.DEFAULT_IMAGE_URL': JSON.stringify(process.env.DEFAULT_IMAGE_URL || 'http://localhost:3000/images/logo-default-profile.png'),
     }),

@@ -65,7 +65,7 @@ async function loginAndGetCookies(page) {
 
     try {
       await axios.post(
-        `${API_BASE}/link-to-sport`,
+        `${API_BASE}/sport`,
         { name: teamName, type: 'team', sportName: 'Rugby Union' },
         { headers: { 'Content-Type': 'application/json' }, withCredentials: true }
       );
@@ -167,7 +167,7 @@ async function loginAndGetCookies(page) {
 
       try {
         await axios.post(
-          `${API_BASE}/link-to-sport`,
+          `${API_BASE}/sport`,
           { name: playerName, type: 'athlete', sportName: 'Rugby Union' },
           { headers: { 'Content-Type': 'application/json' }, withCredentials: true }
         );

@@ -24,10 +24,13 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
+  const navigate = useNavigate();
+
+  console.log('*** RENDERING HOMEPAGE ***')
 
   useEffect(() => {
     if (!user?.username) {
-      fetch('${API_BASE}/auth/session', { credentials: 'include' })
+      fetch(`${process.env.API_BASE}/auth/session`, { credentials: 'include' })
         .then(res => {
           if (!res.ok) throw new Error('Not authenticated');
           return res.json();
@@ -41,14 +44,14 @@ function HomePage({ handleLogout, user, setUser }) {
   }, [user, setUser, navigate]);
 
   useEffect(() => {
-    fetch('/api/calendar-events')
+    fetch(`${process.env.API_BASE}/api/calendar-events`)
       .then(res => res.json())
       .then(data => setUpcomingEvents(Array.isArray(data) ? data : []))
       .catch(err => console.error('Error fetching calendar events:', err));
   }, []);
 
   useEffect(() => {
-    fetch('/api/past-events')
+    fetch(`${process.env.API_BASE}/api/past-events`)
       .then(res => res.json())
       .then(data => setPastEvents(Array.isArray(data) ? data : []))
       .catch(err => console.error('Error fetching past events:', err));
@@ -73,7 +76,6 @@ function HomePage({ handleLogout, user, setUser }) {
   const [suggestedFriends, setSuggestedFriends] = useState([]);
   // show person on node click
   const [selectedPerson, setSelectedPerson] = useState(null);
-  const navigate = useNavigate();
   const graphRef = useRef(null);
 
   const toggleProfile = () => {
@@ -94,21 +96,22 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`/api/top-users`);
-
-      const text = await res.text(); //
-      console.log('Raw response from /api/top-users:', text);
+      const res = await fetch(`${process.env.API_BASE}/api/top-users`,
+        { credentials: 'include' }
+      );
 
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
       }
 
-      const data = JSON.parse(text);
+      const data = await res.json();
+
       setAllPeople(data);
     } catch (err) {
       console.error('Error fetching users:', err);
     }
   };
+
 
   useEffect(() => {
     if (!user) {
@@ -123,7 +126,8 @@ function HomePage({ handleLogout, user, setUser }) {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    fetch('/api/calendar-events')
+    fetch(`${process.env.API_BASE}/api/calendar-events`),
+    { credentials: 'include' }
       .then(res => res.json())
       .then(data => {
         console.log('Fetched events:', data);
@@ -140,12 +144,14 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const fetchFriends = async () => {
     try {
-      const res = await fetch(`/api/user-friends/${user.username}`);
+      const res = await fetch(`${process.env.API_BASE}/api/user-friends/${user.username}`,
+        { credentials: 'include', }
+      );
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
       setFriendResults(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Could not fetch friends:', err);
-      setFriendResults([]);
     }
   };
 
@@ -157,10 +163,12 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const fetchSuggestedFriends = async () => {
     try {
-      const res = await fetch('/api/top-users');
+      const res = await fetch(`${process.env.API_BASE}/api/top-users`,
+      { credentials:'include'}
+    );
 
       const text = await res.text();
-      console.log('Raw response from /api/top-users', text);
+      console.log('***Raw response from /api/top-users:', text);
 
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
@@ -174,12 +182,15 @@ function HomePage({ handleLogout, user, setUser }) {
   };
 
 
+
   useEffect(() => {
     fetchSuggestedFriends();
   }, []);
 
   const filterGraphToFriends = async () => {
-    const res = await fetch(`/api/user-friends/${user.username}`);
+    const res = await fetch(`${process.env.API_BASE}/api/user-friends/${user.username}`,
+      { credentials: 'include' }
+    );
     const data = await res.json();
     setGraphElements(data);
   };
@@ -187,7 +198,9 @@ function HomePage({ handleLogout, user, setUser }) {
   useEffect(() => {
     const fetchTopFriends = async () => {
       try {
-        const res = await fetch(`/api/top-friends/${user.username}`);
+        const res = await fetch(`${process.env.API_BASE}/api/user-friends/${user.username}`,
+          { credentials: 'include' }
+        );
         const data = await res.json();
         if (Array.isArray(data)) {
           setTopFriends(data);
@@ -208,7 +221,9 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const filterGraphForFriends = async () => {
     try {
-      const res = await fetch(`/api/user-friends/${user.username}`);
+      const res = await fetch(`${process.env.API_BASE}/api/${user.username}`,
+        { credentials: 'include' }
+      );
       const data = await res.json();
       if (graphRef.current) {
         graphRef.current.setElements(data);
@@ -221,7 +236,9 @@ function HomePage({ handleLogout, user, setUser }) {
   // user search in the last panel
   const handleSearch = async () => {
     try {
-      const res = await fetch(`/api/search-users?query=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(`${process.env.API_BASE}/api/search-users?query=${encodeURIComponent(searchQuery)}`,
+      { credentials: 'include' }
+    );
       const data = await res.json();
       setSearchResults(data);
     } catch (err) {
@@ -231,7 +248,9 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const handleFriendSearch = async (query) => {
     try {
-      const res = await fetch(`/api/search-friends?query=${encodeURIComponent(query)}`);
+      const res = await fetch(`${process.env.API_BASE}/api/search-friends?query=${encodeURIComponent(query)}`,
+      { credentials: 'include' }
+    );
       const data = await res.json();
       setFriendResults(data);
     } catch (err) {
@@ -242,7 +261,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const handleSendFriendRequest = async (username) => {
     try {
-      const res = await fetch(`/api/send-friend-request/${user.username}/${username}`, { method: 'POST' });
+      const res = await fetch(`${process.env.API_BASE}/api/send-friend-request/${user.username}/${username}`, { method: 'POST' });
       const data = await res.json();
       console.log('Friend request sent:', data);
     } catch (err) {
@@ -266,7 +285,7 @@ function HomePage({ handleLogout, user, setUser }) {
   useEffect(() => {
     async function fetchGraph() {
       try {
-        const res = await fetch('http://localhost:3001/api/graph');
+        const res = await fetch(`${process.env.API_BASE}/api/graph`);
         const data = await res.json();
         console.log('Graph Data:', data);
         setGraphData(data);
@@ -314,7 +333,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
           if (filterType === 'favourites') {
             try {
-              const res = await fetch(`/api/user-likes/${user?.username}`);
+              const res = await fetch(`${process.env.API_BASE}/api/user-likes/${user?.username}`);
               const liked = await res.json();
 
               if (!liked.length) {
@@ -418,7 +437,7 @@ function HomePage({ handleLogout, user, setUser }) {
   }, [graphData, filterType, user?.username, showProfile]);
 
   useEffect(() => {
-    fetch('/api/top-users')
+    fetch(`${process.env.API_BASE}/api/top-users`)
       .then(res => res.json())
       .then(data => {
         console.log('Top Users Response:', data);
@@ -536,7 +555,7 @@ function HomePage({ handleLogout, user, setUser }) {
           <div className="center-top-icons">
             {user && (
               <Link
-                to={`/profile/${user.username}`}
+                to={`/ profile / ${user.username}`}
                 className="flex flex-col items-center mx-1 w-12"
               >
                 <img
@@ -554,7 +573,7 @@ function HomePage({ handleLogout, user, setUser }) {
               .slice(0, showAllFriends ? 5 : 2)
               .map((friend) => (
                 <Link
-                  to={`/profile/${friend.username}`}
+                  to={`/ profile / ${friend.username}`}
                   key={friend.username}
                   className="flex flex-col items-center mx-1 w-12"
                 >

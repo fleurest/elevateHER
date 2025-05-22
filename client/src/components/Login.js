@@ -138,7 +138,7 @@ const Login = ({ onLogin }) => {
         {/* Google login */}
         <button
           type="button"
-          onClick={() => window.location.href = 'http://localhost:3001/api/auth/google'}
+          onClick={() => window.location.href = 'http://localhost:3001/auth/google'}
           className="auth-button-alt flex items-center justify-center"
         >
           <span>Sign in with Google </span>

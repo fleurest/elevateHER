@@ -122,7 +122,7 @@ const STATS_HEADERS = {
                     teamName,
                     leagueName: 'WNBA'
                 });
-                await axios.post(`${API_BASE}/link-to-sport`, {
+                await axios.post(`${API_BASE}/sport`, {
                     name: teamName,
                     type: 'team',
                     sportName: 'Basketball'

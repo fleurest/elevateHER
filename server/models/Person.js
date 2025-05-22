@@ -113,7 +113,7 @@ class Person {
         }
     }
 
-    async getLikedPlayersByUser(username) {
+    async getLikedAthletesByUser(username) {
         const session = this.driver.session();
         try {
             const result = await session.run(

@@ -17,26 +17,26 @@ function Profile({ username, handleLogout }) {
         'https://via.placeholder.com/120'
     );
 
-    const [topPlayers, setTopPlayers] = useState([]);
+    const [topAthletes, setTopAthletes] = useState([]);
     const [seasonError, setSeasonError] = useState('');
     const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
 
-    const [likedPlays, setLikedPlays] = useState([]);
-    const [likedPlaysLoading, setLikedPlaysLoading] = useState(false);
-    const [likedPlaysError, setLikedPlaysError] = useState(null);
+    const [likedAthletes, setLikedAthletes] = useState([]);
+    const [likedAthletesLoading, setLikedAthletesLoading] = useState(false);
+    const [likedAthletesError, setLikedAthletesError] = useState(null);
 
     // load the user’s top 5 liked plays
     useEffect(() => {
-        async function fetchLikedPlays() {
+        async function fetchLikedAthletes() {
             if (!username) return;
 
-            setLikedPlaysLoading(true);
-            setLikedPlaysError(null);
+            setLikedAthletesLoading(true);
+            setLikedAthletesError(null);
 
             try {
-                const response = await fetch(`/api/user-likes/${username}`);
+                const response = await fetch(`${process.env.API_BASE}/api/user-likes/${username}`);
                 if (!response.ok) {
-                    let errorMessage = `Failed to fetch liked plays: ${response.status}`;
+                    let errorMessage = `Failed to fetch liked athletes: ${response.status}`;
                     try {
                         const errorData = await response.json();
                         if (errorData && errorData.error) {
@@ -49,17 +49,17 @@ function Profile({ username, handleLogout }) {
 
                     throw new Error(errorMessage);
                 }
-                const playsData = await response.json();
-                setLikedPlays(playsData);
+                const athletesData = await response.json();
+                setLikedAthletes(athletesData);
             } catch (error) {
-                console.error('Error fetching liked plays:', error);
-                setLikedPlaysError(error.message);
+                console.error('Error fetching liked athletes:', error);
+                setLikedAthletesError(error.message);
             } finally {
-                setLikedPlaysLoading(false);
+                setLikedAthletesLoading(false);
             }
         }
 
-        fetchLikedPlays();
+        fetchLikedAthletes();
     }, [username]);
 
     // initial profile info
@@ -185,12 +185,12 @@ function Profile({ username, handleLogout }) {
             </div>
             <div>
                 <h2>My Top 5 Plays</h2>
-                {likedPlaysLoading && <p>Loading liked plays...</p>} {/* Show loading message */}
-                {likedPlaysError && <p style={{ color: 'red' }}>{likedPlaysError}</p>} {/* Show error message */}
-                {!likedPlaysLoading && !likedPlaysError && (
-                    likedPlays.length > 0 ? (
+                {likedAthletesLoading && <p>Loading liked plays...</p>} {/* Show loading message */}
+                {likedAthletesError && <p style={{ color: 'red' }}>{likedAthletesError}</p>} {/* Show error message */}
+                {!likedAthletesLoading && !likedAthletesError && (
+                    likedAthletes.length > 0 ? (
                         <ul>
-                            {likedPlays.map((play) => (
+                            {likedAthletes.map((play) => (
                                 <li key={play.id}>
                                     <strong>{play.title}</strong>
                                     {play.description ? <p>{play.description}</p> : null}

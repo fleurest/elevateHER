@@ -1,15 +1,10 @@
 const router = require('express').Router();
+const { isAuthenticated } = require('../../../authentication');
+const { getCalendarEvents, listPastEvents, listUpcomingEvents } = require('../../../services/EventCalService');
+const axios = require('axios');
 
-router.get('/calendar-events', async (req, res) => {
-  try {
-    const calendarId = 'c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc@group.calendar.google.com';
-    const events = await listUpcomingEvents(calendarId);
-    res.json(events);
-  } catch (err) {
-    console.error('Failed to fetch calendar events:', err);
-    res.status(500).json({ error: 'Calendar fetch error' });
-  }
-});
+const calendarId = process.env.GOOGLE_CALENDAR_ID;
+const apiKey    = process.env.GOOGLE_API_KEY;
 
 router.get('/past-events', async (req, res) => {
   try {

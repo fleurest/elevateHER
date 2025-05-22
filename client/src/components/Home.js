@@ -45,7 +45,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
 
   useEffect(() => {
-    fetch(`${process.env.API_BASE}/api/past-events`)
+    fetch(`${process.env.API_BASE}/api/events/past-events`)
       .then(res => res.json())
       .then(data => setPastEvents(Array.isArray(data) ? data : []))
       .catch(err => console.error('Error fetching past events:', err));
@@ -90,7 +90,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/top-users`,
+      const res = await fetch(`${process.env.API_BASE}/api/person/top-users`,
         { credentials: 'include' }
       );
 
@@ -120,7 +120,7 @@ function HomePage({ handleLogout, user, setUser }) {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    fetch(`${process.env.API_BASE}/api/calendar-events`,
+    fetch(`${process.env.API_BASE}/api/events/calendar-events`,
     { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
@@ -138,8 +138,8 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const fetchFriends = async () => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/user-friends/${user.username}`,
-        { credentials: 'include', }
+      const res = await fetch(`${process.env.API_BASE}/api/person/user-friends/${user.username}`,
+        { credentials: 'include'}
       );
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
@@ -157,12 +157,12 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const fetchSuggestedFriends = async () => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/top-users`,
+      const res = await fetch(`${process.env.API_BASE}/api/person/top-users`,
       { credentials:'include'}
     );
 
       const text = await res.text();
-      console.log('***Raw response from /api/top-users:', text);
+      console.log('***Raw response from /api/person/top-users:', text);
 
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
@@ -182,7 +182,7 @@ function HomePage({ handleLogout, user, setUser }) {
   }, []);
 
   const filterGraphToFriends = async () => {
-    const res = await fetch(`${process.env.API_BASE}/api/user-friends/${user.username}`,
+    const res = await fetch(`${process.env.API_BASE}/api/person/user-friends/${user.username}`,
       { credentials: 'include' }
     );
     const data = await res.json();
@@ -255,7 +255,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const handleSendFriendRequest = async (username) => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/send-friend-request/${user.username}/${username}`, { method: 'POST' });
+      const res = await fetch(`${process.env.API_BASE}/api/person/send-friend-request/${user.username}/${username}`, { method: 'POST' });
       const data = await res.json();
       console.log('Friend request sent:', data);
     } catch (err) {

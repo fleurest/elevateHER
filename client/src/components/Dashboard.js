@@ -113,7 +113,7 @@ const Dashboard = ({ handleLogout }) => {
     return '';
   };
   useEffect(() => {
-    fetch('http://localhost:3001/api/athletes')
+    fetch(`${process.env.API_BASE}/api/athletes`)
       .then(res => res.json())
       .then(data => setAthletes(data))
       .catch(console.error);
@@ -207,7 +207,7 @@ const Dashboard = ({ handleLogout }) => {
       const personParam = params.get('person');
       if (personParam) {
         const name = decodeURIComponent(personParam.replace(/_/g, ' '));
-        fetch('http://localhost:3001/api/graph')
+        fetch(`${process.env.API_BASE}/api/graph`)
           .then(res => res.json())
           .then(graphData => {
             const allNodes = graphData.nodes || [];
@@ -234,7 +234,7 @@ const Dashboard = ({ handleLogout }) => {
         drawGraph({ nodes: [], edges: [] });
       }
     } else {
-      fetch('http://localhost:3001/api/graph')
+      fetch(`${process.env.API_BASE}/api/graph`)
         .then(res => res.json())
         .then(drawGraph)
         .catch(console.error);
@@ -246,12 +246,12 @@ const Dashboard = ({ handleLogout }) => {
 
   const handlePageRank = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/graph/pagerank');
+      const res = await fetch(`${process.env.API_BASE}/api/graph/pagerank`);
       let data = await res.json();
       if (!Array.isArray(data)) data = data.data || [];
       setPageRanks(data.slice(0, 5));
       const names = data.slice(0, 100).map(p => p.name);
-      const r = await fetch('http://localhost:3001/api/graph/filtered', {
+      const r = await fetch(`${process.env.API_BASE}/api/graph/filtered`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ names })
@@ -265,7 +265,7 @@ const Dashboard = ({ handleLogout }) => {
 
   const handleCommunities = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/graph/communities');
+      const res = await fetch(`${process.env.API_BASE}/api/graph/communities`);
       let data = await res.json();
       if (!Array.isArray(data)) data = data.communities || data;
       setCommunities(data);

@@ -1,4 +1,7 @@
 const router = require('express').Router();
+const driver = require('../../../neo4j');
+const { isAuthenticated } = require('../../../authentication');
+
 
 // router.post('/add-player', isAuthenticated, (req, res) => personController.createOrUpdate(req, res));
 
@@ -50,7 +53,7 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-router.post('/athlete/create', async (req, res) => {
+router.post('/create', async (req, res) => {
     const session = driver.session();
     try {
         const { name, sport, nationality, roles = ['athlete'], gender, profileImage = null, birthDate = null, position = null } = req.body;
@@ -101,7 +104,38 @@ router.post('/athlete/create', async (req, res) => {
     }
 });
 
+router.put('/uuid/:uuid', isAuthenticated, async (req, res) => {
+    const { uuid } = req.params;
+    const { name, sport, description } = req.body;
+  
+    const session = driver.session();
+  
+    try {
+      const result = await session.run(
+        `
+        MATCH (p:Person {uuid: $uuid})
+        SET p.name = $name,
+            p.sport = $sport,
+            p.description = $description
+        RETURN p
+        `,
+        { uuid, name, sport, description }
+      );
+  
+      const updatedPerson = result.records[0]?.get('p')?.properties;
+      if (!updatedPerson) {
+        return res.status(404).json({ error: 'Person not found' });
+      }
+  
+      res.status(200).json({ message: 'Athlete updated', person: updatedPerson });
+    } catch (err) {
+      console.error('Error updating athlete by UUID:', err);
+      res.status(500).json({ error: 'Failed to update athlete' });
+    } finally {
+      await session.close();
+    }
+  });
 
-// GET /atheletes/{athleteId}
+// GET /athletes/{athleteId}
 
 module.exports = router;

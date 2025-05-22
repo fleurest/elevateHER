@@ -72,7 +72,7 @@ module.exports = {
     },
   },
   plugins: [
-    new Dotenv({ systemvars: true, silent: true }),
+    new Dotenv({ systemvars: false, silent: true }),
     new webpack.DefinePlugin({
       'process.env.API_BASE': JSON.stringify(process.env.API_BASE),
       'process.env.BASE_PATH': JSON.stringify(process.env.BASE_PATH || '/'),

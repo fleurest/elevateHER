@@ -43,12 +43,6 @@ function HomePage({ handleLogout, user, setUser }) {
     }
   }, [user, setUser, navigate]);
 
-  useEffect(() => {
-    fetch(`${process.env.API_BASE}/api/calendar-events`)
-      .then(res => res.json())
-      .then(data => setUpcomingEvents(Array.isArray(data) ? data : []))
-      .catch(err => console.error('Error fetching calendar events:', err));
-  }, []);
 
   useEffect(() => {
     fetch(`${process.env.API_BASE}/api/past-events`)
@@ -126,8 +120,8 @@ function HomePage({ handleLogout, user, setUser }) {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    fetch(`${process.env.API_BASE}/api/calendar-events`),
-    { credentials: 'include' }
+    fetch(`${process.env.API_BASE}/api/calendar-events`,
+    { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         console.log('Fetched events:', data);

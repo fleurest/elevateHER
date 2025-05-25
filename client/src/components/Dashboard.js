@@ -135,7 +135,7 @@ const Dashboard = ({ handleLogout }) => {
           n.data.image = img;
           return n;
         }),
-        
+
         ...(data.edges || [])
       ],
       style: [
@@ -173,7 +173,7 @@ const Dashboard = ({ handleLogout }) => {
       n.connectedEdges().removeClass('faded');
       n.connectedEdges().connectedNodes().removeClass('faded');
       const bd = fmt(d.birthDate);
-      setHoverData({ name: d.label, role: d.primaryRole, sport: d.sport, nationality: d.nationality});
+      setHoverData({ name: d.label, role: d.primaryRole, sport: d.sport, nationality: d.nationality });
       setHoverPosition({ x: p.x + 20, y: p.y + 20 });
     });
     cy.on('mouseout', 'node', () => {
@@ -411,15 +411,17 @@ const Dashboard = ({ handleLogout }) => {
         <button onClick={handlePageRank}>PageRank</button>
         <button onClick={handleCommunities} style={{ marginLeft: '10px' }}>Communities</button>
       </div>
-      <button onClick={exportCSV} style={{ marginLeft: '10px' }}>
-        Export CSV
-      </button>
-      <button onClick={exportJSON} style={{ marginLeft: '10px' }}>
-        Export JSON
-      </button>
-      <button onClick={exportGEXF} style={{ marginLeft: '10px' }}>
-        Export GEXF
-      </button>
+      <div className="export-controls">
+        <button onClick={exportCSV}>Export CSV</button>
+        <button onClick={exportJSON}>Export JSON</button>
+        <button onClick={exportGEXF}>Export GEXF</button>
+      </div>
+      <div id="zoomWidget">
+        <button aria-label="Zoom Out" onClick={() => cyRef.current && cyRef.current.zoom(cyRef.current.zoom() * 0.85)}>-</button>
+        <div className="zoom-rail"></div>
+        <button aria-label="Zoom In" onClick={() => cyRef.current && cyRef.current.zoom(cyRef.current.zoom() * 1.15)}>+</button>
+      </div>
+
       {hoverData && hoverPosition && (
         <div style={{ position: 'fixed', top: hoverPosition.y, left: hoverPosition.x, backgroundColor: 'rgba(255,255,255,0.9)', padding: '8px', border: '1px solid #ccc', borderRadius: '6px', zIndex: 1003, fontSize: '12px', pointerEvents: 'none' }}>
           <strong>{hoverData.name}</strong><br />

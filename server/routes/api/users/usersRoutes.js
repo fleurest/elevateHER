@@ -1,7 +1,63 @@
 const router = require('express').Router();
-const driver = require('../../../neo4j');
-const { isAuthenticated, isAdmin } = require('../../../authentication');
+const { driver } = require('../../../neo4j');
+const bcrypt = require('bcrypt');
+const { validateLogin, checkValidation } = require('../../../utils/validators');
+const { isAuthenticated, isAdmin, isVerified} = require('../../../authentication');
+const Person = require('../../../models/Person');
 const PersonService = require('../../../services/PersonService');
+const PersonController = require('../../../controllers/PersonController');
+
+const personModel   = new Person(driver);
+const personService = new PersonService(personModel, driver);
+const personController = new PersonController(personService);
+
+
+// router.post('/',         createPerson);    // signup
+// router.post('/login',    loginPerson);
+// router.get('/:id',       getPersonProfile);
+// router.patch('/:id',     updatePerson);
+// router.delete('/:id',    deletePerson);
+
+// router.get(   '/',        (req, res) => ctl.list(req, res) );
+// router.post(  '/',        (req, res) => ctl.createOrUpdate(req, res) );
+// router.post(  '/login',   (req, res) => ctl.login(req, res) );
+// router.get(   '/search',  (req, res) => ctl.search(req, res) );
+// router.get(   '/:id',     (req, res) => ctl.getById(req, res) );
+// router.patch( '/:id',     (req, res) => ctl.update(req, res) );
+// router.delete('/:id',     (req, res) => ctl.delete(req, res) );
+
+
+// People route
+/**
+ * GET /api/people
+ * Query string parameters:
+ * - 
+ * - 
+ */
+
+// SIGN UP
+router.post('/', personController.createOrUpdatePerson);
+
+// LOGIN
+router.post(
+  '/login',
+  validateLogin,
+  checkValidation,
+  personController.login
+);
+
+// SESSION CHECK
+router.get('/session', personController.sessionInfo);
+
+// LOGOUT
+router.post('/logout', personController.logout);
+
+
+router.get(
+  '/search',
+  isAuthenticated,
+  personController.searchUsers
+);
 
 router.delete('/uuid/:uuid', isAdmin, async (req, res) => {
   const { uuid } = req.params;
@@ -35,7 +91,7 @@ router.delete('/uuid/:uuid', isAdmin, async (req, res) => {
 });
 
 
-router.get('/person/likes/:username', async (req, res) => {
+router.get('/likes/:username', async (req, res) => {
   const { username } = req.params;
 
   try {
@@ -71,7 +127,8 @@ router.post('/likes', isAuthenticated, async (req, res) => {
   }
 });
 
-router.get('/person/friends/:username', async (req, res) => {
+// GET friends for username
+router.get('/friends/:username', async (req, res) => {
   const { username } = req.params;
 
   try {
@@ -83,17 +140,10 @@ router.get('/person/friends/:username', async (req, res) => {
   }
 });
 
-router.get('/top-users', async (req, res) => {
-  try {
-    const users = await personService.getTopUsers();
-    res.json(users);
-  } catch (error) {
-    console.error('[SERVER] Error fetching top users:', error);
-    res.status(500).json({ error: 'Failed to fetch top users' });
-  }
-});
+// USERS TOP 5
+router.get('/top', personController.getTopUsers);
 
-router.get('/user-friends/:username', isAuthenticated, async (req, res) => {
+router.get('/friends/:username', isAuthenticated, async (req, res) => {
   const { username } = req.params;
   try {
     const records = await graph.getAcceptedFriends(username);
@@ -128,7 +178,7 @@ router.get('/user-friends/:username', isAuthenticated, async (req, res) => {
 
 
 // friend request accepted
-router.post('/friend-accept', async (req, res) => {
+router.post('/accept', async (req, res) => {
   const { fromUsername, toUsername } = req.body;
 
   try {
@@ -141,7 +191,7 @@ router.post('/friend-accept', async (req, res) => {
 });
 
 // incoming friend requests
-router.get('/friends/pending-incoming/:username', async (req, res) => {
+router.get('/pending-incoming/:username', async (req, res) => {
   try {
     const results = await personModel.getIncomingFriendRequests(req.params.username);
     res.json({ incoming: results });
@@ -199,6 +249,33 @@ router.post('/friend-request', isAuthenticated, async (req, res) => {
   } catch (err) {
     console.error('Error sending friend request:', err);
     res.status(500).json({ error: 'Failed to send friend request' });
+  }
+});
+
+// POST users profile update
+router.post('/update', isAuthenticated, async (req, res) => {
+  const { username, email = '', location = '', bio = '' } = req.body;
+  const session = driver.session();
+
+  try {
+    const result = await session.run(
+      `
+      MATCH (p:Person {username: $username})
+      SET p.email = $email,
+          p.location = $location,
+          p.bio = $bio
+      RETURN p
+      `,
+      { username, email, location, bio }
+    );
+
+    const updatedProps = result.records[0]?.get('p').properties;
+    res.json(updatedProps);
+  } catch (err) {
+    console.error('Error updating profile:', err);
+    res.status(500).json({ error: 'Failed to update user profile' });
+  } finally {
+    await session.close();
   }
 });
 

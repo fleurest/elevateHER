@@ -1,10 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+const driver = require('../neo4j');
+const Graph = require('../models/Graph')
 
 class GraphService {
-  constructor(graphModel) {
+  constructor(graphModel, driver) {
     this.graphModel = graphModel;
-    this.driver = graphModel.driver;
+    this.driver = driver;
     this.graphName = 'peopleKinSport';
   }
 

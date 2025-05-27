@@ -6,6 +6,8 @@ const session = require('express-session');
 const { verifyConnection, driver } = require('./neo4j');
 const neo4jRoutes = require('./routes/neo4jRoutes');
 const apiRoutes = require('./routes/api');
+const authRoutes = require('./routes/auth/authRoutes');
+
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const passport = require('./utils/passport');
@@ -21,7 +23,6 @@ const SSL_KEY_PATH = process.env.SSL_KEY_PATH || path.join(__dirname, '..', 'cer
 const SSL_CERT_PATH = process.env.SSL_CERT_PATH || path.join(__dirname, '..', 'certs', 'localhost.pem');
 
 const useHttps = fs.existsSync(process.env.SSL_KEY_PATH) && fs.existsSync(process.env.SSL_CERT_PATH);
-const clientOrigin = process.env.CLIENT_ORIGIN || (useHttps ? 'https://localhost:3000' : 'http://localhost:3000');
 
 // Security middleware
 app.use(helmet());
@@ -39,9 +40,8 @@ if (useHttps && process.env.NODE_ENV === 'production') {
 
 // CORS
 app.use(cors({
-  origin: clientOrigin,
-  credentials: true,
-  exposedHeaders: ['set-cookie']
+  origin: 'http://localhost:3000',
+  credentials: true
 }));
 
 // parsing & cookies
@@ -49,15 +49,13 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'dev-secret',
   resave: false,
   saveUninitialized: false,
   name: 'sessionId',
   cookie: {
-    path: process.env.BASE_PATH || '/',
-    maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     sameSite: 'lax'
   },
 }));
@@ -67,31 +65,12 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-// TODO: Delete commented out code.
-// app.get('/auth/google/callback',
-//   passport.authenticate('google', {
-//     failureRedirect: process.env.FRONTEND_LOGIN_URL || 'http://localhost:3000/login',
-//     session: true
-//   }),
-//   (req, res, next) => {
-//     console.log('[SERVER] Google login success:', req.user);
 
-//     req.login(req.user, (err) => {
-//       if (err) {
-//         console.error('Login error after Google auth:', err);
-//         return res.redirect(process.env.FRONTEND_LOGIN_URL || 'http://localhost:3000/login');
-//       }
-//       console.log('[SERVER] Session after login:', req.session);
-//       return res.redirect(process.env.FRONTEND_HOME_URL || 'http://localhost:3000/home');
-
-//     });
-//   }
-// );
 
 app.get(
   '/auth/google/callback',
   passport.authenticate('google', {
-    failureRedirect: `${process.env.BASE_PATH}/login`,
+    failureRedirect: `${process.env.FRONTEND_LOGIN_URL}`,
     session: true
   }),
   (req, res) => {
@@ -117,8 +96,10 @@ app.get(
 );
 
 // api routes
-// app.use('/api', neo4jRoutes);
 app.use('/api', apiRoutes);
+
+// auth routes
+app.use('/auth', authRoutes);
 
 // assets
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
@@ -182,7 +163,7 @@ app.get(`${process.env.BASE_PATH}/*`, (req, res) => {
 //   }
 // });
 
-app.get('/auth/session', (req, res) => {
+app.get('/session', (req, res) => {
   if (req.isAuthenticated()) {
     return res.json({ user: req.user });
   }

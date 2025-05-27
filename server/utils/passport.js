@@ -5,7 +5,7 @@ const { driver } = require('../neo4j');
 const PersonService = require('../services/PersonService');
 const PersonModel = require('../models/Person');
 
-const personSvc = new PersonService(PersonModel, driver);
+const personSvc   = new PersonService(new PersonModel(driver), driver);
 
 passport.serializeUser((user, done) => {
     done(null, user.email);

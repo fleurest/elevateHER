@@ -72,11 +72,9 @@ module.exports = {
     },
   },
   plugins: [
-    new Dotenv({ systemvars: false, silent: true }),
+    new Dotenv({ path: '.env', safe: false, systemvars: false, silent: true }),
     new webpack.DefinePlugin({
       'process.env.API_BASE': JSON.stringify(process.env.API_BASE),
-      'process.env.BASE_PATH': JSON.stringify(process.env.BASE_PATH || '/'),
-      'process.env.DEFAULT_IMAGE_URL': JSON.stringify(process.env.DEFAULT_IMAGE_URL || 'http://localhost:3000/images/logo-default-profile.png'),
     }),
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, 'client/public/index.html'),

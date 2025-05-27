@@ -234,6 +234,32 @@ class PersonService {
             await session.close();
         }
     }
+
+    async searchUsersByName(q) { return this.personModel.searchByName({ query: q, sport: null }) }
+
+    async listAthletes({ random, athleteCount = 5 }) {
+        if (random) {
+            return this.athleteModel.getRandomAthletes(+athleteCount);
+        } else {
+            return this.athleteModel.findAthletes({});
+        }
+    }
+
+    async removeAthleteOrganisation(personId, organisationId) {
+        // drop the PARTICIPATES_IN relationship in Neo4j
+        const session = this.driver.session();
+        try {
+            await session.run(
+                `
+            MATCH (p:Person {id:$personId})-[r:PARTICIPATES_IN]->(o:Organisation {id:$organisationId})
+            DELETE r
+            `,
+                { personId, organisationId }
+            );
+        } finally {
+            await session.close();
+        }
+    }
 }
 
 module.exports = PersonService;

@@ -15,22 +15,21 @@ function AppContent() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
+  const API_BASE = 'http://localhost:3001';  
 
   useEffect(() => {
     async function checkSession() {
       try {
-        const res = await fetch(`${process.env.API_BASE}/api/me`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE}/api/users/session`, { credentials: 'include' });
         if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
+          const { user: u } = await res.json();
+          setUser({ username: u.identifier, email: u.identifier });
           setIsAuthenticated(true);
         } else {
           setIsAuthenticated(false);
           setUser(null);
         }
       } catch (err) {
-        console.error('Session check failed', err);
         setIsAuthenticated(false);
       } finally {
         setLoading(false);
@@ -41,7 +40,7 @@ function AppContent() {
 
 
   const handleLogin = async ({ email, password }) => {
-    const res = await fetch('/api/login', {
+    const res = await fetch(`${API_BASE}/api/users/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -69,7 +68,7 @@ function AppContent() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/logout', {
+      await fetch(`${API_BASE}/api/users/logout`, {
         method: 'POST',
         credentials: 'include',
       });

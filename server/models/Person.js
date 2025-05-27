@@ -1,3 +1,5 @@
+// delegates directly to PersonModel or PersonService
+
 class Person {
     constructor(driver) {
         this.driver = driver;

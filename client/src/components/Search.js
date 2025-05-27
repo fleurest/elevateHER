@@ -104,7 +104,7 @@ function Search({ user }) {
 
     const handleDelete = async (uuid) => {
         if (!window.confirm('Delete this item?')) return;
-        const res = await fetch(`${process.env.API_BASE}/api/person/uuid/${uuid}`, { method: 'DELETE' });
+        const res = await fetch(`${process.env.API_BASE}/api/users/uuid/${uuid}`, { method: 'DELETE' });
         if (res.ok) {
             alert('Deleted');
             handleSearch(new Event('submit'));

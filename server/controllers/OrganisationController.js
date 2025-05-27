@@ -1,44 +1,63 @@
+const { driver } = require('../neo4j');
+const Organisation = require('../models/Organisation');
+const OrganisationService = require('../services/OrganisationService');
+
+const organisationModel = new Organisation(driver);
+const organisationService = new OrganisationService(organisationModel, driver);
+
 class OrganisationController {
-    constructor(organisationService, personService) {
-        this.organisationService = organisationService;
-        this.personService = personService;
+  constructor(service) {
+    this.service = service;
+    this.list = this.list.bind(this);
+    this.upsert = this.upsert.bind(this);
+    this.link = this.link.bind(this);
+    this.linkTeamToLeague = this.linkTeamToLeague.bind(this);
+  }
+
+  async list(req, res, next) {
+    try {
+      const orgs = await this.service.listOrganisations();
+      res.json(orgs);
+    } catch (err) {
+      console.error('[OrganisationController.list] Error:', err);
+      next(err);
     }
+  }
 
-    async upsert(req, res) {
-        try {
-            const team = await this.organisationService.upsertTeam(req.body);
-            res.status(201).json({ message: `Team '${team.name}' upserted`, team });
-        } catch (error) {
-            res.status(400).json({ error: error.message });
-        }
+  async upsert(req, res, next) {
+    try {
+      const team = await this.service.upsertTeam(req.body);
+      res.status(201).json({ message: `Team '${team.name}' upserted`, team });
+    } catch (err) {
+      console.error('[OrganisationController.upsert] Error:', err);
+      next(err);
     }
+  }
 
-    async link(req, res) {
-        const { athleteName, teamName } = req.body;
-        try {
-            await this.personService.linkAthleteToTeam(name, teamName, sport, "Sport");
-            res.status(200).json({ message: `${athleteName} linked to team ${teamName}` });
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        }
+  async link(req, res, next) {
+    const { athleteName, teamName, sport = 'unknown', sportLabel = 'Sport' } = req.body;
+    try {
+      await this.service.linkAthleteToTeam(athleteName, teamName, sport, sportLabel);
+      res.json({ message: `${athleteName} linked to ${teamName}` });
+    } catch (err) {
+      console.error('[OrganisationController.link] Error:', err);
+      next(err);
     }
+  }
 
-    async linkTeamToLeague(req, res) {
-        const { teamName, leagueName } = req.body;
-
-        if (!teamName || !leagueName) {
-            return res.status(400).json({ error: 'teamName and leagueName are required' });
-        }
-
-        try {
-            await this.organisationService.linkTeamToLeague(teamName, leagueName);
-            res.status(200).json({ message: `${teamName} linked to league ${leagueName}` });
-        } catch (err) {
-            console.error('[linkTeamToLeague] Error:', err);
-            res.status(500).json({ error: `Failed to link ${teamName} to league ${leagueName}` });
-        }
+  async linkTeamToLeague(req, res, next) {
+    const { teamName, leagueName } = req.body;
+    if (!teamName || !leagueName) {
+      return res.status(400).json({ error: 'teamName and leagueName are required' });
     }
-
+    try {
+      await this.service.linkTeamToLeague(teamName, leagueName);
+      res.json({ message: `${teamName} linked to league ${leagueName}` });
+    } catch (err) {
+      console.error('[OrganisationController.linkTeamToLeague] Error:', err);
+      next(err);
+    }
+  }
 }
 
 module.exports = OrganisationController;

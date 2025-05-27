@@ -3,10 +3,10 @@ const puppeteer = require('puppeteer');
 const axios = require('axios');
 
 const BASE = 'https://www.afl.com.au';
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = process.env.API_BASE_URL;
 
 const loginAndGetCookies = async (page) => {
-    await page.goto('http://localhost:3000/login', { waitUntil: 'networkidle2' });
+    await page.goto(`${process.env.API_BASE}/login`, { waitUntil: 'networkidle2' });
     const username = process.env.API_USERNAME;
     const password = process.env.API_PASSWORD;
     if (!username || !password) throw new Error("Missing credentials");
@@ -27,7 +27,7 @@ const loginAndGetCookies = async (page) => {
         axios.defaults.headers.Cookie = cookieHeader;
 
         await page.goto(`${BASE}/aflw/teams`, { waitUntil: 'networkidle2' });
-        await page.evaluate(() => window.scrollBy(0, window.innerHeight)); // scroll down to trigger loading
+        await page.evaluate(() => window.scrollBy(0, window.innerHeight));
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         const teamEntries = await page.evaluate(() => {
@@ -60,7 +60,7 @@ const loginAndGetCookies = async (page) => {
             };
 
             try {
-                await axios.post(`${API_BASE}/team/upsert`, teamMeta, {
+                await axios.post(`${API_BASE}/api/organisation/`, teamMeta, {
                     headers: { 'Content-Type': 'application/json' },
                     withCredentials: true
                 });
@@ -70,7 +70,7 @@ const loginAndGetCookies = async (page) => {
             }
 
             try {
-                await axios.post(`${API_BASE}/team/link-athlete`, {
+                await axios.post(`${API_BASE}/api/athlete/link`, {
                     athleteName: teamMeta.name,
                     teamName: teamMeta.name,
                     sport: "Australian Rules Football",
@@ -126,7 +126,7 @@ const loginAndGetCookies = async (page) => {
                 };
 
                 try {
-                    const res = await axios.get(`${API_BASE}/search`, {
+                    const res = await axios.get(`${API_BASE}/athlete/search`, {
                         params: { query: athlete.name, sport: athlete.sport },
                         withCredentials: true
                     });
@@ -137,13 +137,13 @@ const loginAndGetCookies = async (page) => {
                         continue;
                     }
 
-                    await axios.post(`${API_BASE}/athlete/create`, athletePayload, {
+                    await axios.post(`${API_BASE}/api/athlete/`, athletePayload, {
                         headers: { 'Content-Type': 'application/json' },
                         withCredentials: true
                     });
                     console.log(`✅ Uploaded: ${athlete.name}`);
 
-                    await axios.post(`${API_BASE}/team/link-athlete`, {
+                    await axios.post(`${API_BASE}/api/athlete/link`, {
                         athleteName: athlete.name,
                         teamName: teamMeta.name,
                         sport: teamMeta.sport,

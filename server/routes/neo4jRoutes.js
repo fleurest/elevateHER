@@ -5,23 +5,11 @@ const bcrypt = require('bcrypt');
 const axios = require('axios');
 const saltRounds = 10;
 const { sanitizeEmail, sanitizeUsername, sanitizePassword } = require('../utils/inputSanitizers');
-const Person = require('../models/Person');
-const PersonService = require('../services/PersonService');
-const PersonController = require('../controllers/PersonController');
 const path = require('path');
 console.log('Looking for Graph at:', path.resolve(__dirname, '../models/Graph'));
 const Graph = require('../models/Graph');
 const GraphService = require('../services/GraphService');
 const { getCalendarEvents, listPastEvents, listUpcomingEvents } = require('../services/EventCalService');
-const Organisation = require('../models/Organisation');
-const OrganisationService = require('../services/OrganisationService');
-const OrganisationController = require('../controllers/OrganisationController');
-const personModel = new Person(driver);
-const personService = new PersonService(personModel, driver);
-const personController = new PersonController(personService);
-const organisationModel = new Organisation(driver);
-const organisationService = new OrganisationService(organisationModel);
-const organisationController = new OrganisationController(organisationService, personService);
 
 const graphModel = new Graph(driver);
 const graphService = new GraphService(graphModel);
@@ -29,18 +17,7 @@ const graphService = new GraphService(graphModel);
 const { isAuthenticated, isAdmin } = require('../authentication');
 
 const passport = require('../utils/passport');
-const { validateRegistration, validateLogin } = require('../utils/validators');
-
-// nodes
-// router.get('/nodes', async (req, res) => {
-//   try {
-//     const graph = await graphService.buildBasicGraph();
-//     res.json(graph);
-//   } catch (err) {
-//     console.error('Query error:', err);
-//     res.status(500).json({ error: 'Internal Server Error' });
-//   }
-// });
+const { validateRegistration, validateLogin, checkValidation } = require('../utils/validators');
 
 // register route
 router.post('/register', validateRegistration, async (req, res) => {
@@ -79,102 +56,6 @@ router.post('/register', validateRegistration, async (req, res) => {
   }
 });
 
-router.post('/login', validateLogin, async (req, res) => {
-    console.log('>>> LOGIN route hit');
-    console.log('>>> request body:', req.body);
-  
-    const identifier = sanitizeEmail(req.body.email);
-    const password = sanitizePassword(req.body.password);
-  
-    if (!identifier || !password) {
-      return res.status(400).json({ error: 'Missing credentials' });
-    }
-  
-    let session;
-    try {
-      session = driver.session();
-      const result = await session.run(
-        'MATCH (p:Person {email: $id}) RETURN p.password AS hash',
-        { id: identifier }
-      );
-  
-      if (!result.records.length) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-  
-      const hash = result.records[0].get('hash');
-  
-      if (!hash) {
-        return res.status(400).json({ error: 'Account has no password set. Try Google login.' });
-      }
-  
-      const match = await bcrypt.compare(password, hash);
-  
-      if (!match) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-  
-      req.session.user = { identifier };
-      res.status(200).json({ message: 'Login successful', user: { identifier } });
-    } catch (err) {
-      console.error('Login error:', err);
-      res.status(500).json({ error: 'Login failed' });
-    } finally {
-      session?.close();
-    }
-  });
-  
-
-
-
-router.get('/session', (req, res) => {
-  if (req.session?.user?.username) {
-    return res.status(200).json({ authenticated: true, user: req.session.user });
-  } else {
-    return res.status(401).json({ authenticated: false });
-  }
-});
-
-router.post('/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('Error destroying session:', err);
-      return res.status(500).json({ error: 'Logout failed' });
-    }
-    res.clearCookie('token', {
-      httpOnly: true,
-      sameSite: 'Strict',
-      secure: process.env.NODE_ENV === 'production',
-    });
-    res.json({ message: 'Logged out' });
-  });
-});
-
-router.post('/user/update', isAuthenticated, async (req, res) => {
-  const { username, email = '', location = '', bio = '' } = req.body;
-  const session = driver.session();
-
-  try {
-    const result = await session.run(
-      `
-      MATCH (p:Person {username: $username})
-      SET p.email = $email,
-          p.location = $location,
-          p.bio = $bio
-      RETURN p
-      `,
-      { username, email, location, bio }
-    );
-
-    const updatedProps = result.records[0]?.get('p').properties;
-    res.json(updatedProps);
-  } catch (err) {
-    console.error('Error updating profile:', err);
-    res.status(500).json({ error: 'Failed to update user profile' });
-  } finally {
-    await session.close();
-  }
-});
 
 router.get('/refresh', (req, res) => {
   const token = req.cookies.token;

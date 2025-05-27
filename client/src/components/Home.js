@@ -11,6 +11,8 @@ import playersIcon from '../assets/icon_player.png';
 import eventsIcon from '../assets/icon_events.png';
 import pagesIcon from '../assets/icon_pages.png';
 
+const API_BASE = process.env.API_BASE;
+
 function HomePage({ handleLogout, user, setUser }) {
   const [graphData, setGraphData] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -30,7 +32,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
   useEffect(() => {
     if (!user?.username) {
-      fetch(`${process.env.API_BASE}/auth/session`, { credentials: 'include' })
+      fetch(`${API_BASE}/api/users/session`, { credentials: 'include' })
         .then(res => {
           if (!res.ok) throw new Error('Not authenticated');
           return res.json();
@@ -90,7 +92,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/person/top-users`,
+      const res = await fetch(`${API_BASE}/api/users/top`,
         { credentials: 'include' }
       );
 
@@ -121,7 +123,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
   useEffect(() => {
     fetch(`${process.env.API_BASE}/api/events/calendar-events`,
-    { credentials: 'include' })
+      { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         console.log('Fetched events:', data);
@@ -138,8 +140,8 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const fetchFriends = async () => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/person/user-friends/${user.username}`,
-        { credentials: 'include'}
+      const res = await fetch(`${process.env.API_BASE}/api/users/friends/${user.username}`,
+        { credentials: 'include' }
       );
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
@@ -157,12 +159,12 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const fetchSuggestedFriends = async () => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/person/top-users`,
-      { credentials:'include'}
-    );
+      const res = await fetch(`${API_BASE}/api/users/top`,
+        { credentials: 'include' }
+      );
 
       const text = await res.text();
-      console.log('***Raw response from /api/person/top-users:', text);
+      console.log('***Raw response from /api/users/top:', text);
 
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
@@ -182,7 +184,7 @@ function HomePage({ handleLogout, user, setUser }) {
   }, []);
 
   const filterGraphToFriends = async () => {
-    const res = await fetch(`${process.env.API_BASE}/api/person/user-friends/${user.username}`,
+    const res = await fetch(`${process.env.API_BASE}/api/users/friends/${user.username}`,
       { credentials: 'include' }
     );
     const data = await res.json();
@@ -192,7 +194,7 @@ function HomePage({ handleLogout, user, setUser }) {
   useEffect(() => {
     const fetchTopFriends = async () => {
       try {
-        const res = await fetch(`${process.env.API_BASE}/api/user-friends/${user.username}`,
+        const res = await fetch(`${process.env.API_BASE}/api/users/friends/${user.username}`,
           { credentials: 'include' }
         );
         const data = await res.json();
@@ -230,9 +232,9 @@ function HomePage({ handleLogout, user, setUser }) {
   // user search in the last panel
   const handleSearch = async () => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/search-users?query=${encodeURIComponent(searchQuery)}`,
-      { credentials: 'include' }
-    );
+      const res = await fetch(`${process.env.API_BASE}/api/users/search?query=${encodeURIComponent(searchQuery)}`,
+        { credentials: 'include' }
+      );
       const data = await res.json();
       setSearchResults(data);
     } catch (err) {
@@ -242,9 +244,9 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const handleFriendSearch = async (query) => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/search-friends?query=${encodeURIComponent(query)}`,
-      { credentials: 'include' }
-    );
+      const res = await fetch(`${process.env.API_BASE}/api/users/friends/search?query=${encodeURIComponent(query)}`,
+        { credentials: 'include' }
+      );
       const data = await res.json();
       setFriendResults(data);
     } catch (err) {
@@ -255,7 +257,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const handleSendFriendRequest = async (username) => {
     try {
-      const res = await fetch(`${process.env.API_BASE}/api/person/send-friend-request/${user.username}/${username}`, { method: 'POST' });
+      const res = await fetch(`${process.env.API_BASE}/api/users/sendfriendrequest/${user.username}/${username}`, { method: 'POST' });
       const data = await res.json();
       console.log('Friend request sent:', data);
     } catch (err) {
@@ -271,15 +273,16 @@ function HomePage({ handleLogout, user, setUser }) {
 
 
   useEffect(() => {
-    console.log('User:', user.username);
-    console.log('Friends:', friends.map(f => f.username));
-    console.log('All users:', allPeople.map(p => ({ username: p.username, roles: p.roles })));
-  }, [allPeople, friends]);
-
-  useEffect(() => {
     async function fetchGraph() {
       try {
-        const res = await fetch(`${process.env.API_BASE}/api/graph`);
+        const res = await fetch(`${process.env.API_BASE}/api/graph`, { credentials: 'include' });
+
+        if (!res.ok) {
+          const errText = await res.text();
+
+          throw new Error(`Graph fetch failed: ${res.status} – ${errText}`);
+        }
+
         const data = await res.json();
         console.log('Graph Data:', data);
         setGraphData(data);
@@ -289,6 +292,7 @@ function HomePage({ handleLogout, user, setUser }) {
     }
     fetchGraph();
   }, []);
+
 
 
   useEffect(() => {
@@ -431,7 +435,7 @@ function HomePage({ handleLogout, user, setUser }) {
   }, [graphData, filterType, user?.username, showProfile]);
 
   useEffect(() => {
-    fetch(`${process.env.API_BASE}/api/top-users`)
+    fetch(`${process.env.API_BASE}/api/users/top`)
       .then(res => res.json())
       .then(data => {
         console.log('Top Users Response:', data);

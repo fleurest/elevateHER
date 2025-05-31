@@ -1,10 +1,10 @@
 require('dotenv').config();
+const fetch = require('node-fetch');
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const session = require('express-session');
 const { verifyConnection, driver } = require('./neo4j');
-const neo4jRoutes = require('./routes/neo4jRoutes');
 const apiRoutes = require('./routes/api');
 const authRoutes = require('./routes/auth/authRoutes');
 
@@ -64,36 +64,35 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-
-
-app.get(
-  '/auth/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${process.env.FRONTEND_LOGIN_URL}`,
-    session: true
-  }),
-  (req, res) => {
+// Image proxy route to bypass CORS
+app.get('/api/image-proxy', async (req, res) => {
+  try {
+    const { url } = req.query;
     
-    console.log('*** neo4jRoutes: Google login success:', req.user);
-  
-    req.login(req.user, (err) => {
-      if (err) {
-        console.error('Login error:', err);
-        return res.redirect(process.env.FRONTEND_LOGIN_URL || '/login');
-      }
-
-      console.log('Session after login:', req.session);
-      
-      console.log('**** process.env.FRONTEND_HOME_URL -->', process.env.FRONTEND_HOME_URL);
-      const base = process.env.BASE_PATH?.replace(/\/+$/, '') || '';
-      console.log('**** base -->', base);
-      
-      console.log('[SERVER] Session after login:', req.session);
-      return res.redirect(process.env.FRONTEND_HOME_URL);
-    });
+    if (!url) {
+      return res.status(400).send('URL parameter required');
+    }
+    
+    console.log('[IMAGE-PROXY] Fetching:', url);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.log('[IMAGE-PROXY] Failed to fetch:', response.status);
+      return res.status(404).send('Image not found');
+    }
+    
+    // Setting CORS headers so frontend can access the image
+    res.set('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=86400');
+    
+    response.body.pipe(res);
+  } catch (error) {
+    console.error('[IMAGE-PROXY] Error:', error);
+    res.status(500).send('Failed to fetch image');
   }
-);
+});
 
 // api routes
 app.use('/api', apiRoutes);
@@ -108,60 +107,7 @@ app.get(`${process.env.BASE_PATH}/*`, (req, res) => {
   res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
-// app.post('/api/login', async (req, res) => {
-//   console.log('>>> LOGIN route hit');
-//   console.log('>>> request body:', req.body);
-//   const username = sanitizeUsername(req.body.username);
-//   const password = sanitizePassword(req.body.password);
-//   let session = null;
 
-//   if (!username || !password) {
-//     return res.status(400).json({ error: 'Missing credentials' });
-//   }
-
-//   try {
-//     session = driver.session();
-//     const result = await session.run(
-//       'MATCH (p:Person {username: $username}) RETURN p',
-//       { username }
-//     );
-
-//     if (result.records.length === 0) {
-//       return res.status(401).json({ error: 'Invalid credentials' });
-//     }
-
-//     const person = result.records[0].get('p').properties;
-//     const hash = person.password;
-//     const match = await bcrypt.compare(password, hash);
-
-//     if (match) {
-//       req.session.user = {
-//         id: person.id,
-//         username: person.username,
-//         email: person.email,
-//       };
-//       req.session.loggedIn = true;
-//       console.log('Session after login', req.session);
-//       res.json({
-//         message: 'Login successful',
-//         user: {
-//           id: person.id,
-//           username: person.username,
-//           email: person.email,
-//         },
-//       });
-//     } else {
-//       res.status(401).json({ error: 'Invalid credentials' });
-//     }
-//   } catch (err) {
-//     console.error('Login error:', err);
-//     res.status(500).json({ error: 'Login failed' });
-//   } finally {
-//     if (session) {
-//       await session.close();
-//     }
-//   }
-// });
 
 app.get('/session', (req, res) => {
   if (req.isAuthenticated()) {

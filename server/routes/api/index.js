@@ -13,5 +13,6 @@ router.use('/graph', graphRoutes)
 router.use('/me', meRoutes)
 router.use('/users', usersRoutes)
 router.use('/organisations', orgRoutes)
+router.use('/auth', require('../auth/authRoutes'));
 
 module.exports = router;

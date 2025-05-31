@@ -1,3 +1,5 @@
+const neo4j = require('neo4j-driver');
+
 class Graph {
     constructor(driver) {
         this.driver = driver;
@@ -12,7 +14,7 @@ class Graph {
 
             const result = await session.run(
                 'MATCH (n)-[r]->(m) RETURN n, r, m LIMIT $limit',
-                { limit: safeLimit }
+                { limit: neo4j.int(safeLimit) }
             );
             return result.records;
         } finally {
@@ -22,7 +24,8 @@ class Graph {
 
     async _safeLimit(limit, defaultVal) {
         const n = Number.isInteger(limit) ? limit : parseInt(limit, 10);
-        return Number.isNaN(n) ? defaultVal : n;
+        const result = Number.isNaN(n) ? defaultVal : n;
+        return Math.floor(result);
     }
 
     async getAllConnections(limit = 100) {
@@ -36,7 +39,7 @@ class Graph {
             RETURN n, r, m
             LIMIT toInteger($limit)
             `,
-                { limit: safeLimit }
+                { limit: neo4j.int(safeLimit) }
             );
             return result.records;
         } finally {
@@ -92,6 +95,140 @@ class Graph {
                 organisationId: rec.get('organisationId'),
                 organisation: rec.get('organisationNode').properties
             }));
+        } finally {
+            await session.close();
+        }
+    }
+
+    /**
+     * Get liked entities (people, teams, etc.) for a user by email
+     * @param {string} email - User's email
+     * @param {number} limit - Maximum number of results
+     * @returns {Promise<Array>} Array of liked entities with relationship details
+     */
+    async getLikedByEmail(email, limit = 50) {
+        const session = this.driver.session();
+        const safeLimit = await this._safeLimit(limit, 50);
+
+        try {
+            const result = await session.run(
+                `
+                MATCH (user:Person {email: $email})-[r:LIKES]->(target)
+                RETURN 
+                    user,
+                    r,
+                    target,
+                    labels(target) AS targetLabels
+                ORDER BY r.createdAt DESC
+                LIMIT $limit
+                `,
+                { 
+                    email: email, 
+                    limit: neo4j.int(safeLimit) 
+                }
+            );
+            
+            return result.records;
+        } finally {
+            await session.close();
+        }
+    }
+
+    /**
+     * Get liked people specifically for a user by email
+     * @param {string} email - User's email
+     * @param {number} limit - Maximum number of results
+     * @returns {Promise<Array>} Array of liked people
+     */
+    async getLikedPeopleByEmail(email, limit = 50) {
+        const session = this.driver.session();
+        const safeLimit = await this._safeLimit(limit, 50);
+
+        try {
+            const result = await session.run(
+                `
+                MATCH (user:Person {email: $email})-[r:LIKES]->(person:Person)
+                RETURN 
+                    user,
+                    r,
+                    person
+                ORDER BY r.createdAt DESC
+                LIMIT $limit
+                `,
+                { 
+                    email: email, 
+                    limit: neo4j.int(safeLimit) 
+                }
+            );
+            
+            return result.records;
+        } finally {
+            await session.close();
+        }
+    }
+
+    /**
+     * Get liked organisations/teams for a user by email
+     * @param {string} email - User's email
+     * @param {number} limit - Maximum number of results
+     * @returns {Promise<Array>} Array of liked organisations
+     */
+    async getLikedOrganisationsByEmail(email, limit = 50) {
+        const session = this.driver.session();
+        const safeLimit = await this._safeLimit(limit, 50);
+
+        try {
+            const result = await session.run(
+                `
+                MATCH (user:Person {email: $email})-[r:LIKES]->(org:Organisation)
+                RETURN 
+                    user,
+                    r,
+                    org
+                ORDER BY r.createdAt DESC
+                LIMIT $limit
+                `,
+                { 
+                    email: email, 
+                    limit: neo4j.int(safeLimit) 
+                }
+            );
+            
+            return result.records;
+        } finally {
+            await session.close();
+        }
+    }
+
+     /**
+     * Get friends for a user by email
+     * @param {string} email - User's email
+     * @param {number} limit - Maximum number of results
+     * @returns {Promise<Array>} Array of friend relationships
+     */
+     async getFriendsByEmail(email, limit = 50) {
+        const session = this.driver.session();
+        const safeLimit = await this._safeLimit(limit, 50);
+
+        try {
+            const result = await session.run(
+                `
+                MATCH (user:Person {email: $email})-[r:FRIENDS_WITH]-(friend:Person)
+                WHERE 'user' IN friend.roles
+                RETURN 
+                    user,
+                    r,
+                    friend
+                ORDER BY r.createdAt DESC
+                LIMIT $limit
+                `,
+                { 
+                    email: email, 
+                    limit: neo4j.int(safeLimit) 
+                }
+            );
+            
+            return result.records;
         } finally {
             await session.close();
         }

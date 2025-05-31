@@ -83,7 +83,7 @@ const PopUp = ({ person, position }) => {
   );
 };
 
-const Dashboard = ({ handleLogout }) => {
+const Dashboard = ({ handleLogout, containerStyle = { width: '100%', height: '500px' } }) => {
   const [mode, setMode] = useState('dynamic');
   const [pageRanks, setPageRanks] = useState([]);
   const [communities, setCommunities] = useState([]);
@@ -126,7 +126,7 @@ const Dashboard = ({ handleLogout }) => {
       elements: [
         ...(data.nodes || []).map(n => {
           // uses stored profileImage
-          let img = n.data.image || n.data.profileImage;
+          let img = n.data.profileImage || n.data.image;
           // defaults to Wikipedia
           if (!img) {
             const wikiName = n.data.label.replace(/ /g, '_');
@@ -139,7 +139,7 @@ const Dashboard = ({ handleLogout }) => {
         ...(data.edges || [])
       ],
       style: [
-        { selector: 'node', style: { 'background-color': '#fff', 'background-image': 'data(image)', 'background-fit': 'cover', 'border-width': 3, 'border-color': '#0074D9', label: 'data(label)', fontSize: 10, width: 50, height: 50 } },
+        { selector: 'node', style: {'background-image': 'data(image)', 'background-fit': 'cover', 'border-width': 3, 'border-color': '#0074D9', label: 'data(label)', fontSize: 10, width: 50, height: 50 } },
         { selector: 'edge', style: { width: 2, 'line-color': '#ccc', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } }
       ],
       layout: { name: 'cose-bilkent', animate: true }
@@ -193,7 +193,7 @@ const Dashboard = ({ handleLogout }) => {
     if (personParam) {
       const name = decodeURIComponent(personParam.replace(/_/g, ' '));
       const match = cy.nodes().filter(n => n.data('label') === name);
-      if (match.length) match.tap();
+      if (match.length) data(match);
     }
 
     cyRef.current = cy;
@@ -405,7 +405,7 @@ const Dashboard = ({ handleLogout }) => {
         </div>
       )}
 
-      <div ref={cyContainerRef} style={{ position: 'absolute', top: 0, bottom: 0, left: mode === 'dynamic' ? '220px' : 0, right: 0 }} />
+      <div ref={cyContainerRef} style={containerStyle} />
 
       <div style={{ position: 'fixed', top: '70px', left: mode === 'dynamic' ? '220px' : '10px', backgroundColor: '#fff', padding: '10px', borderRadius: '8px', zIndex: 1001 }}>
         <button onClick={handlePageRank}>PageRank</button>

@@ -12,28 +12,29 @@ passport.serializeUser((user, done) => {
 });
 
 passport.deserializeUser(async (email, done) => {
-    try {
+  console.log('[deserializeUser] Looking up email:', email);
+  try {
       const session = driver.session();
       const result = await session.run(
-        'MATCH (p:Person {email: $email}) RETURN p',
-        { email }
+          'MATCH (p:Person {email: $email}) RETURN p',
+          { email }
       );
       await session.close();
       
       const record = result.records[0];
       if (!record) {
-        console.warn('[deserializeUser] No user found for email:', email);
-        return done(null, null);
+          console.warn('[deserializeUser] No user found for email:', email);
+          return done(null, null);
       }
   
       const user = record.get('p').properties;
       console.log('[deserializeUser] Found user:', user);
       return done(null, user);
-    } catch (err) {
+  } catch (err) {
       console.error('[deserializeUser] Error:', err);
       return done(err);
-    }
-  });
+  }
+});
   
 
 passport.use(new GoogleStrategy({

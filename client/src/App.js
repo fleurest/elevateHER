@@ -5,8 +5,8 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import HamburgerMenu from './components/HamburgerMenu';
 import Home from './components/Home';
-import Profile from './components/Profile';
 import Search from './components/Search';
+import Events from './components/Events';
 import { BASE_PATH } from './config';
 
 function AppContent() {
@@ -15,21 +15,29 @@ function AppContent() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const API_BASE = 'http://localhost:3001';  
+  const API_BASE = 'http://localhost:3001';
 
   useEffect(() => {
     async function checkSession() {
       try {
-        const res = await fetch(`${API_BASE}/api/users/session`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE}/auth/session`, { credentials: 'include' });
         if (res.ok) {
-          const { user: u } = await res.json();
-          setUser({ username: u.identifier, email: u.identifier });
-          setIsAuthenticated(true);
+          const data = await res.json();
+          if (data.user) {
+            // User is authenticated
+            setUser({ username: data.user.identifier, email: data.user.identifier });
+            setIsAuthenticated(true);
+          } else {
+            // User is not authenticated
+            setIsAuthenticated(false);
+            setUser(null);
+          }
         } else {
           setIsAuthenticated(false);
           setUser(null);
         }
       } catch (err) {
+        console.error('Session check error:', err);
         setIsAuthenticated(false);
       } finally {
         setLoading(false);
@@ -94,7 +102,7 @@ function AppContent() {
           <Route
             path="/"
             element={
-              isAuthenticated ? <Navigate to="/profile" /> : <Login onLogin={handleLogin} />
+              isAuthenticated ? <Navigate to="/home" /> : <Login onLogin={handleLogin} />
             }
           />
           <Route
@@ -111,23 +119,23 @@ function AppContent() {
               loading ? (
                 <div>Loading...</div>
               ) : isAuthenticated && user ? (
-                <Home handleLogout={handleLogout} user={user} />
+                <Home handleLogout={handleLogout} user={user} setUser={setUser} />
               ) : (
                 <Navigate to="/login" replace />
               )
             }
           />
+          <Route path="/search" element={<Search />} />
           <Route
-            path="/profile"
+            path="/events"
             element={
-              isAuthenticated && user ? (
-                <Profile handleLogout={handleLogout} username={user.username} />
+              isAuthenticated ? (
+                <Events />
               ) : (
-                <Navigate to="/login" />
+                <Navigate to="/login" replace />
               )
             }
           />
-          <Route path="/search" element={<Search />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       )}

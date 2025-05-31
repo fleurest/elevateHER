@@ -57,7 +57,7 @@ const Login = ({ onLogin }) => {
     }
 
     try {
-      const response = await fetch(`${process.env.API_BASE}/api/register`, {
+      const response = await fetch(`${API_BASE}/api/users/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, username, password }),

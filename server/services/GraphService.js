@@ -1,3 +1,5 @@
+const neo4j = require('neo4j-driver');
+
 const fs = require('fs');
 const path = require('path');
 const driver = require('../neo4j');
@@ -88,19 +90,22 @@ class GraphService {
         data: {
           id: node.identity.toString(),
           label: node.properties.name || node.labels[0],
-          image: node.properties.profileImage || './images/logo-default-profile.png',
-          ...node.properties
+          image: node.properties.profileImage || null, 
+          type: node.labels[0]?.toLowerCase() || 'unknown',
+                    ...node.properties
         }
       });
       if (!nodesMap.has(n.identity.toString())) nodesMap.set(n.identity.toString(), mapNode(n));
       if (!nodesMap.has(m.identity.toString())) nodesMap.set(m.identity.toString(), mapNode(m));
-      edges.push({ data: {
-        id: r.identity.toString(),
-        source: n.identity.toString(),
-        target: m.identity.toString(),
-        label: r.type.replace(/_/g, ' ').toLowerCase(),
-        title: r.type.replace(/_/g, ' ').toLowerCase()
-      }});
+      edges.push({
+        data: {
+          id: r.identity.toString(),
+          source: n.identity.toString(),
+          target: m.identity.toString(),
+          label: r.type.replace(/_/g, ' ').toLowerCase(),
+          title: r.type.replace(/_/g, ' ').toLowerCase()
+        }
+      });
     });
     return { nodes: Array.from(nodesMap.values()), edges };
   }
@@ -109,7 +114,7 @@ class GraphService {
     const session = this.driver.session();
     const result = await session.run(
       `MATCH (p:Person)
-       WHERE exists(p.pagerank)
+       WHERE p.pagerank IS NOT NULL
        RETURN p.name AS name, p.pagerank AS score
        ORDER BY score DESC
        LIMIT 20`
@@ -159,6 +164,167 @@ class GraphService {
       await session.close();
     }
   }
+
+  /**
+   * Get participation graph - delegated to model
+   */
+  async getParticipationGraph(limit = 25) {
+    return await this.graphModel.getParticipationGraph(limit);
+  }
+
+  /**
+   * Get liked entities for a user by email
+   * @param {string} email - User's email
+   * @param {Object} options - Options object
+   * @param {number} options.limit - Maximum number of results
+   * @param {string} options.type - Filter by type ('person', 'organization', or null for all)
+   * @returns {Promise<Object>} Graph structure with nodes and edges
+   */
+  async getLikedByEmail(email, { limit = 50, type = null } = {}) {
+    let records;
+
+    switch (type) {
+      case 'person':
+        records = await this.graphModel.getLikedPeopleByEmail(email, limit);
+        break;
+      case 'organization':
+        records = await this.graphModel.getLikedOrganizationsByEmail(email, limit);
+        break;
+      default:
+        records = await this.graphModel.getLikedByEmail(email, limit);
+    }
+
+    const nodesMap = new Map();
+    const edges = [];
+
+    records.forEach(record => {
+      const user = record.get('user');
+      const target = record.get('target') || record.get('person') || record.get('org');
+      const relationship = record.get('r');
+
+
+      const mapNode = node => ({
+        data: {
+          id: node.identity.toString(),
+          label: node.properties.name || node.properties.email || node.labels[0],
+          image: node.properties.profileImage || null ,
+          type: node.labels[0]?.toLowerCase() || 'unknown',
+          ...node.properties
+        }
+        
+      });
+
+      // Add user node
+      if (!nodesMap.has(user.identity.toString())) {
+        nodesMap.set(user.identity.toString(), mapNode(user));
+      }
+
+      // Add target node
+      if (!nodesMap.has(target.identity.toString())) {
+        nodesMap.set(target.identity.toString(), mapNode(target));
+      }
+
+      // Add relationship edge
+      edges.push({
+        data: {
+          id: relationship.identity.toString(),
+          source: user.identity.toString(),
+          target: target.identity.toString(),
+          label: 'likes',
+          title: 'likes',
+          relationshipType: 'LIKES',
+          createdAt: relationship.properties.createdAt,
+          ...relationship.properties
+        }
+      });
+    });
+
+    return {
+      nodes: Array.from(nodesMap.values()),
+      edges,
+      totalCount: records.length
+    };
+  }
+
+  /**
+   * Get liked entities summary for a user
+   * @param {string} email - User's email
+   * @returns {Promise<Object>} Summary of liked entities
+   */
+  async getLikedSummary(email) {
+    const [allLiked, likedPeople, likedOrgs] = await Promise.all([
+      this.graphModel.getLikedByEmail(email, 1),
+      this.graphModel.getLikedPeopleByEmail(email, 100),
+      this.graphModel.getLikedOrganizationsByEmail(email, 100)
+    ]);
+
+    return {
+      totalLiked: likedPeople.length + likedOrgs.length,
+      likedPeople: likedPeople.length,
+      likedOrganizations: likedOrgs.length,
+      hasLikes: (likedPeople.length + likedOrgs.length) > 0
+    };
+  }
+
+  /**
+ * Get friends for a user by email
+ * @param {string} email - User's email
+ * @param {Object} options - Options object
+ * @param {number} options.limit - Maximum number of results
+ * @returns {Promise<Object>} Graph structure with nodes and edges
+ */
+async getFriendsByEmail(email, { limit = 50 } = {}) {
+  const records = await this.graphModel.getFriendsByEmail(email, limit);
+
+  const nodesMap = new Map();
+  const edges = [];
+
+  records.forEach(record => {
+      const user = record.get('user');
+      const friend = record.get('friend');
+      const relationship = record.get('r');
+
+      const mapNode = node => ({
+          data: {
+              id: node.identity.toString(),
+              label: node.properties.name || node.properties.email || node.labels[0],
+              image: node.properties.profileImage || null,
+              type: node.labels[0]?.toLowerCase() || 'unknown',
+              ...node.properties
+          }
+      });
+
+      // Add user node
+      if (!nodesMap.has(user.identity.toString())) {
+          nodesMap.set(user.identity.toString(), mapNode(user));
+      }
+
+      // Add friend node
+      if (!nodesMap.has(friend.identity.toString())) {
+          nodesMap.set(friend.identity.toString(), mapNode(friend));
+      }
+
+      // Add friendship edge
+      edges.push({
+          data: {
+              id: relationship.identity.toString(),
+              source: user.identity.toString(),
+              target: friend.identity.toString(),
+              label: 'friends',
+              title: 'friends',
+              relationshipType: 'FRIENDS_WITH',
+              createdAt: relationship.properties.createdAt,
+              ...relationship.properties
+          }
+      });
+  });
+
+  return {
+      nodes: Array.from(nodesMap.values()),
+      edges,
+      totalCount: records.length
+  };
+}
 
 }
 

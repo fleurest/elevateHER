@@ -1,21 +1,36 @@
-// delegates directly to PersonModel or PersonService
-
 class Person {
     constructor(driver) {
         this.driver = driver;
     }
 
-    static queries = {
-        createOrUpdate: `
-            MERGE (p:Person {name: $name})
-            ON CREATE SET
-              p.sport = $sport,
-              p.uuid = randomUUID()
-            ON MATCH SET
-              p.sport = coalesce($sport, p.sport)
-            RETURN p
-        `
-    };
+    async createOrUpdateUser({ username, email, passwordHash, roles, location, bio, profileImage }) {
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                `
+                MERGE (u:Person { email: $email })
+                ON CREATE SET u.username = $username, 
+                             u.password = $passwordHash, 
+                             u.roles = $roles, 
+                             u.uuid = randomUUID(),
+                             u.location = $location,
+                             u.bio = $bio,
+                             u.profileImage = $profileImage
+                ON MATCH SET u.username = $username, 
+                            u.password = coalesce($passwordHash, u.password), 
+                            u.roles = $roles,
+                            u.location = $location,
+                            u.bio = $bio,
+                            u.profileImage = $profileImage
+                RETURN u
+                `,
+                { username, email, passwordHash, roles, location, bio, profileImage }
+            );
+            return result.records[0].get('u').properties;
+        } finally {
+            await session.close();
+        }
+    }
 
     async createOrUpdateAthlete({
         name,
@@ -56,6 +71,36 @@ class Person {
         }
     }
 
+    async getAthletes({ random = false, limit = 100 }) {
+        const session = this.driver.session();
+        try {
+            const safeLimit = Number.isInteger(limit) ? limit : parseInt(limit, 10);
+
+            let query = `
+            MATCH (p:Person)
+            WHERE 'athlete' IN p.roles
+            RETURN p
+            LIMIT toInteger($limit)
+          `;
+
+            if (random) {
+                query = `
+              MATCH (p:Person)
+              WHERE 'athlete' IN p.roles
+              RETURN p
+              ORDER BY rand()
+              LIMIT toInteger($limit)
+            `;
+            }
+
+            const result = await session.run(query, { limit: safeLimit });
+            return result.records.map(r => r.get('p').properties);
+        } finally {
+            await session.close();
+        }
+    }
+
+
     async updateById(id, { name, sport, description }) {
         const session = this.driver.session();
         try {
@@ -88,7 +133,8 @@ class Person {
                 MATCH (p:Person)
                 WHERE toLower(p.name) CONTAINS toLower($query)
                 ${sport ? 'AND toLower(p.sport) = toLower($sport)' : ''}
-                RETURN p LIMIT 10
+                RETURN p 
+                LIMIT 10
             `;
             const result = await session.run(cypher, { query, sport });
             return result.records.map(r => r.get('p'));
@@ -115,18 +161,84 @@ class Person {
         }
     }
 
-    async getLikedAthletesByUser(username) {
+    async getPasswordHashByEmail(email) {
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                'MATCH (p:Person {email: $email}) WHERE p.password IS NOT NULL RETURN p.password AS hash',
+                { email }
+            );
+            if (result.records.length === 0) return null;
+            return result.records[0].get('hash');
+        } finally {
+            await session.close();
+        }
+    }
+
+
+    async getLikedAthletesByUser(identifier) {
         const session = this.driver.session();
         try {
             const result = await session.run(
                 `
-                MATCH (p:Person {username: $username})-[:LIKED]->(p:Person)
-                RETURN p
+                MATCH (user:Person)-[:LIKED]->(athlete:Person)
+                WHERE (user.username = $identifier OR user.email = $identifier)
+                AND 'athlete' IN athlete.roles
+                RETURN user, athlete
                 LIMIT 5
                 `,
-                { username }
+                { identifier }
             );
-            return result.records.map(r => r.get('p'));
+            
+            const nodes = [];
+            const edges = [];
+            
+            result.records.forEach(record => {
+                const user = record.get('user');
+                const athlete = record.get('athlete');
+                
+                // Add user node (avoid duplicates)
+                if (!nodes.find(n => n.data.id === user.properties.uuid || user.properties.username)) {
+                    nodes.push({
+                        data: {
+                            id: user.properties.uuid || user.properties.username,
+                            label: user.properties.name || user.properties.username,
+                            type: 'user',
+                            image: user.properties.profileImage,
+                            ...user.properties
+                        }
+                    });
+                }
+                
+                // Add athlete node (avoid duplicates)
+                if (!nodes.find(n => n.data.id === athlete.properties.uuid)) {
+                    nodes.push({
+                        data: {
+                            id: athlete.properties.uuid,
+                            label: athlete.properties.name,
+                            type: 'athlete',
+                            sport: athlete.properties.sport,
+                            nationality: athlete.properties.nationality,
+                            gender: athlete.properties.gender,
+                            image: athlete.properties.profileImage,
+                            birthDate: athlete.properties.birthDate,
+                            roles: athlete.properties.roles,
+                            ...athlete.properties
+                        }
+                    });
+                }
+                
+                // Add edge
+                edges.push({
+                    data: {
+                        source: user.properties.uuid || user.properties.username,
+                        target: athlete.properties.uuid,
+                        relationship: 'LIKED'
+                    }
+                });
+            });
+            
+            return { nodes, edges };
         } finally {
             await session.close();
         }

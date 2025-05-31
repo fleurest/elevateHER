@@ -1,30 +1,18 @@
 const router = require('express').Router();
 const { driver } = require('../../../neo4j');
 const bcrypt = require('bcrypt');
-const { validateLogin, checkValidation } = require('../../../utils/validators');
-const { isAuthenticated, isAdmin, isVerified} = require('../../../authentication');
+const { validateRegistration,
+  validateLogin,
+  checkValidation } = require('../../../utils/validators');
+const { isAuthenticated, isAdmin, isVerified } = require('../../../authentication');
 const Person = require('../../../models/Person');
 const PersonService = require('../../../services/PersonService');
 const PersonController = require('../../../controllers/PersonController');
 
-const personModel   = new Person(driver);
+const personModel = new Person(driver);
 const personService = new PersonService(personModel, driver);
 const personController = new PersonController(personService);
 
-
-// router.post('/',         createPerson);    // signup
-// router.post('/login',    loginPerson);
-// router.get('/:id',       getPersonProfile);
-// router.patch('/:id',     updatePerson);
-// router.delete('/:id',    deletePerson);
-
-// router.get(   '/',        (req, res) => ctl.list(req, res) );
-// router.post(  '/',        (req, res) => ctl.createOrUpdate(req, res) );
-// router.post(  '/login',   (req, res) => ctl.login(req, res) );
-// router.get(   '/search',  (req, res) => ctl.search(req, res) );
-// router.get(   '/:id',     (req, res) => ctl.getById(req, res) );
-// router.patch( '/:id',     (req, res) => ctl.update(req, res) );
-// router.delete('/:id',     (req, res) => ctl.delete(req, res) );
 
 
 // People route
@@ -46,9 +34,6 @@ router.post(
   personController.login
 );
 
-// SESSION CHECK
-router.get('/session', personController.sessionInfo);
-
 // LOGOUT
 router.post('/logout', personController.logout);
 
@@ -58,6 +43,24 @@ router.get(
   isAuthenticated,
   personController.searchUsers
 );
+
+// REGISTER
+router.post(
+  '/register',
+  validateRegistration,
+  checkValidation,
+  personController.register
+);
+
+
+//     res.status(201).json({ message: 'User registered successfully' });
+//   } catch (err) {
+//     console.error('Registration error:', err);
+//     res.status(500).json({ error: 'Registration failed' });
+//   } finally {
+//     if (session) await session.close();
+//   }
+// });
 
 router.delete('/uuid/:uuid', isAdmin, async (req, res) => {
   const { uuid } = req.params;
@@ -252,31 +255,8 @@ router.post('/friend-request', isAuthenticated, async (req, res) => {
   }
 });
 
-// POST users profile update
-router.post('/update', isAuthenticated, async (req, res) => {
-  const { username, email = '', location = '', bio = '' } = req.body;
-  const session = driver.session();
 
-  try {
-    const result = await session.run(
-      `
-      MATCH (p:Person {username: $username})
-      SET p.email = $email,
-          p.location = $location,
-          p.bio = $bio
-      RETURN p
-      `,
-      { username, email, location, bio }
-    );
-
-    const updatedProps = result.records[0]?.get('p').properties;
-    res.json(updatedProps);
-  } catch (err) {
-    console.error('Error updating profile:', err);
-    res.status(500).json({ error: 'Failed to update user profile' });
-  } finally {
-    await session.close();
-  }
-});
+// POST /api/users/update - Update user profile
+router.post('/update', isAuthenticated, personController.updateProfile);
 
 module.exports = router;

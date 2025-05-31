@@ -1,807 +1,743 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import Split from 'react-split';
 import cytoscape from 'cytoscape';
-import HamburgerMenu from './HamburgerMenu';
 import logo from '../assets/logo-default-profile.png';
-import { Link } from 'react-router-dom';
 import EditProfileForm from './EditProfileForm';
-
-import homeIcon from '../assets/icon_home.png';
-import playersIcon from '../assets/icon_player.png';
-import eventsIcon from '../assets/icon_events.png';
-import pagesIcon from '../assets/icon_pages.png';
+import '../style.css';         // Your CSS variables + Bootstrap import
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 const API_BASE = process.env.API_BASE;
 
+function getPlaceholderIcon(nodeType) {
+  const iconUrl = 'https://img.icons8.com/color/150/';
+  
+  const icons = {
+    'Event': `${iconUrl}calendar.png`,
+    'Organisation': `${iconUrl}office-building.png`,
+    'Sport': `${iconUrl}soccer-ball.png`,
+    'Sponsor': `${iconUrl}briefcase.png`,
+    'Friends': `${iconUrl}people.png`,
+    'Player': `${iconUrl}running.png`,
+    'default': `${iconUrl}question-mark.png`
+  };
+  
+  return icons[nodeType] || icons['default'];
+}
+
 function HomePage({ handleLogout, user, setUser }) {
-  const [graphData, setGraphData] = useState(null);
-  const [selectedNode, setSelectedNode] = useState(null);
-  const [filterType, setFilterType] = useState(null);
+
   const cyContainerRef = useRef(null);
   const cyInstanceRef = useRef(null);
-  const [showProfile, setShowProfile] = useState(false);
-  const [prevFilter, setPrevFilter] = useState(null);
-  const [editProfile, setEditProfile] = useState(false);
-  const [editableUser, setEditableUser] = useState(user);
 
+  const [graphData, setGraphData] = useState(null);
+  const [centerGraphData, setCenterGraphData] = useState(null);
+
+  // activeView: 'profile' | 'players' | 'friends' | 'verify' | 'explore'
+  const [activeView, setActiveView] = useState('profile');
+
+  // If editing profile, show EditProfileForm in right column
+  const [editProfile, setEditProfile] = useState(false);
+
+  // Top friends for the icon bar
+  const [topFriends, setTopFriends] = useState([]);
+  const [showAllFriends, setShowAllFriends] = useState(false);
+
+  // “Get Explore” → filterType determines which label to filter by
+  const [filterType, setFilterType] = useState(null);
+
+  // For suggestion, “Suggested Friends” etc.
+  const [suggestedFriends, setSuggestedFriends] = useState([]);
+
+  // Upcoming/past events for right pane
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
-  const navigate = useNavigate();
 
-  console.log('*** RENDERING HOMEPAGE ***')
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!user?.username) {
-      fetch(`${API_BASE}/api/users/session`, { credentials: 'include' })
-        .then(res => {
+      fetch(`${API_BASE}/auth/session`, { credentials: 'include' })
+        .then((res) => {
           if (!res.ok) throw new Error('Not authenticated');
           return res.json();
         })
         .then(({ user: sessionUser }) => {
           setUser(sessionUser);
-          setEditableUser(sessionUser);
         })
         .catch(() => navigate('/login'));
     }
   }, [user, setUser, navigate]);
 
-
   useEffect(() => {
-    fetch(`${process.env.API_BASE}/api/events/past-events`)
-      .then(res => res.json())
-      .then(data => setPastEvents(Array.isArray(data) ? data : []))
-      .catch(err => console.error('Error fetching past events:', err));
+
+    fetch(`${API_BASE}/api/events/past-events`)
+      .then((res) => res.json())
+      .then((data) => setPastEvents(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Error fetching past events:', err));
+
+    fetch(`${API_BASE}/api/events/calendar-events`, { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => setUpcomingEvents(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Error fetching calendar events:', err));
   }, []);
 
-  const handleShowProfile = () => setShowProfile(true);
-  const handleHideProfile = () => setShowProfile(false);
-
-  const [showMyPlayers, setShowMyPlayers] = useState(false);
-  const [allPeople, setAllPeople] = useState([]);
-  const [showAllFriends, setShowAllFriends] = useState(false);
-  const [topFriends, setTopFriends] = useState([]);
-  const [friends, setFriends] = useState([]);
-  const [showFriendsPanel, setShowFriendsPanel] = useState(false);
-  // search add friend
-  const [showAddFriendPanel, setShowAddFriendPanel] = useState(false);
-  const [showFriendSearch, setShowFriendSearch] = useState(false);
-  const [friendResults, setFriendResults] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [suggestedUsers, setSuggestedUsers] = useState([]);
-  const [suggestedFriends, setSuggestedFriends] = useState([]);
-  // show person on node click
-  const [selectedPerson, setSelectedPerson] = useState(null);
-  const graphRef = useRef(null);
-
-  const toggleProfile = () => {
-    setShowProfile((prev) => {
-      const next = !prev;
-
-      if (next) {
-        setPrevFilter(filterType);
-        setFilterType(null);
-      } else {
-        setFilterType(prevFilter);
-        setEditProfile(false);
-      }
-
-      return next;
-    });
-  };
-
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/users/top`,
-        { credentials: 'include' }
-      );
-
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      setAllPeople(data);
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    }
-  };
-
-
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
+    if (!user) navigate('/login');
   }, [user, navigate]);
 
-  if (!user) {
-    return null;
-  }
-  const [tomorrowEvents, setTomorrowEvents] = useState([]);
-  const [events, setEvents] = useState([]);
-
+  // Fetch the full graph once
   useEffect(() => {
-    fetch(`${process.env.API_BASE}/api/events/calendar-events`,
-      { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        console.log('Fetched events:', data);
-        setEvents(data);
-      })
-      .catch(err => console.error('Error fetching calendar events:', err));
-  }, []);
-
-  useEffect(() => {
-    if (!showProfile) {
-      setFilterType(null);
-    }
-  }, [showProfile]);
-
-  const fetchFriends = async () => {
-    try {
-      const res = await fetch(`${process.env.API_BASE}/api/users/friends/${user.username}`,
-        { credentials: 'include' }
-      );
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-      const data = await res.json();
-      setFriendResults(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Could not fetch friends:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (showFriendsPanel) {
-      fetchFriends();
-    }
-  }, [showFriendsPanel]);
-
-  const fetchSuggestedFriends = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/users/top`,
-        { credentials: 'include' }
-      );
-
-      const text = await res.text();
-      console.log('***Raw response from /api/users/top:', text);
-
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.status}`);
-      }
-
-      const data = JSON.parse(text);
-      setSuggestedFriends(data);
-    } catch (err) {
-      console.error('Could not fetch friend suggestions:', err);
-    }
-  };
-
-
-
-  useEffect(() => {
-    fetchSuggestedFriends();
-  }, []);
-
-  const filterGraphToFriends = async () => {
-    const res = await fetch(`${process.env.API_BASE}/api/users/friends/${user.username}`,
-      { credentials: 'include' }
-    );
-    const data = await res.json();
-    setGraphElements(data);
-  };
-
-  useEffect(() => {
-    const fetchTopFriends = async () => {
+    async function fetchFullGraph() {
       try {
-        const res = await fetch(`${process.env.API_BASE}/api/users/friends/${user.username}`,
-          { credentials: 'include' }
-        );
+        const res = await fetch(`${API_BASE}/api/graph`, { credentials: 'include' });
+        if (!res.ok) throw new Error(`Graph fetch failed: ${res.status}`);
         const data = await res.json();
-        if (Array.isArray(data)) {
-          setTopFriends(data);
-        } else {
-          console.warn('Expected array for top friends, got:', data);
-          setTopFriends([]);
-        }
-      } catch (err) {
-        console.error('Failed to load top friends', err);
-        setTopFriends([]);
-      }
-    };
-
-    if (user?.username) fetchTopFriends();
-  }, [user]);
-
-
-
-  const filterGraphForFriends = async () => {
-    try {
-      const res = await fetch(`${process.env.API_BASE}/api/${user.username}`,
-        { credentials: 'include' }
-      );
-      const data = await res.json();
-      if (graphRef.current) {
-        graphRef.current.setElements(data);
-      }
-    } catch (err) {
-      console.error('Failed to filter graph for friends:', err);
-    }
-  };
-
-  // user search in the last panel
-  const handleSearch = async () => {
-    try {
-      const res = await fetch(`${process.env.API_BASE}/api/users/search?query=${encodeURIComponent(searchQuery)}`,
-        { credentials: 'include' }
-      );
-      const data = await res.json();
-      setSearchResults(data);
-    } catch (err) {
-      console.error('Search error:', err);
-    }
-  };
-
-  const handleFriendSearch = async (query) => {
-    try {
-      const res = await fetch(`${process.env.API_BASE}/api/users/friends/search?query=${encodeURIComponent(query)}`,
-        { credentials: 'include' }
-      );
-      const data = await res.json();
-      setFriendResults(data);
-    } catch (err) {
-      console.error('Friend search failed:', err);
-      setFriendResults([]);
-    }
-  };
-
-  const handleSendFriendRequest = async (username) => {
-    try {
-      const res = await fetch(`${process.env.API_BASE}/api/users/sendfriendrequest/${user.username}/${username}`, { method: 'POST' });
-      const data = await res.json();
-      console.log('Friend request sent:', data);
-    } catch (err) {
-      console.error('Error sending friend request:', err);
-    }
-  };
-  useEffect(() => {
-    if (user?.username) {
-      fetchUsers();
-      fetchFriends();
-    }
-  }, [user]);
-
-
-  useEffect(() => {
-    async function fetchGraph() {
-      try {
-        const res = await fetch(`${process.env.API_BASE}/api/graph`, { credentials: 'include' });
-
-        if (!res.ok) {
-          const errText = await res.text();
-
-          throw new Error(`Graph fetch failed: ${res.status} – ${errText}`);
-        }
-
-        const data = await res.json();
-        console.log('Graph Data:', data);
         setGraphData(data);
       } catch (err) {
-        console.error('Error fetching graph:', err);
+        console.error('Error fetching full graph:', err);
       }
     }
-    fetchGraph();
+    fetchFullGraph();
   }, []);
 
-
-
+  // Fetch top friends for icon bar
   useEffect(() => {
-    if (!cyInstanceRef.current) return;
+    if (!user?.username) return;
+    fetch(`${API_BASE}/api/users/friends/${user.username}`, { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => setTopFriends(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Error loading top friends:', err));
+  }, [user?.username]);
 
-    const cy = cyInstanceRef.current;
-    const tapHandler = (event) => {
-      const nodeData = event.target.data();
-      if (nodeData.label === "Person") {
-        setSelectedPerson({
-          name: nodeData.name,
-          description: nodeData.description,
-          profileImage: nodeData.profileImage
-        });
-        setShowAddFriendPanel(true);
+  // ─── Left‐Menu Handlers ───────────────────────────────────────────────────────
+
+  const handleMyProfile = () => {
+    setActiveView('profile');
+    setEditProfile(false);
+    setCenterGraphData(null);
+    setFilterType(null);
+  };
+
+  const handleMyPlayers = async () => {
+    setActiveView('players');
+    setEditProfile(false);
+    setFilterType(null);
+
+    try {
+      const encodedIdentifier = encodeURIComponent(user.username);
+      console.log('Original user.username:', user.username);
+      console.log('Encoded identifier:', encodedIdentifier);
+      console.log('Full URL:', `${API_BASE}/api/graph/liked/${encodedIdentifier}`);
+
+      const res = await fetch(
+        `${API_BASE}/api/graph/liked/${encodedIdentifier}`,
+        { credentials: 'include' }
+      );
+
+      console.log('Response status:', res.status);
+      console.log('Response ok:', res.ok);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.log('Error response:', errorText);
+        throw new Error(`Error ${res.status}: ${errorText}`);
       }
-    };
 
-    cy.on('tap', 'node', tapHandler);
+      const data = await res.json();
+      setCenterGraphData(data);
+    } catch (err) {
+      console.error('Error fetching liked athletes graph:', err);
+      setCenterGraphData(null);
+    }
+  };
 
-    return () => {
-      cy.removeListener('tap', 'node', tapHandler);
-    };
-  }, [cyInstanceRef.current]);
+  const handleMyFriends = async () => {
+    setActiveView('friends');
+    setEditProfile(false);
+    setFilterType(null);
 
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/graph/friends/${user.username}`,
+        { credentials: 'include' }
+      );
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+      setCenterGraphData(data);
+    } catch (err) {
+      console.error('Error fetching accepted friends graph:', err);
+      setCenterGraphData(null);
+    }
+  };
 
+  const handleGetVerified = () => {
+    setActiveView('verify');
+    setEditProfile(false);
+    setCenterGraphData(null);
+    setFilterType(null);
+  };
+
+  const handleExplore = (category) => {
+    setActiveView('explore');
+    setEditProfile(false);
+    setFilterType(category);
+    setCenterGraphData(null);
+  };
+
+  // ─── Cytoscape Hook ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (showProfile) return;
-    if (!graphData || !cyContainerRef.current || !cyContainerRef.current.offsetParent) return;
+    if (
+      activeView !== 'players' &&
+      activeView !== 'friends' &&
+      activeView !== 'explore'
+    ) {
+      if (cyInstanceRef.current) {
+        cyInstanceRef.current.destroy();
+        cyInstanceRef.current = null;
+      }
+      return;
+    }
+
+    let dataToRender = null;
+
+    if (activeView === 'players' || activeView === 'friends') {
+
+      if (!centerGraphData) return;
+      dataToRender = {
+        nodes: centerGraphData.nodes || [],
+        edges: centerGraphData.edges || []
+      };
+    } else if (activeView === 'explore') {
+      // Use full graphData, filter by filterType
+      if (!graphData || !filterType) return;
+      const nodes = (graphData.nodes || []).filter(
+        (n) => n.data.label === filterType
+      );
+      const nodeIds = new Set(nodes.map((n) => n.data.id));
+      const edges = (graphData.edges || []).filter(
+        (e) => nodeIds.has(e.data.source) && nodeIds.has(e.data.target)
+      );
+      dataToRender = { nodes, edges };
+    }
+
+    if (!dataToRender) return;
 
     const timeout = setTimeout(() => {
-      const initCytoscape = async () => {
-        try {
-          let nodes = graphData.nodes;
-          let edges = graphData.edges;
-
-          if (filterType === 'favourites') {
-            try {
-              const res = await fetch(`${process.env.API_BASE}/api/user-likes/${user?.username}`);
-              const liked = await res.json();
-
-              if (!liked.length) {
-                const goToPlayers = window.confirm(
-                  "You haven’t liked any players yet. Want to browse the Players page?"
-                );
-                if (goToPlayers) {
-                  navigate('/search');
-                }
-                return;
-              }
-
-              const likedNames = liked.map(p => p.name);
-              nodes = nodes.filter(n => likedNames.includes(n.data.name));
-            } catch (err) {
-              console.error('Error filtering favourites:', err);
-              return;
-            }
-          } else if (filterType) {
-            nodes = nodes.filter(n => n.data.label === filterType);
-          }
-
-          const nodeIds = new Set(nodes.map(n => n.data.id));
-          edges = edges.filter(e => nodeIds.has(e.data.source) && nodeIds.has(e.data.target));
-
-          const elements = [
-            ...nodes.map(n => ({ data: n.data })),
-            ...edges.map(e => ({ data: e.data }))
-          ];
-
-          if (cyInstanceRef.current) {
-            cyInstanceRef.current.destroy();
-            cyInstanceRef.current = null;
-          }
-
-          if (elements.length === 0) {
-            console.warn('No elements to display in Cytoscape.');
-            return;
-          }
-
-          const cy = cytoscape({
-            container: cyContainerRef.current,
-            elements,
-            style: [
-              {
-                selector: 'node',
-                style: {
-                  'background-color': '#35374b',
-                  'label': 'data(name)',
-                  'color': '#f1f2f3',
-                  'text-valign': 'center',
-                  'text-halign': 'center',
-                  'font-size': 10,
-                  'width': 40,
-                  'height': 40
-                }
-              },
-              {
-                selector: 'edge',
-                style: {
-                  'width': 2,
-                  'line-color': '#797ca0',
-                  'target-arrow-color': '#797ca0',
-                  'target-arrow-shape': 'triangle',
-                  'curve-style': 'bezier',
-                  'label': 'data(label)',
-                  'font-size': 8,
-                  'text-background-color': '#fff',
-                  'text-background-opacity': 1,
-                  'text-background-shape': 'roundrectangle',
-                  'text-rotation': 'none',
-                  'text-margin-y': -10,
-                  'min-zoomed-font-size': 4
-                }
-              }
-            ],
-            layout: { name: 'breadthfirst', direction: 'TB', animate: true }
-          });
-
-          cy.on('tap', 'node', (evt) => {
-            setSelectedNode(evt.target.data());
-          });
-
-          cyInstanceRef.current = cy;
-        } catch (err) {
-          console.error('Cytoscape init error:', err);
+      try {
+        if (cyInstanceRef.current) {
+          cyInstanceRef.current.destroy();
+          cyInstanceRef.current = null;
         }
-      };
 
-      initCytoscape();
-    }, 150);
+        const cy = cytoscape({
+          container: cyContainerRef.current,
+          elements: [
+            ...dataToRender.nodes.map((n) => {
+              console.log('🔍 Processing node:', n.data.label, 'type:', n.data.type, 'profileImage:', n.data.profileImage);
+              
+              let img = n.data.profileImage || n.data.image;
+              
+              if (!img) {
+                if (n.data.type === 'user' || (n.data.label && n.data.label.includes('@'))) {
+                  // Use app logo for user nodes
+                  img = logo;
+                } else if (n.data.roles && n.data.roles.includes('athlete')) {
+                  // For athletes with names, look at Wikipedia first
+                  const wikiName = (n.data.label || 'default').replace(/ /g, '_');
+                  const wikiUrl = `https://en.wikipedia.org/wiki/Special:FilePath/${wikiName}.jpg`;
+                  img = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(wikiUrl)}`;
+                } else {
+
+                  const nodeType = n.data.type || n.data.label || 'default';
+                  img = getPlaceholderIcon(nodeType);
+                }
+              } else if (img.includes('afl.com.au') || img.includes('wikipedia.org')) {
+                // Proxy external images for CORS issues
+                img = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(img)}`;
+              }
+              
+              if (!img) {
+                console.warn('Image is null for node:', n.data.label, 'using fallback');
+                img = logo;
+              }
+              
+              console.log('🔍 Final image URL for', n.data.label, ':', img);
+              n.data.image = img;
+              return n;
+            }),
+            ...dataToRender.edges
+          ],
+          style: [
+            {
+              selector: 'node',
+              style: {
+                'background-color': '#fff',
+                'background-image': 'data(image)',
+                'background-fit': 'cover',
+                'background-position': 'center',
+                'border-width': 3,
+                'border-color': 'var(--purple)',
+                label: 'data(label)',
+                fontSize: 10,
+                width: 50,
+                height: 50
+              }
+            },
+            {
+              selector: 'edge',
+              style: {
+                width: 2,
+                'line-color': '#ccc',
+                'target-arrow-shape': 'triangle',
+                'curve-style': 'bezier'
+              }
+            }
+          ],
+          layout: { name: 'cose-bilkent', animate: true }
+        });
+
+        // pin top 5 for friends
+        if (activeView === 'friends') {
+          const topFive = cy
+            .nodes()
+            .sort((a, b) => b.degree() - a.degree())
+            .slice(0, 5);
+          topFive.forEach((n) => n.lock());
+        }
+
+        cy.on('tap', 'node', (evt) => {
+          const n = evt.target;
+          cy.elements().addClass('faded');
+          n.removeClass('faded');
+          n.connectedEdges().removeClass('faded');
+          n.connectedEdges().connectedNodes().removeClass('faded');
+          cy.center(n);
+          cy.zoom({ level: 2, position: n.position() });
+        });
+        cy.on('tap', (evt) => {
+          if (evt.target === cy) {
+            cy.elements().removeClass('faded');
+          }
+        });
+
+        cyInstanceRef.current = cy;
+      } catch (err) {
+        console.error('Cytoscape init error:', err);
+      }
+    }, 100);
 
     return () => {
       clearTimeout(timeout);
       if (cyInstanceRef.current) {
         cyInstanceRef.current.destroy();
         cyInstanceRef.current = null;
-        cyInstanceRef.current = null;
       }
     };
-  }, [graphData, filterType, user?.username, showProfile]);
+  }, [activeView, centerGraphData, graphData, filterType]);
+
+  // ─── “Suggested Friends” (for Explore Friends) ───────────────────────────────
+  const fetchSuggestedFriends = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/top`, { credentials: 'include' });
+      const text = await res.text();
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = JSON.parse(text);
+      setSuggestedFriends(data);
+    } catch (err) {
+      console.error('Could not fetch suggested friends:', err);
+    }
+  };
 
   useEffect(() => {
-    fetch(`${process.env.API_BASE}/api/users/top`)
-      .then(res => res.json())
-      .then(data => {
-        console.log('Top Users Response:', data);
-        setFriendResults(Array.isArray(data) ? data : []);
-      })
-      .catch(err => {
-        console.error('Error loading users', err);
-        setFriendResults([]);
-      });
-  }, []);
+    if (activeView === 'explore' && filterType === 'Friends') {
+      fetchSuggestedFriends();
+    }
+  }, [activeView, filterType]);
 
-  const toggleFilter = type =>
-    setFilterType(prev => (prev === type ? null : type));
+  if (!user) return null;
 
   return (
-    <div className="home-page-layout">
-      <div className="home-page-column home-page-left">
-        <div className="logo-section">
-          <img src={logo} alt="Logo" className="small-logo" />
-        </div>
-
-        <div className="favourites-section">
-          <h2>Favourites</h2>
-          <ul>
-            <li className="cursor-pointer" onClick={toggleProfile}>
-              My Profile {showProfile ? '▲' : '▼'}
-              {showProfile}
-            </li>
-
-            <li
-              className="cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                const newShowMyPlayers = !showMyPlayers;
-                setShowMyPlayers(newShowMyPlayers);
-                setShowProfile(false);
-                if (newShowMyPlayers) {
-                  setFilterType('Player');
-                } else {
-                  setFilterType(null);
-                }
-
-                setSelectedNode(null);
-                setShowFriendsPanel(false);
-              }}
-            >
-              My Players {showMyPlayers ? '▲' : '▼'}
-            </li>
-          </ul>
-        </div>
-
-        <div className="explore-section">
-          <h2>Explore</h2>
-          <ul>
-            <li
-              className="cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                const nextState = !showFriendsPanel;
-                setShowFriendsPanel(nextState);
-                setShowProfile(false);
-                setShowMyPlayers(false);
-                setSelectedNode(null);
-                if (nextState) {
-                  fetchSuggestedFriends();
-                }
-              }}
-            >
-              Friends {showAddFriendPanel ? '▲' : '▼'}
-            </li>
-            <li>Players {showMyPlayers ? '▲' : '▼'}</li>
-            <li
-              style={{ cursor: 'pointer', userSelect: 'none' }}
-              onClick={() => toggleFilter('Sport')}
-            >
-              Sports {filterType === 'Sport' ? '▲' : '▼'}
-            </li>
-            <li
-              style={{ cursor: 'pointer', userSelect: 'none' }}
-              onClick={() => toggleFilter('Event')}
-            >
-              Events {filterType === 'Event' ? '▲' : '▼'}
-            </li>
-            <li className="reset-filter" onClick={() => setFilterType(null)}>Reset Filter</li>
-          </ul>
-        </div>
-
-        <div className="explore-section">
-          <h2>News</h2>
-          <ul>
-            <li>My News </li>
-          </ul>
-          <div style={{ textAlign: "center", marginTop: "20px" }}>
-            <button
-              onClick={handleLogout}
-              type="button"
-              style={{ padding: "10px 20px", fontSize: "16px" }}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="home-page-column home-page-center">
-        <div className="icon-bar-wrapper">
-          <div className="center-top-icons">
-            <Link to="/home" className="icon-link my-icon home-icon" ></Link>
-            <Link to="/dashboard" className="icon-link my-icon players-icon"></Link>
-            <Link to="/profile" className="icon-link my-icon events-icon" ></Link>
-            <Link to="/search" className="icon-link my-icon pages-icon" ></Link>
-          </div>
-        </div>
-        <div className="icon-bar-wrapper">
-          <div className="center-top-icons">
-            {user && (
-              <Link
-                to={`/ profile / ${user.username}`}
-                className="flex flex-col items-center mx-1 w-12"
-              >
-                <img
-                  src={user.profileImage || logo}
-                  alt={user.username}
-                  className="small-logo w-7 h-7 rounded-full object-cover"
-                />
-                <span className="text-[10px] mt-1 text-center truncate w-full">
-                  {user.username}
-                </span>
-              </Link>
-            )}
-
-            {Array.isArray(topFriends) && topFriends
-              .slice(0, showAllFriends ? 5 : 2)
-              .map((friend) => (
-                <Link
-                  to={`/ profile / ${friend.username}`}
-                  key={friend.username}
-                  className="flex flex-col items-center mx-1 w-12"
-                >
-                  <img
-                    src={friend.profileImage || logo}
-                    alt={friend.username}
-                    className="small-logo w-7 h-7 rounded-full object-cover"
-                  />
-                  <span className="text-[10px] mt-1 text-center truncate w-full">
-                    {friend.username}
-                  </span>
-                </Link>
-              ))}
-
-          </div>
-          {topFriends.length > 2 && (
-            <button
-              onClick={() => setShowAllFriends((prev) => !prev)}
-              className="text-[10px] text-gray-500 mt-1 ml-2 underline"
-            >
-              {showAllFriends ? '<' : '>'}
-            </button>
-          )}
-
-        </div>
-        {showProfile ? (
-          <div className="profile-panel">
-            <h3>Profile Info</h3>
-            <div className="profile-details">
-              <img src={logo} alt="Profile" className="profile-pic" />
-              <p><strong>Username:</strong> {user?.username || 'Unknown'}</p>
-              <p><strong>Email:</strong> {user?.email || 'Not provided'}</p>
-              <button className="auth-button-alt" onClick={toggleProfile}>
-                Close Profile
-              </button>
-              <button
-                className="mt-2 text-sm text-blue-600 underline"
-                onClick={() => setEditProfile(true)}
-                disabled={!showProfile}
-              >
-                Edit Profile
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <h2>Player Graph</h2>
-            <div className="player-network-graph">
-              <div ref={cyContainerRef} style={{ height: '500px', width: '100%' }} />
-            </div>
-          </>
-        )}
-
-        {showFriendSearch && friendResults.length > 0 && (
-          <ul className="mt-2 ml-4 border rounded bg-white shadow">
-            {friendResults.map(user => (
-              <li key={user.id} className="p-2 border-b flex justify-between items-center">
-                {user.name}
-                <button
-                  onClick={() => sendFriendRequest(user.username)}
-                  className="text-sm text-purple-600 hover:underline"
-                >
-                  Add
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {showMyPlayers && (
-          <div
-            className="players-panel"
-            style={{
-              margin: '20px 0',
-              padding: '20px',
-              border: '1px solid #ccc',
-              borderRadius: '8px',
-              backgroundColor: '#fff'
-            }}
-          >
-          </div>
-        )}
-        {showFriendsPanel && (
-          <div className="mt-2 pl-4">
-            <p className="text-sm mb-2">Search or view your friends here</p><ul>
-              {friendResults.map((user) => (
-                <li key={user.id} className="flex justify-between items-center mb-2">
-                  <span>{user.username}</span>
-
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {showAddFriendPanel && (
-          <div className="bg-purple-50 p-4 border-l border-purple-200">
-            <h2 className="text-xl font-semibold mb-2">Find Friends</h2>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search users"
-              className="w-full p-2 border rounded mb-2"
+    <div style={{ height: '100vh', width: '100vw' }}>
+      {/* ── Outer Split: Left (20%) vs. (Center+Right) (80%) ───────────────────── */}
+      <Split
+        sizes={[20, 80]}
+        minSize={150}
+        gutterSize={8}
+        gutterAlign="center"
+        direction="horizontal"
+        snapOffset={30}
+        style={{ display: 'flex', height: '100%' }}
+      >
+        {/* ===== Left Sidebar (20%) ===== */}
+        <div className="bg-pink h-100 overflow-auto" style={{ padding: '1rem' }}>
+          {/* Logo */}
+          <div className="text-center mb-4">
+            <img
+              src={logo}
+              alt="Logo"
+              className="rounded-circle"
+              style={{ width: '80px', height: '80px', border: '2px solid var(--purple)' }}
             />
-            <button
-              onClick={handleSearch}
-              className="bg-purple-600 text-white px-4 py-2 rounded"
-            >
-              Search
-            </button>
-
-            <ul className="mt-4">
-              {Array.isArray(searchResults) && searchResults.length > 0 ? (
-                searchResults.map(result => (
-                  <li key={result.id} className="p-2 border-b">
-                    {result.name}
-                    {/* TODO: Add Friend button */}
-                  </li>
-                ))
-              ) : (
-                <li className="p-2 text-gray-500">No results found</li>
-              )}
-            </ul>
           </div>
-        )}
-        {fetchSuggestedFriends.length > 0 && (
-          <div className="mt-4">
-            <ul className="list-disc pl-5">
-              {fetchSuggestedFriends.map((friend, index) => (
-                <li key={index}>{friend.username}</li>
-              ))}
-            </ul>
-          </div>
-        )}
 
-        <div className="mt-4">
-          <h3 className="text-md font-bold mb-2">Suggested Friends</h3>
-          <ul className="list-disc pl-4 space-y-1">
-            {suggestedFriends.map(person => (
-              <li key={person.username} className="flex justify-between items-center">
-                <span>{person.username}</span>
-                <button
-                  className="text-sm text-blue-600 underline"
-                  onClick={() => handleSendFriendRequest(person.username)}
-                >
-                  Send Friend Request
-                </button>
+          {/* ── Favourites Section ───────────────────────────────────────────── */}
+          <div className="mb-4">
+            <h5 className="text-navy">Favourites</h5>
+            <ul className="list-unstyled">
+              <li
+                className={`menu-item ${activeView === 'profile' || activeView === 'verify' ? 'active-menu-item' : ''}`}
+                onClick={handleMyProfile}
+              >
+                My Profile
               </li>
-            ))}
-            <ul className="list-disc pl-5">
-              {suggestedFriends.map((friend, index) => (
-                <li key={friend.id || friend.username || index}>{friend.username}</li>))}
+              <li
+                className={`menu-item ${activeView === 'players' ? 'active-menu-item' : ''}`}
+                onClick={handleMyPlayers}
+              >
+                My Players
+              </li>
+              <li
+                className={`menu-item ${activeView === 'friends' ? 'active-menu-item' : ''}`}
+                onClick={handleMyFriends}
+              >
+                My Friends
+              </li>
+              <li
+                className={`menu-item ${activeView === 'verify' ? 'active-menu-item' : ''}`}
+                onClick={handleGetVerified}
+              >
+                Get Verified
+              </li>
             </ul>
-          </ul>
+          </div>
+
+          {/* ── Explore Section ───────────────────────────────────────────────── */}
+          <div className="mb-4">
+            <h5 className="text-navy">Explore</h5>
+            <ul className="list-unstyled">
+              <li
+                className={`menu-item ${activeView === 'explore' && filterType === 'Friends' ? 'active-menu-item' : ''}`}
+                onClick={() => handleExplore('Friends')}
+              >
+                Friends
+              </li>
+              <li
+                className={`menu-item ${activeView === 'explore' && filterType === 'Player' ? 'active-menu-item' : ''}`}
+                onClick={() => handleExplore('Player')}
+              >
+                Players
+              </li>
+              <li
+                className={`menu-item ${activeView === 'explore' && filterType === 'Sport' ? 'active-menu-item' : ''}`}
+                onClick={() => handleExplore('Sport')}
+              >
+                Sports
+              </li>
+              <li
+                className={`menu-item ${activeView === 'explore' && filterType === 'Event' ? 'active-menu-item' : ''}`}
+                onClick={() => handleExplore('Event')}
+              >
+                Events
+              </li>
+              <li
+                className={`menu-item ${activeView === 'explore' && filterType === 'Organisation' ? 'active-menu-item' : ''}`}
+                onClick={() => handleExplore('Organisation')}
+              >
+                Organisations
+              </li>
+              <li
+                className={`menu-item ${activeView === 'explore' && filterType === 'Sponsor' ? 'active-menu-item' : ''}`}
+                onClick={() => handleExplore('Sponsor')}
+              >
+                Sponsors
+              </li>
+            </ul>
+          </div>
         </div>
-      </div>
-      <div className="home-page-column home-page-right">
-        {!editProfile && (
-          <div className="flex flex-col md:flex-row gap-6 mt-6">
-            <div className="flex-1 bg-white p-4 rounded shadow">
-              <h2 className="text-lg font-semibold mb-3">Upcoming Events</h2>
-              {upcomingEvents.length > 0 ? (
-                <ul className="text-sm">
-                  {upcomingEvents.map(event => (
-                    <li key={event.id} className="mb-2">
-                      <strong>{event.summary}</strong><br />
-                      {event.start?.dateTime || event.start?.date}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>No upcoming events found.</p>
-              )}
-              <div className="calendar-container">
-                <iframe
-                  src="https://calendar.google.com/calendar/embed?src=c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc%40group.calendar.google.com&ctz=America%2FNew_York"
-                  style={{ border: 0 }}
-                  width="100%"
-                  height="600"
-                  frameBorder="0"
-                  scrolling="no"
-                  title="Google Calendar"
-                ></iframe>
+
+        <Split
+          sizes={[75, 25]}
+          minSize={200}
+          gutterSize={8}
+          gutterAlign="center"
+          direction="horizontal"
+          style={{ display: 'flex', height: '100%' }}
+        >
+          {/* ===== Center Column ===== */}
+          <div className="bg-grey h-100 overflow-auto" style={{ padding: '1rem' }}>
+            {/* First icon‐bar*/}
+            <div className="home-page-column home-page-center mb-3">
+              <div className="icon-bar-wrapper">
+                <div className="center-top-icons">
+                  <Link to="/home" className="icon-link my-icon home-icon" />
+                  <Link to="/dashboard" className="icon-link my-icon players-icon" />
+                  <Link to="/events" className="icon-link my-icon events-icon" />
+                  <Link to="/search" className="icon-link my-icon pages-icon" />
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 bg-white p-4 rounded shadow">
-              <h2 className="text-lg font-semibold mb-3">Past Events</h2>
-              {pastEvents.length > 0 ? (
-                <ul className="text-sm">
-                  {pastEvents.map((event, index) => (
-                    <li key={index} className="mb-2">
-                      <strong>{event.eventName || 'Unnamed Event'}</strong><br />
-                      {event.year ? Number(event.year.low ?? event.year) : 'Unknown Year'}<br />
-                      {event.location && <span>{event.location}</span>}<br />
-                      {event.eventType && <span className="italic">{event.eventType}</span>}
-                    </li>
+            {/* Second icon‐bar user + top friends */}
+            <div className="home-page-column home-page-center mb-4">
+              <div className="icon-bar-wrapper">
+                <div className="center-top-icons">
+                  {user && (
+                    <Link to={`/profile/${user.username}`} className="flex flex-col items-center mx-1 w-12">
+                      <img
+                        src={user.profileImage || logo}
+                        alt={user.username}
+                        className="small-logo w-7 h-7 rounded-full object-cover"
+                      />
+                      <span className="text-[10px] mt-1 text-center truncate w-full">{user.username}</span>
+                    </Link>
+                  )}
+                  {topFriends.slice(0, showAllFriends ? 5 : 2).map((friend) => (
+                    <Link
+                      key={friend.username}
+                      to={`/profile/${friend.username}`}
+                      className="flex flex-col items-center mx-1 w-12"
+                    >
+                      <img
+                        src={friend.profileImage || logo}
+                        alt={friend.username}
+                        className="small-logo w-7 h-7 rounded-full object-cover"
+                      />
+                      <span className="text-[10px] mt-1 text-center truncate w-full">
+                        {friend.username}
+                      </span>
+                    </Link>
                   ))}
-                </ul>
+                  {topFriends.length > 2 && (
+                    <button
+                      className="text-[10px] text-navy mt-1 ml-2"
+                      style={{ textDecoration: 'underline', background: 'none', border: 'none', padding: 0 }}
+                      onClick={() => setShowAllFriends((prev) => !prev)}
+                    >
+                      {showAllFriends ? '<' : '>'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Center Content ────────────────────────────────────────────────── */}
+            {/* Profile view */}
+            {activeView === 'profile' && (
+              <div className="card mb-4">
+                <div className="card-body">
+                  <h5 className="card-title text-navy">Profile Info</h5>
+                  <div className="d-flex align-items-center mb-3">
+                    <img
+                      src={logo}
+                      alt="Profile"
+                      className="rounded-circle me-3"
+                      style={{ width: '60px', height: '60px', border: '2px solid var(--purple)' }}
+                    />
+                    <div>
+                      <p className="mb-1">
+                        <strong>Username:</strong> {user.username}
+                      </p>
+                      <p className="mb-1">
+                        <strong>Email:</strong> {user.email || 'Not provided'}
+                      </p>
+                    </div>
+                  </div>
+                  <button className="btn btn-outline-primary me-2" onClick={handleMyProfile}>
+                    Refresh Profile
+                  </button>
+                  <button className="btn btn-link" onClick={() => setEditProfile(true)} disabled={!activeView}>
+                    Edit Profile
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Verify view */}
+            {activeView === 'verify' && (
+              <div className="card mb-4">
+                <div className="card-body">
+                  <h5 className="card-title text-navy">Profile & Verify</h5>
+                  <div className="d-flex align-items-center mb-3">
+                    <img
+                      src={logo}
+                      alt="Profile"
+                      className="rounded-circle me-3"
+                      style={{ width: '60px', height: '60px', border: '2px solid var(--purple)' }}
+                    />
+                    <div>
+                      <p className="mb-1">
+                        <strong>Username:</strong> {user.username}
+                      </p>
+                      <p className="mb-1">
+                        <strong>Email:</strong> {user.email || 'Not provided'}
+                      </p>
+                    </div>
+                  </div>
+                  <button className="btn btn-success">Get Verified</button>
+                </div>
+              </div>
+            )}
+
+            {/* My Players or My Friends graph */}
+            {(activeView === 'players' || activeView === 'friends') && (
+              <>
+                <h5 className="text-navy">
+                  {activeView === 'players' ? 'Liked Athletes Graph' : 'Friends Graph'}
+                </h5>
+                <div
+                  className="border rounded mb-4"
+                  style={{ height: '400px', overflow: 'hidden', borderColor: 'var(--purple)' }}
+                >
+                  <div ref={cyContainerRef} style={{ height: '100%', width: '100%' }} />
+                </div>
+              </>
+            )}
+
+            {/* Explore graph */}
+            {activeView === 'explore' && filterType && (
+              <>
+                <h5 className="text-navy">{`Explore: ${filterType}`}</h5>
+                <div
+                  className="border rounded mb-4"
+                  style={{ height: '400px', overflow: 'hidden', borderColor: 'var(--purple)' }}
+                >
+                  <div ref={cyContainerRef} style={{ height: '100%', width: '100%' }} />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ===== Right Sidebar ===== */}
+          <div className="bg-light-purple h-100 overflow-auto" style={{ padding: '1rem', color: 'var(--grey)' }}>
+            <div className="container-fluid p-0">
+              {editProfile ? (
+                // ───── If editing profile, show EditProfileForm in right column ───
+                <EditProfileForm
+                  user={user}
+                  setUser={setUser}
+                  onCancel={() => setEditProfile(false)}
+                  onSave={(updatedUser) => {
+                    setUser(updatedUser);
+                    setEditProfile(false);
+                  }}
+                />
               ) : (
-                <p>No past events available.</p>
+                // ───── Otherwise, show default membership/events/suggested friends cards ─
+                <>
+                  {/* Membership card */}
+                  <div className="card text-center mb-4" style={{ backgroundColor: 'var(--purple)', color: 'var(--grey)' }}>
+                    <div className="card-body">
+                      <img
+                        src={user.profileImage || logo}
+                        alt="Profile"
+                        className="rounded-circle mb-2"
+                        style={{ width: '60px', height: '60px', border: '2px solid var(--pink)' }}
+                      />
+                      <p className="mb-1">Athlete Spotlight</p>
+                      <p style={{ fontSize: '14px' }}>
+                        Player of the Day
+                      </p>
+                      <button className="btn btn-light btn-sm">See Player Profile</button>
+                    </div>
+                  </div>
+
+                  {/* Events card */}
+                  <section className="right-section-card">
+                    <header className="d-flex justify-content-between align-items-center mb-3">
+                      <h3 className="mb-0">Events</h3>
+                      <Link
+                        to="/events"
+                        className="events-see-all-link"
+                      >
+                        See all
+                      </Link>
+                    </header>
+
+                    {upcomingEvents.length > 0 ? (
+                      <ul className="events-list">
+                        {upcomingEvents.slice(0, 2).map((event, index) => {
+                          const eventDate = new Date(event.start.dateTime || event.start);
+                          const day = eventDate.getDate();
+                          const month = eventDate.toLocaleString('default', { month: 'short' });
+
+                          return (
+                            <li key={index} className="events-list-item">
+                              <div className="event-date-mini">
+                                {day}<br />
+                                <small>{month}</small>
+                              </div>
+                              <div className="event-info">
+                                <strong className="event-name">
+                                  {event.summary}
+                                </strong><br />
+                                <small className="event-location">
+                                  {event.location || 'Online event'}
+                                </small><br />
+                                <Link
+                                  to={`/events/${event.id || index}`}
+                                  className="event-details-link"
+                                >
+                                  Details
+                                </Link>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <div className="events-empty-mini">
+                        No upcoming events
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Suggested Friends */}
+                  <div className="card">
+                    <div className="card-header d-flex justify-content-between align-items-center bg-purple text-grey">
+                      <span>Suggested Friends</span>
+                      <Link to="/friends" className="text-grey" style={{ fontSize: '14px', textDecoration: 'underline' }}>
+                        See all
+                      </Link>
+                    </div>
+                    <ul className="list-group list-group-flush">
+                      {suggestedFriends.length > 0 ? (
+                        suggestedFriends.map((person) => (
+                          <li
+                            key={person.username}
+                            className="list-group-item d-flex align-items-center justify-content-between"
+                            style={{ backgroundColor: 'var(--grey)' }}
+                          >
+                            <div className="d-flex align-items-center">
+                              <img
+                                src={person.profileImage || 'https://i.pravatar.cc/150?img=5'}
+                                alt={person.username}
+                                className="rounded-circle me-2"
+                                style={{ width: '40px', height: '40px', border: '2px solid var(--purple)' }}
+                              />
+                              <div>
+                                <div className="text-navy"><strong>{person.username}</strong></div>
+                                <div className="text-navy small">Suggested for you</div>
+                              </div>
+                            </div>
+                            <button className="btn btn-outline-light btn-sm" onClick={() => { /* send request */ }}>
+                              Add Friend
+                            </button>
+                          </li>
+                        ))
+                      ) : (
+                        <li className="list-group-item text-center" style={{ backgroundColor: 'var(--grey)' }}>
+                          No suggestions.
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                </>
               )}
             </div>
           </div>
-        )}
-
-
-        {editProfile ? (
-          <EditProfileForm
-            user={editableUser}
-            setUser={setEditableUser}
-            onCancel={() => setEditProfile(false)}
-            onSave={(updatedUser) => {
-              setEditProfile(false);
-              setEditableUser(updatedUser);
-              setUser(updatedUser);
-            }}
-          />
-        ) : selectedNode ? (
-          <div>
-            <h2>Details</h2>
-            {Object.entries(selectedNode).map(([key, value]) => (
-              <p key={key}><strong>{key}:</strong> {JSON.stringify(value)}</p>
-            ))}
-          </div>
-        ) : null}
-
-      </div>
-
+        </Split>
+      </Split>
     </div>
   );
 }

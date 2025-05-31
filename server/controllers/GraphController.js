@@ -11,6 +11,8 @@ class GraphController {
         this.graphService = graphService;
         this.getGraph = this.getGraph.bind(this);
         this.getParticipationGraph = this.getParticipationGraph.bind(this);
+        this.getLikedByEmail = this.getLikedByEmail.bind(this);
+        this.getLikedSummary = this.getLikedSummary.bind(this);
     }
 }
 
@@ -99,6 +101,7 @@ async function getParticipationGraph(req, res, next) {
                     id: node.identity.toString(),
                     label: node.properties.name || node.labels[0],
                     image: node.properties.profileImage || './images/logo-default-profile.png',
+                    type: node.labels[0]?.toLowerCase() || 'unknown',
                     ...node.properties
                 }
             });
@@ -123,6 +126,112 @@ async function getParticipationGraph(req, res, next) {
     }
 }
 
+/**
+ * GET /api/graph/liked/:email
+ * Get liked entities for a user by email
+ * Query parameters:
+ * - limit: number of results (default: 50)
+ * - type: filter by type ('person', 'organization', or null for all)
+ */
+async function getLikedByEmail(req, res, next) {
+    try {
+        const { email } = req.params;
+        const limit = parseInt(req.query.limit, 10) || 50;
+        const type = req.query.type || null;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email parameter is required' });
+        }
+
+        // Validate email format (basic validation)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        const data = await graphService.getLikedByEmail(email, { limit, type });
+        
+        if (data.totalCount === 0) {
+            return res.status(200).json({
+                nodes: [],
+                edges: [],
+                totalCount: 0,
+                message: 'No liked entities found for this user'
+            });
+        }
+
+        res.status(200).json(data);
+    } catch (err) {
+        console.error('Error in getLikedByEmail:', err);
+        res.status(500).json({ error: 'Failed to get liked entities' });
+    }
+}
+
+/**
+ * GET /api/graph/liked/:email/summary
+ * Get summary of liked entities for a user
+ */
+async function getLikedSummary(req, res, next) {
+    try {
+        const { email } = req.params;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email parameter is required' });
+        }
+
+        // Validate email format (basic validation)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        const summary = await graphService.getLikedSummary(email);
+        res.status(200).json(summary);
+    } catch (err) {
+        console.error('Error in getLikedSummary:', err);
+        res.status(500).json({ error: 'Failed to get liked summary' });
+    }
+}
+
+/**
+ * GET /api/graph/friends/:email
+ * Get friends graph for a user by email
+ * Query parameters:
+ * - limit: number of results (default: 50)
+ */
+async function getFriendsByEmail(req, res, next) {
+    try {
+        const { email } = req.params;
+        const limit = parseInt(req.query.limit, 10) || 50;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email parameter is required' });
+        }
+
+        // Validate email format (basic validation)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        const data = await graphService.getFriendsByEmail(email, { limit });
+        
+        if (data.totalCount === 0) {
+            return res.status(200).json({
+                nodes: [],
+                edges: [],
+                totalCount: 0,
+                message: 'No friends found for this user'
+            });
+        }
+
+        res.status(200).json(data);
+    } catch (err) {
+        console.error('Error in getFriendsByEmail:', err);
+        res.status(500).json({ error: 'Failed to get friends' });
+    }
+}
+
 module.exports = {
     getGraph,
     postEmbeddings,
@@ -131,4 +240,7 @@ module.exports = {
     getCommunities,
     exportEdges,
     getParticipationGraph,
+    getLikedByEmail,
+    getLikedSummary,
+    getFriendsByEmail
 };

@@ -26,6 +26,15 @@ class PersonService {
         return await this.personModel.createOrUpdateAthlete(cleaned);
     }
 
+    async createOrUpdateUser(data) {
+        return this.personModel.createOrUpdateUser(data);
+    }
+
+    async getPasswordHashByEmail(email) {
+        return this.personModel.getPasswordHashByEmail(email);
+    }
+
+
     async updateGoogleIdByEmail(email, googleId) {
         const session = this.driver.session();
         try {
@@ -38,16 +47,11 @@ class PersonService {
         }
     }
 
-    async authenticatePerson(username, password) {
-        const personRecord = await this.personModel.findByUser(username);
-        if (!personRecord) return { person: null, roles: [] };
-
-        const isValid = await bcrypt.compare(password, personRecord.password);
-        if (!isValid) return { person: null, roles: [] };
-
-        const { password: _, ...sanitizedPerson } = personRecord;
-        return { person: sanitizedPerson, roles: personRecord.roles || [] };
-    }
+    async authenticateUser(email, password) {
+        const hash = await this.getPasswordHashByEmail(email);
+        if (!hash) return false;
+        return bcrypt.compare(password, hash);
+      }
 
     async getTopUsers(limit = 5) {
         const session = this.driver.session();
@@ -237,13 +241,10 @@ class PersonService {
 
     async searchUsersByName(q) { return this.personModel.searchByName({ query: q, sport: null }) }
 
-    async listAthletes({ random, athleteCount = 5 }) {
-        if (random) {
-            return this.athleteModel.getRandomAthletes(+athleteCount);
-        } else {
-            return this.athleteModel.findAthletes({});
-        }
+    async listAthletes({ random = false, athleteCount = 5 }) {
+        return this.personModel.getAthletes({ random, limit: athleteCount });
     }
+
 
     async removeAthleteOrganisation(personId, organisationId) {
         // drop the PARTICIPATES_IN relationship in Neo4j

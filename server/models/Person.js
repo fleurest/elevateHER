@@ -181,7 +181,7 @@ class Person {
         try {
             const result = await session.run(
                 `
-                MATCH (user:Person)-[:LIKED]->(athlete:Person)
+                MATCH (user:Person)-[:LIKES]->(athlete:Person)
                 WHERE (user.username = $identifier OR user.email = $identifier)
                 AND 'athlete' IN athlete.roles
                 RETURN user, athlete
@@ -233,7 +233,7 @@ class Person {
                     data: {
                         source: user.properties.uuid || user.properties.username,
                         target: athlete.properties.uuid,
-                        relationship: 'LIKED'
+                        relationship: 'LIKES'
                     }
                 });
             });

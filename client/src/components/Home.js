@@ -25,6 +25,16 @@ function getPlaceholderIcon(nodeType) {
   return icons[nodeType] || icons['default'];
 }
 
+function getAvatarSrc(src) {
+  if (
+    src &&
+    (src.includes('afl.com.au') || src.includes('wikipedia.org'))
+  ) {
+    return `${API_BASE}/api/image-proxy?url=${encodeURIComponent(src)}`;
+  }
+  return src || logo;
+}
+
 function HomePage({ handleLogout, user, setUser }) {
 
   const cyContainerRef = useRef(null);
@@ -68,6 +78,8 @@ function HomePage({ handleLogout, user, setUser }) {
 
   // Right panel view state: 'default' | 'nodeDetails' | 'personDetails' | 'friendSearch'
   const [rightPanelView, setRightPanelView] = useState('default');
+  const [spotlightAthlete, setSpotlightAthlete] = useState(null);
+  const [likeMessage, setLikeMessage] = useState('');
 
   const navigate = useNavigate();
 
@@ -84,6 +96,16 @@ function HomePage({ handleLogout, user, setUser }) {
         .catch(() => navigate('/login'));
     }
   }, [user, setUser, navigate]);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/athletes?random=true&athleteCount=1`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) setSpotlightAthlete(data[0]);
+        else setSpotlightAthlete(null);
+      })
+      .catch(() => setSpotlightAthlete(null));
+  }, []);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/events/past-events`)
@@ -124,6 +146,60 @@ function HomePage({ handleLogout, user, setUser }) {
       .then((data) => setTopFriends(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Error loading top friends:', err));
   }, [user?.username]);
+
+  const handleSpotlightProfile = () => {
+    if (!spotlightAthlete) return;
+    setActiveView('spotlightPlayer');
+    setSelectedPerson({
+      name: spotlightAthlete.name,
+      description: spotlightAthlete.description,
+      profileImage: spotlightAthlete.profileImage,
+      username: spotlightAthlete.username,
+      email: spotlightAthlete.email,
+      location: spotlightAthlete.nationality || spotlightAthlete.location || '',
+      sport: spotlightAthlete.sport,
+      gender: spotlightAthlete.gender,
+      uuid: spotlightAthlete.uuid
+    });
+    setRightPanelView('personDetails');
+    setEditProfile(false);
+    setCenterGraphData(null);
+    setFilterType(null);
+    setSelectedNode(null);
+  };
+
+  const handleLikePlayer = async (username) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/likes`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: user.username,
+          athleteName: username,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLikeMessage('Player Liked!');
+        // Auto-hide after 2 seconds
+        setTimeout(() => setLikeMessage(''), 2000);
+
+        // If you're on the liked athletes view, refresh the graph!
+        if (activeView === 'players') {
+          handleMyPlayers(); // Call your existing function to refetch liked athletes graph
+        }
+      } else {
+        setLikeMessage(data.error || 'Could not like player.');
+        setTimeout(() => setLikeMessage(''), 2000);
+      }
+    } catch (err) {
+      setLikeMessage('Error liking player.');
+      setTimeout(() => setLikeMessage(''), 2000);
+    }
+  };
+
+
 
   const handleSearch = async () => {
     try {
@@ -618,52 +694,56 @@ function HomePage({ handleLogout, user, setUser }) {
             </div>
 
             {/* Second icon‐bar user + top friends */}
-            <div className="home-page-column home-page-center mb-4">
-              <div className="icon-bar-wrapper">
-                <div className="center-top-icons">
-                  {user && (
-                    <Link to={`/profile/${user.username}`} className="flex flex-col items-center mx-1 w-12">
-                      <img
-                        src={user.profileImage || logo}
-                        alt={user.username}
-                        className="small-logo w-7 h-7 rounded-full object-cover"
-                      />
-                      <span className="text-[10px] mt-1 text-center truncate w-full">{user.username}</span>
-                    </Link>
-                  )}
-                  {topFriends.slice(0, 5).map((friend) => {
-                    // Use username if available, otherwise use email (and encodeURIComponent for safety)
-                    const friendId = friend.username || encodeURIComponent(friend.email || '');
-                    return (
-                      <Link
-                        key={friendId}
-                        to={`/profile/${friendId}`}
-                        className="flex flex-col items-center mx-1 w-12"
-                      >
-                        <img
-                          src={friend.profileImage || logo}
-                          alt={friend.username || friend.email}
-                          className="small-logo w-7 h-7 rounded-full object-cover"
-                        />
-                        <span className="text-[10px] mt-1 text-center truncate w-full">
-                          {friend.username || friend.email}
-                        </span>
-                      </Link>
-                    );
-                  })}
-
-                  {topFriends.length > 2 && (
-                    <button
-                      className="text-[10px] text-navy mt-1 ml-2"
-                      style={{ textDecoration: 'underline', background: 'none', border: 'none', padding: 0 }}
-                      onClick={() => setShowAllFriends((prev) => !prev)}
+            <div className="profile-panel" style={{ marginTop: 0 }}>
+              <h3 style={{ marginBottom: "16px", textAlign: "center", letterSpacing: "0.5px" }}>My Friends</h3>
+              <div style={{ display: "flex", justifyContent: "center", gap: "16px" }}>
+                {topFriends.length === 0 ? (
+                  <span className="text-navy" style={{ fontSize: "14px" }}>No friends yet!</span>
+                ) : (
+                  topFriends.slice(0, 5).map((friend) => (
+                    <Link
+                      key={friend.username || friend.uuid || friend.email}
+                      to={`/profile/${encodeURIComponent(friend.username || friend.email || friend.uuid)}`}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        width: "64px"
+                      }}
                     >
-                      {showAllFriends ? '<' : '>'}
-                    </button>
-                  )}
-                </div>
+                      <img
+                        src={getAvatarSrc(friend.profileImage, API_BASE, logo)}
+                        alt={friend.username || 'Friend'}
+                        className="small-logo"
+                        style={{
+                          marginBottom: "6px",
+                          border: "2px solid var(--purple)",
+                          width: "64px",
+                          height: "64px",
+                          objectFit: "cover",
+                          borderRadius: "50%"
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          textAlign: "center",
+                          width: "100%",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          color: "var(--navy)"
+                        }}
+                      >
+                        {friend.username || 'Unknown'}
+                      </span>
+                    </Link>
+                  ))
+                )}
               </div>
             </div>
+
+
 
             {/* ── Center Content ────────────────────────────────────────────────── */}
             {/* Profile view */}
@@ -768,6 +848,32 @@ function HomePage({ handleLogout, user, setUser }) {
                 )}
               </>
             )}
+            {activeView === 'spotlightPlayer' && selectedPerson && (
+              <div className="card mb-4">
+                <div className="card-body text-center">
+                  <img
+                    src={getAvatarSrc(selectedPerson.profileImage, API_BASE, logo)}
+                    alt={selectedPerson.name}
+                    className="rounded-circle mb-2"
+                    style={{ width: '80px', height: '80px', border: '2px solid var(--purple)' }}
+                  />
+                  <h5 className="text-navy">{selectedPerson.name}</h5>
+                  <p className="mb-1"><strong>Sport:</strong> {selectedPerson.sport || 'N/A'}</p>
+                  <p className="mb-1"><strong>Location:</strong> {selectedPerson.location || 'N/A'}</p>
+                  <p className="mb-1"><strong>Gender:</strong> {selectedPerson.gender || 'N/A'}</p>
+                  {selectedPerson.description && <p>{selectedPerson.description}</p>}
+                  {selectedPerson.username && (
+                    <Link
+                      to={`/profile/${selectedPerson.username}`}
+                      className="btn btn-outline-secondary btn-sm mt-2"
+                    >
+                      View Full Profile
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* ===== Right Sidebar ===== */}
@@ -809,6 +915,17 @@ function HomePage({ handleLogout, user, setUser }) {
                 <div className="card">
                   <div className="card-header bg-purple text-grey">
                     <h6 className="mb-0">Person Details</h6>
+                    {likeMessage && (
+                      <div style={{
+                        margin: "8px 0",
+                        color: "green",
+                        fontWeight: "bold",
+                        fontSize: "13px"
+                      }}>
+                        {likeMessage}
+                      </div>
+                    )}
+
                     <button
                       className="btn btn-sm btn-outline-light float-end"
                       onClick={() => setRightPanelView('default')}
@@ -833,10 +950,11 @@ function HomePage({ handleLogout, user, setUser }) {
                     <div className="mt-3">
                       <button
                         className="btn btn-outline-primary btn-sm me-2"
-                        onClick={() => handleSendFriendRequest(selectedPerson.username || selectedPerson.name)}
+                        onClick={() => handleLikePlayer(selectedPerson.username || selectedPerson.name)}
                       >
-                        Add Friend
+                        Like Player
                       </button>
+
                       <Link
                         to={`/profile/${selectedPerson.username || selectedPerson.name}`}
                         className="btn btn-outline-secondary btn-sm"
@@ -919,22 +1037,45 @@ function HomePage({ handleLogout, user, setUser }) {
               ) : (
                 // ───── Default right panel content ───
                 <>
-                  {/* Membership card */}
+                  {/* Random Athlete card */}
                   <div className="card text-center mb-4" style={{ backgroundColor: 'var(--purple)', color: 'var(--grey)' }}>
                     <div className="card-body">
-                      <img
-                        src={user.profileImage || logo}
-                        alt="Profile"
-                        className="rounded-circle mb-2"
-                        style={{ width: '60px', height: '60px', border: '2px solid var(--pink)' }}
-                      />
-                      <p className="mb-1">Athlete Spotlight</p>
-                      <p style={{ fontSize: '14px' }}>
-                        Player of the Day
-                      </p>
-                      <button className="btn btn-light btn-sm">See Player Profile</button>
+                      {spotlightAthlete ? (
+                        <>
+                          <img
+                            src={getAvatarSrc(spotlightAthlete.profileImage, API_BASE, logo)}
+                            alt={spotlightAthlete.name}
+                            className="rounded-circle mb-2"
+                            style={{ width: '60px', height: '60px', border: '2px solid var(--pink)' }}
+                          />
+                          <p className="mb-1">Athlete Spotlight</p>
+                          <p style={{ fontSize: '14px' }}>Player of the Day</p>
+                          <p style={{ fontSize: '13px', marginBottom: 0 }}>
+                            <strong>{spotlightAthlete.name}</strong> <span style={{ fontStyle: 'italic' }}>{spotlightAthlete.sport || ''}</span>
+                          </p>
+                          <button
+                            className="btn btn-light btn-sm mt-2"
+                            onClick={handleSpotlightProfile}
+                          >
+                            See Player Profile
+                          </button>
+
+                        </>
+                      ) : (
+                        <>
+                          <img
+                            src={logo}
+                            alt="Profile"
+                            className="rounded-circle mb-2"
+                            style={{ width: '60px', height: '60px', border: '2px solid var(--pink)' }}
+                          />
+                          <p className="mb-1">Athlete Spotlight</p>
+                          <p style={{ fontSize: '14px' }}>Player of the Day</p>
+                        </>
+                      )}
                     </div>
                   </div>
+
 
                   {/* Events card */}
                   <section className="right-section-card">

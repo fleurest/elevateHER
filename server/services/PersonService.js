@@ -157,31 +157,36 @@ class PersonService {
         }
     }
 
-    async getFriendsForUser(username, limit = 4) {
+    async getFriendsForUser(identifier, limit = 4) {
         const session = this.driver.session();
         try {
             const result = await session.run(
                 `
-            MATCH (:Person {username: $username})-[:FRIENDS_WITH]-(friend:Person)
-            WHERE 'user' IN friend.roles
-            RETURN friend
-            ORDER BY rand()
-            LIMIT $limit
-            `,
-                { username, limit: neo4j.int(limit) }
+                MATCH (p:Person)
+                WHERE p.username = $identifier OR p.email = $identifier OR p.uuid = $identifier
+                MATCH (p)-[:FRIENDS_WITH]-(friend:Person)
+                WHERE 'user' IN friend.roles
+                RETURN friend
+                ORDER BY rand()
+                LIMIT $limit
+                `,
+                { identifier, limit: neo4j.int(limit) }
             );
-
+    
             return result.records.map(record => {
                 const node = record.get('friend');
                 return {
                     username: node.properties.username,
                     profileImage: node.properties.profileImage || null,
+                    email: node.properties.email || null,
+                    uuid: node.properties.uuid || null,
                 };
             });
         } finally {
             await session.close();
         }
     }
+    
 
     async getSuggestedUsers(currentUsername) {
         const session = this.driver.session();

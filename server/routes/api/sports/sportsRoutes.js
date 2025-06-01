@@ -47,80 +47,76 @@ router.post('/create', async (req, res) => {
   }
 });
 
-// Link athlete or team to sport 
-router.post('/', async (req, res) => {
-  const { name, type, sportName } = req.body;
+// Create new sport node if it doesn't exist and not an alternate name in another Sport node
+router.post('/', async (req, res, next) => {
+  const { name, alternateName, iocDisciplineCode } = req.body;
 
-  if (!name || !sportName || !type) {
-    return res.status(400).json({ 
-      error: 'Missing required fields: name, type, or sportName' 
+
+  if (!name || !Array.isArray(alternateName) || alternateName.length === 0 || !iocDisciplineCode) {
+    return res.status(400).json({
+      message:
+        'Missing required fields (name, alternateName [as nonempty array], or iocDisciplineCode).',
     });
   }
 
   const session = driver.session();
   try {
-    let matchQuery, relationshipType;
-    
-    if (type === 'athlete') {
-      matchQuery = 'MATCH (n:Person {name: $name})';
-      relationshipType = 'PARTICIPATES_IN';
-    } else if (type === 'team') {
-      matchQuery = 'MATCH (n:Organisation {name: $name})';
-      relationshipType = 'COMPETES_IN';
-    } else {
-      return res.status(400).json({ 
-        error: 'Invalid type provided. Must be "athlete" or "team".' 
-      });
+    // Check if a Sport with this name OR with this name in its alternateName array already exists
+    const checkResult = await session.run(
+      `
+      MATCH (s:Sport)
+      WHERE s.name = $name
+         OR $name IN s.alternateName
+      RETURN s
+      LIMIT 1
+      `,
+      { name }
+    );
+
+    if (checkResult.records.length > 0) {
+      // Already exists → conflict
+      return res.status(409).json({ message: `Sport "${name}" already exists (by name or alternateName).` });
     }
 
-    const cypher = `
-      ${matchQuery}
-      MERGE (s:Sport {name: $sportName})
-      ON CREATE SET s.label = 'Sport', s.createdAt = datetime()
-      MERGE (n)-[:${relationshipType}]->(s)
-      RETURN n, s
-    `;
+    // Create new Sport node
+    await session.run(
+      `
+      CREATE (s:Sport {
+        name: $name,
+        alternateName: $alternateName,
+        iocDisciplineCode: $iocDisciplineCode
+      })
+      `,
+      { name, alternateName, iocDisciplineCode }
+    );
 
-    await session.run(cypher, { name, sportName });
-
-    res.json({ 
-      message: `Linked ${type} ${name} to sport ${sportName}` 
-    });
-    
+    return res.status(201).json({ message: `Sport "${name}" created successfully.` });
   } catch (err) {
-    console.error('Error linking to sport:', err);
-    res.status(500).json({ error: 'Failed to link to sport' });
+    console.error('❗️ Error in POST /sport:', err);
+    return res.status(500).json({ message: 'Internal server error.' });
   } finally {
     await session.close();
   }
 });
 
 // Get all sports
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   const session = driver.session();
   try {
-    const cypher = `
-      MATCH (s:Sport)
-      OPTIONAL MATCH (s)<-[:PARTICIPATES_IN]-(athlete:Person)
-      OPTIONAL MATCH (s)<-[:COMPETES_IN]-(team:Organisation)
-      RETURN s, 
-             count(DISTINCT athlete) as athleteCount,
-             count(DISTINCT team) as teamCount
-      ORDER BY s.name
-    `;
-
-    const result = await session.run(cypher);
-    const sports = result.records.map(record => ({
-      ...record.get('s').properties,
-      athleteCount: record.get('athleteCount').toNumber(),
-      teamCount: record.get('teamCount').toNumber()
+    const result = await session.run(
+      `MATCH (s:Sport)
+       RETURN s.name AS name, s.alternateName AS alternateName, s.iocDisciplineCode AS iocDisciplineCode
+       ORDER BY s.name`
+    );
+    const sports = result.records.map(r => ({
+      name: r.get('name'),
+      alternateName: r.get('alternateName'),
+      iocDisciplineCode: r.get('iocDisciplineCode'),
     }));
-
-    res.json(sports);
-
+    return res.status(200).json(sports);
   } catch (err) {
-    console.error('Error fetching sports:', err);
-    res.status(500).json({ error: 'Failed to fetch sports' });
+    console.error('❗️ Error in GET /sports:', err);
+    return res.status(500).json({ message: 'Internal server error.' });
   } finally {
     await session.close();
   }

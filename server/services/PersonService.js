@@ -216,14 +216,14 @@ class PersonService {
         }
     }
 
-    async linkAthleteToTeam(athleteName, teamName, sport = "unknown", sportLabel = "Sport") {
+    async linkAthleteToOrg(athleteName, organisationName, sport = "unknown", sportLabel = "Sport") {
         const session = this.driver.session();
         try {
             await session.run(
                 `
                 MERGE (a:Person {name: $athleteName})
-                MERGE (t:Organisation {normalizedName: toLower(REPLACE($teamName, ' ', '-'))})
-                  ON CREATE SET t.name = $teamName,
+                MERGE (t:Organisation {normalizedName: toLower(REPLACE($organisationName, ' ', '-'))})
+                  ON CREATE SET t.name = $organisationName,
                                 t.roles = ['team'],
                                 t.description = 'Auto-created from athlete pipeline'
                 MERGE (s:Sport {name: $sport})
@@ -231,7 +231,7 @@ class PersonService {
                 MERGE (a)-[:PARTICIPATES_IN]->(t)
                 MERGE (t)-[:PARTICIPATES_IN]->(s)
                 `,
-                { athleteName, teamName, sport, sportLabel }
+                { athleteName, organisationName, sport, sportLabel }
             );
 
         } finally {

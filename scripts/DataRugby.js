@@ -33,7 +33,7 @@ async function loginAndGetCookies(page) {
     await page.goto(TEAM_URL, { waitUntil: 'domcontentloaded' });
 
     const fullTitle = await page.title();
-    const teamName = fullTitle.split(' - ')[0].trim();
+    const organisationName = fullTitle.split(' - ')[0].trim();
 
     const competitions = await page.evaluate(() => {
       const list = [];
@@ -55,10 +55,10 @@ async function loginAndGetCookies(page) {
     try {
       await axios.post(
         `${API_BASE}/team/upsert`,
-        { name: teamName, sport: 'Rugby Union', roles: ['team'], location: 'England' },
+        { name: organisationName, sport: 'Rugby Union', roles: ['team'], location: 'England' },
         { headers: { 'Content-Type': 'application/json' }, withCredentials: true }
       );
-      console.log(`✅ Upserted team: ${teamName}`);
+      console.log(`✅ Upserted team: ${organisationName}`);
     } catch (e) {
       console.warn(`Team upsert skipped: ${e.response?.data || e.message}`);
     }
@@ -66,10 +66,10 @@ async function loginAndGetCookies(page) {
     try {
       await axios.post(
         `${API_BASE}/sport`,
-        { name: teamName, type: 'team', sportName: 'Rugby Union' },
+        { name: organisationName, type: 'team', sportName: 'Rugby Union' },
         { headers: { 'Content-Type': 'application/json' }, withCredentials: true }
       );
-      console.log(`🔗 Linked team '${teamName}' to Rugby Union`);
+      console.log(`🔗 Linked team '${organisationName}' to Rugby Union`);
     } catch (e) {
       console.warn(`Link to sport skipped: ${e.response?.data || e.message}`);
     }
@@ -78,10 +78,10 @@ async function loginAndGetCookies(page) {
       try {
         await axios.post(
           `${API_BASE}/team/link-league`,
-          { teamName, leagueName: comp },
+          { organisationName, leagueName: comp },
           { headers: { 'Content-Type': 'application/json' }, withCredentials: true }
         );
-        console.log(`🔗 Linked team '${teamName}' to competition '${comp}'`);
+        console.log(`🔗 Linked team '${organisationName}' to competition '${comp}'`);
       } catch (e) {
         console.warn(`Link team->competition skipped for ${comp}: ${e.response?.data || e.message}`);
       }
@@ -157,10 +157,10 @@ async function loginAndGetCookies(page) {
       try {
         await axios.post(
           `${API_BASE}/team/link-athlete`,
-          { athleteName: playerName, teamName },
+          { athleteName: playerName, organisationName },
           { headers: { 'Content-Type': 'application/json' }, withCredentials: true }
         );
-        console.log(`🔗 Linked ${playerName} -> ${teamName}`);
+        console.log(`Linked ${playerName} -> ${organisationName}`);
       } catch (e) {
         console.warn(`Link athlete->team skipped for ${playerName}: ${e.response?.data || e.message}`);
       }

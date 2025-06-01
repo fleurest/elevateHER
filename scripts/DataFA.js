@@ -28,14 +28,14 @@ const API_BASE = 'http://localhost:3000/api';
       console.log(teams);
       console.log(`Found ${teams.length} teams`);
 
-      for (const { name: teamName, slug } of teams) {
+      for (const { name: organisationName, slug } of teams) {
         const teamUrl = `${BASE}/player/?club=${slug}`;
-        console.log(`Queuing team page: ${teamUrl} for ${teamName}`);
-        await cluster.queue({ url: teamUrl, type: 'team', meta: { teamName, slug, leagueName: meta.leagueName } });
+        console.log(`Queuing team page: ${teamUrl} for ${organisationName}`);
+        await cluster.queue({ url: teamUrl, type: 'team', meta: { organisationName, slug, leagueName: meta.leagueName } });
       }
 
     } else if (type === 'team') {
-      console.log(`Visiting team players page: ${url} for ${meta.teamName}`);
+      console.log(`Visiting team players page: ${url} for ${meta.organisationName}`);
       await page.goto(url, { waitUntil: 'networkidle2' });
       await page.waitForSelector('a[href*="/player/"]', { timeout: 15000 });
       await page.evaluate(() => window.scrollBy(0, window.innerHeight));
@@ -49,8 +49,8 @@ const API_BASE = 'http://localhost:3000/api';
           }))
       );
       
-      console.log(`Found ${playerLinks.length} players for ${meta.teamName}`);
-      if (!playerLinks.length) return console.log(`No players for ${meta.teamName}`);
+      console.log(`Found ${playerLinks.length} players for ${meta.organisationName}`);
+      if (!playerLinks.length) return console.log(`No players for ${meta.organisationName}`);
 
       for (const playerUrl of playerLinks) {
         console.log(`Queuing player: ${playerUrl.name}`);
@@ -92,17 +92,17 @@ const API_BASE = 'http://localhost:3000/api';
 
         await axios.post(`${API_BASE}/team/link-athlete`, {
           athleteName: player.name,
-          teamName: meta.teamName
+          organisationName: meta.organisationName
         });
-        console.log(`🔗 Linked ${player.name} -> ${meta.teamName}`);
+        console.log(`🔗 Linked ${player.name} -> ${meta.organisationName}`);
 
-        if (!linkedTeams.has(meta.teamName)) {
+        if (!linkedTeams.has(meta.organisationName)) {
           await axios.post(`${API_BASE}/team/link-league`, {
-            teamName: meta.teamName,
+            organisationName: meta.organisationName,
             leagueName: meta.leagueName
           });
-          console.log(`Linked ${meta.teamName} -> ${meta.leagueName}`);
-          linkedTeams.add(meta.teamName);
+          console.log(`Linked ${meta.organisationName} -> ${meta.leagueName}`);
+          linkedTeams.add(meta.organisationName);
         }
       } catch (err) {
         console.error(`Error for ${player.name}:`, err.response?.status, err.response?.data || err.message);

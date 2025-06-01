@@ -69,17 +69,17 @@ const CONCURRENCY = 5;
             });
             console.log(`Upserted: ${athlete.name}`);
 
-            const teamName = `Team ${athlete.nationality}`;
+            const organisationName = `Team ${athlete.nationality}`;
             await axios.post(`${API_BASE}/team/link-athlete`, {
               athleteName: athlete.name,
-              teamName: `Team ${athlete.nationality}`,
+              organisationName: `Team ${athlete.nationality}`,
               sport: athlete.sport,
               sportLabel: 'Sport'
             }, {
               headers: { 'Content-Type': 'application/json' }
             });
 
-            console.log(`Linked ${athlete.name} to ${teamName} and ${athlete.sport}`);
+            console.log(`Linked ${athlete.name} to ${organisationName} and ${athlete.sport}`);
           } catch (err) {
             console.error(`${athlete.name}:`, err.response?.data || err.message);
           }

@@ -129,7 +129,7 @@ router.post('/', personController.createOrUpdatePerson);
 // });
 
 // POST   /api/athletes/:id/organisation    → add PARTICIPATES_IN relationship to team org
-router.post('/:id/organisation', personController.linkAthleteToTeam);
+router.post('/:id/organisation', personController.linkAthleteToOrg);
 
 // DELETE /api/athletes/:id/organisation/:organisationId → remove PARTICIPATES_IN relationship
 router.delete('/:id/organisation/:organisationId', personController.removeAthleteOrganisation);

@@ -41,7 +41,7 @@ const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
                 await cluster.queue({
                     url: teamUrl,
                     type: 'team',
-                    meta: { teamName: name }
+                    meta: { organisationName: name }
                 });
             }
 
@@ -58,7 +58,7 @@ const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
                 }))
             );
 
-            console.log(`Found ${playerLinks.length} players for ${meta.teamName}`);
+            console.log(`Found ${playerLinks.length} players for ${meta.organisationName}`);
 
             for (const { name, url: playerUrl } of playerLinks) {
                 if (!playerUrl) continue;
@@ -133,13 +133,13 @@ const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
         
                 await axios.post(`${API_BASE}/team/link-athlete`, {
                     athleteName: player.name,
-                    teamName: meta.teamName
+                    organisationName: meta.organisationName
                 }, {
                     headers: { 'Content-Type': 'application/json' },
                     withCredentials: true
                 });
     
-                console.log(`Linked ${player.name} -> ${meta.teamName}`);
+                console.log(`Linked ${player.name} -> ${meta.organisationName}`);
         
                 await axios.post(`${API_BASE}/sport`, {
                     name: player.name,
@@ -152,19 +152,19 @@ const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
         
                 console.log(`Linked athlete ${player.name} -> Cricket`);
         
-                if (!linkedTeams.has(meta.teamName)) {
+                if (!linkedTeams.has(meta.organisationName)) {
                     await axios.post(`${API_BASE}/team/link-league`, {
-                        teamName: meta.teamName,
+                        organisationName: meta.organisationName,
                         leagueName: "Women's Premier League (Cricket)"
                     }, {
                         headers: { 'Content-Type': 'application/json' },
                         withCredentials: true
                     });
         
-                    console.log(`Linked ${meta.teamName} -> Women's Premier League (Cricket)`);
+                    console.log(`Linked ${meta.organisationName} -> Women's Premier League (Cricket)`);
         
                     await axios.post(`${API_BASE}/sport`, {
-                        name: meta.teamName,
+                        name: meta.organisationName,
                         type: 'team',
                         sportName: 'Cricket'
                     }, {
@@ -172,8 +172,8 @@ const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
                         withCredentials: true
                     });
         
-                    console.log(`Linked ${meta.teamName} (team) -> Cricket`);
-                    linkedTeams.add(meta.teamName);
+                    console.log(`Linked ${meta.organisationName} (team) -> Cricket`);
+                    linkedTeams.add(meta.organisationName);
                 }
         
             } catch (err) {
@@ -192,5 +192,5 @@ const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
     await cluster.idle();
     await cluster.close();
 
-    console.log('🎉 Finished scraping WPL teams and players');
+    console.log('Finished scraping WPL teams and players');
 })();

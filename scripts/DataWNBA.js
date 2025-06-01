@@ -45,7 +45,7 @@ const STATS_HEADERS = {
                     const parts = spanText.split('•').map(s => s.replace('#', '').trim());
                     const position = parts[1] || '';
 
-                    const teamName = tile.querySelector('._PlayerTile__teamName_1ixf3_71 ._TeamName__name_1k5qz_11')
+                    const organisationName = tile.querySelector('._PlayerTile__organisationName_1ixf3_71 ._organisationName__name_1k5qz_11')
                         ?.textContent
                         .trim() || '';
                     const country = tile.querySelector('._PlayerTile__country_1ixf3_139 dd')
@@ -53,7 +53,7 @@ const STATS_HEADERS = {
                         .trim() || '';
                     const photoEl = tile.querySelector('img[alt$="headshot"]') || tile.querySelector('img[src*="cdn.wnba.com/headshots"]');
                     const profileImage = photoEl?.src?.trim() || null;
-                    return { personId, name, url, teamName, position, country, image };
+                    return { personId, name, url, organisationName, position, country, image };
                 });
             });
 
@@ -63,7 +63,7 @@ const STATS_HEADERS = {
             }
 
         } else if (data.type === 'processPlayer') {
-            const { personId, name, url, teamName, position, country } = data.player;
+            const { personId, name, url, organisationName, position, country } = data.player;
             console.log(`Processing ${name} (${personId})`);
 
             let birthDate = null, nationality = country;
@@ -113,22 +113,22 @@ const STATS_HEADERS = {
 
             await axios.post(`${API_BASE}/team/link-athlete`, {
                 athleteName: name,
-                teamName
+                organisationName
             }, { headers: { 'Content-Type': 'application/json' } });
-            console.log(`🔗  Linked ${name} → ${teamName}`);
+            console.log(`🔗  Linked ${name} → ${organisationName}`);
 
-            if (!linkedTeams.has(teamName)) {
+            if (!linkedTeams.has(organisationName)) {
                 await axios.post(`${API_BASE}/team/link-league`, {
-                    teamName,
+                    organisationName,
                     leagueName: 'WNBA'
                 });
                 await axios.post(`${API_BASE}/sport`, {
-                    name: teamName,
+                    name: organisationName,
                     type: 'team',
                     sportName: 'Basketball'
                 });
-                linkedTeams.add(teamName);
-                console.log(`Linked ${teamName} → WNBA & Basketball`);
+                linkedTeams.add(organisationName);
+                console.log(`Linked ${organisationName} → WNBA & Basketball`);
             }
         }
     });

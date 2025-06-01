@@ -4,7 +4,7 @@ import Split from 'react-split';
 import cytoscape from 'cytoscape';
 import logo from '../assets/logo-default-profile.png';
 import EditProfileForm from './EditProfileForm';
-import '../style.css';         // Your CSS variables + Bootstrap import
+import '../style.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const API_BASE = process.env.API_BASE;
@@ -43,15 +43,31 @@ function HomePage({ handleLogout, user, setUser }) {
   const [topFriends, setTopFriends] = useState([]);
   const [showAllFriends, setShowAllFriends] = useState(false);
 
-  // “Get Explore” → filterType determines which label to filter by
+  // "Get Explore" → filterType determines which label to filter by
   const [filterType, setFilterType] = useState(null);
 
-  // For suggestion, “Suggested Friends” etc.
+  // For suggestion, "Suggested Friends" etc.
   const [suggestedFriends, setSuggestedFriends] = useState([]);
 
   // Upcoming/past events for right pane
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
+  
+  // Selected node details (shows in right panel when node is clicked)
+  const [selectedNode, setSelectedNode] = useState(null);
+  
+  // Selected person details (shows when person node is clicked)
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  
+  // Friend search functionality
+  const [showAddFriendPanel, setShowAddFriendPanel] = useState(false);
+  const [showFriendSearch, setShowFriendSearch] = useState(false);
+  const [friendResults, setFriendResults] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  
+  // Right panel view state: 'default' | 'nodeDetails' | 'personDetails' | 'friendSearch'
+  const [rightPanelView, setRightPanelView] = useState('default');
 
   const navigate = useNavigate();
 
@@ -70,7 +86,6 @@ function HomePage({ handleLogout, user, setUser }) {
   }, [user, setUser, navigate]);
 
   useEffect(() => {
-
     fetch(`${API_BASE}/api/events/past-events`)
       .then((res) => res.json())
       .then((data) => setPastEvents(Array.isArray(data) ? data : []))
@@ -109,6 +124,57 @@ function HomePage({ handleLogout, user, setUser }) {
       .then((data) => setTopFriends(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Error loading top friends:', err));
   }, [user?.username]);
+  
+  const handleSearch = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/search?query=${encodeURIComponent(searchQuery)}`,
+        { credentials: 'include' }
+      );
+      const data = await res.json();
+      setSearchResults(data);
+    } catch (err) {
+      console.error('Search error:', err);
+    }
+  };
+
+  const handleFriendSearch = async (query) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/friends/search?query=${encodeURIComponent(query)}`,
+        { credentials: 'include' }
+      );
+      const data = await res.json();
+      setFriendResults(data);
+    } catch (err) {
+      console.error('Friend search failed:', err);
+      setFriendResults([]);
+    }
+  };
+
+  const handleSendFriendRequest = async (username) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/sendfriendrequest/${user.username}/${username}`, { 
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      console.log('Friend request sent:', data);
+    } catch (err) {
+      console.error('Error sending friend request:', err);
+    }
+  };
+
+  const fetchFriends = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/friends/${user.username}`,
+        { credentials: 'include' }
+      );
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
+      setFriendResults(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Could not fetch friends:', err);
+    }
+  };
 
   // ─── Left‐Menu Handlers ───────────────────────────────────────────────────────
 
@@ -117,12 +183,18 @@ function HomePage({ handleLogout, user, setUser }) {
     setEditProfile(false);
     setCenterGraphData(null);
     setFilterType(null);
+    setRightPanelView('default');
+    setSelectedNode(null);
+    setSelectedPerson(null);
   };
 
   const handleMyPlayers = async () => {
     setActiveView('players');
     setEditProfile(false);
     setFilterType(null);
+    setRightPanelView('default');
+    setSelectedNode(null);
+    setSelectedPerson(null);
 
     try {
       const encodedIdentifier = encodeURIComponent(user.username);
@@ -156,6 +228,9 @@ function HomePage({ handleLogout, user, setUser }) {
     setActiveView('friends');
     setEditProfile(false);
     setFilterType(null);
+    setRightPanelView('default');
+    setSelectedNode(null);
+    setSelectedPerson(null);
 
     try {
       const res = await fetch(
@@ -176,6 +251,9 @@ function HomePage({ handleLogout, user, setUser }) {
     setEditProfile(false);
     setCenterGraphData(null);
     setFilterType(null);
+    setRightPanelView('default');
+    setSelectedNode(null);
+    setSelectedPerson(null);
   };
 
   const handleExplore = (category) => {
@@ -183,6 +261,9 @@ function HomePage({ handleLogout, user, setUser }) {
     setEditProfile(false);
     setFilterType(category);
     setCenterGraphData(null);
+    setRightPanelView('default');
+    setSelectedNode(null);
+    setSelectedPerson(null);
   };
 
   // ─── Cytoscape Hook ───────────────────────────────────────────────────────────
@@ -202,7 +283,6 @@ function HomePage({ handleLogout, user, setUser }) {
     let dataToRender = null;
 
     if (activeView === 'players' || activeView === 'friends') {
-
       if (!centerGraphData) return;
       dataToRender = {
         nodes: centerGraphData.nodes || [],
@@ -248,7 +328,6 @@ function HomePage({ handleLogout, user, setUser }) {
                   const wikiUrl = `https://en.wikipedia.org/wiki/Special:FilePath/${wikiName}.jpg`;
                   img = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(wikiUrl)}`;
                 } else {
-
                   const nodeType = n.data.type || n.data.label || 'default';
                   img = getPlaceholderIcon(nodeType);
                 }
@@ -292,6 +371,12 @@ function HomePage({ handleLogout, user, setUser }) {
                 'target-arrow-shape': 'triangle',
                 'curve-style': 'bezier'
               }
+            },
+            {
+              selector: '.faded',
+              style: {
+                opacity: 0.3
+              }
             }
           ],
           layout: { name: 'cose-bilkent', animate: true }
@@ -306,18 +391,41 @@ function HomePage({ handleLogout, user, setUser }) {
           topFive.forEach((n) => n.lock());
         }
 
+        // ========== NEW: Enhanced click handlers for right panel ==========
         cy.on('tap', 'node', (evt) => {
-          const n = evt.target;
+          const nodeData = evt.target.data();
+          
+          // Visual effects
           cy.elements().addClass('faded');
-          n.removeClass('faded');
-          n.connectedEdges().removeClass('faded');
-          n.connectedEdges().connectedNodes().removeClass('faded');
-          cy.center(n);
-          cy.zoom({ level: 2, position: n.position() });
+          evt.target.removeClass('faded');
+          evt.target.connectedEdges().removeClass('faded');
+          evt.target.connectedEdges().connectedNodes().removeClass('faded');
+          cy.center(evt.target);
+          cy.zoom({ level: 2, position: evt.target.position() });
+          
+          // Update right panel based on node type
+          if (nodeData.label === "Person" || nodeData.type === "user") {
+            setSelectedPerson({
+              name: nodeData.name || nodeData.label,
+              description: nodeData.description,
+              profileImage: nodeData.profileImage || nodeData.image,
+              username: nodeData.username,
+              id: nodeData.id
+            });
+            setRightPanelView('personDetails');
+            setSelectedNode(null);
+          } else {
+            // For non-person nodes, show general node details
+            setSelectedNode(nodeData);
+            setRightPanelView('nodeDetails');
+            setSelectedPerson(null);
+          }
         });
+
         cy.on('tap', (evt) => {
           if (evt.target === cy) {
             cy.elements().removeClass('faded');
+            // Don't clear the right panel when clicking empty space
           }
         });
 
@@ -336,7 +444,7 @@ function HomePage({ handleLogout, user, setUser }) {
     };
   }, [activeView, centerGraphData, graphData, filterType]);
 
-  // ─── “Suggested Friends” (for Explore Friends) ───────────────────────────────
+  // ─── "Suggested Friends" (for Explore Friends) ───────────────────────────────
   const fetchSuggestedFriends = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/users/top`, { credentials: 'include' });
@@ -354,6 +462,20 @@ function HomePage({ handleLogout, user, setUser }) {
       fetchSuggestedFriends();
     }
   }, [activeView, filterType]);
+
+  // ========== NEW: Functions to open friend search panel ==========
+  const openFriendSearchPanel = () => {
+    setRightPanelView('friendSearch');
+    setSearchQuery('');
+    setSearchResults([]);
+    fetchFriends();
+  };
+
+  const closeFriendSearchPanel = () => {
+    setRightPanelView('default');
+    setSearchQuery('');
+    setSearchResults([]);
+  };
 
   if (!user) return null;
 
@@ -453,6 +575,23 @@ function HomePage({ handleLogout, user, setUser }) {
                 Sponsors
               </li>
             </ul>
+          </div>
+
+          {/* ── News Section ───────────────────────────────────────────────────── */}
+          <div className="mb-4">
+            <h5 className="text-navy">News</h5>
+            <ul className="list-unstyled">
+              <li className="menu-item">My News</li>
+            </ul>
+            <div style={{ textAlign: "center", marginTop: "20px" }}>
+              <button
+                onClick={handleLogout}
+                type="button"
+                className="btn btn-outline-danger btn-sm"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
 
@@ -591,6 +730,7 @@ function HomePage({ handleLogout, user, setUser }) {
                 >
                   <div ref={cyContainerRef} style={{ height: '100%', width: '100%' }} />
                 </div>
+                <p className="text-muted small">Click on nodes to see details in the right panel →</p>
               </>
             )}
 
@@ -604,6 +744,23 @@ function HomePage({ handleLogout, user, setUser }) {
                 >
                   <div ref={cyContainerRef} style={{ height: '100%', width: '100%' }} />
                 </div>
+                <p className="text-muted small">Click on nodes to see details in the right panel →</p>
+                {filterType === 'Friends' && (
+                  <div className="mt-3">
+                    <button 
+                      className="btn btn-outline-primary me-2"
+                      onClick={openFriendSearchPanel}
+                    >
+                      Search Friends
+                    </button>
+                    <button 
+                      className="btn btn-outline-secondary"
+                      onClick={fetchSuggestedFriends}
+                    >
+                      Get Suggestions
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -622,8 +779,140 @@ function HomePage({ handleLogout, user, setUser }) {
                     setEditProfile(false);
                   }}
                 />
+              ) : rightPanelView === 'nodeDetails' && selectedNode ? (
+                // ───── Show selected node details ───
+                <div className="card">
+                  <div className="card-header bg-purple text-grey">
+                    <h6 className="mb-0">Node Details</h6>
+                    <button 
+                      className="btn btn-sm btn-outline-light float-end"
+                      onClick={() => setRightPanelView('default')}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="card-body" style={{ backgroundColor: 'var(--grey)' }}>
+                    {Object.entries(selectedNode).map(([key, value]) => (
+                      <p key={key} className="text-navy mb-2">
+                        <strong>{key}:</strong> {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ) : rightPanelView === 'personDetails' && selectedPerson ? (
+                // ───── Show selected person details ───
+                <div className="card">
+                  <div className="card-header bg-purple text-grey">
+                    <h6 className="mb-0">Person Details</h6>
+                    <button 
+                      className="btn btn-sm btn-outline-light float-end"
+                      onClick={() => setRightPanelView('default')}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="card-body text-center" style={{ backgroundColor: 'var(--grey)' }}>
+                    <img
+                      src={selectedPerson.profileImage || logo}
+                      alt={selectedPerson.name}
+                      className="rounded-circle mb-3"
+                      style={{ width: '80px', height: '80px', border: '2px solid var(--purple)' }}
+                    />
+                    <h6 className="text-navy">{selectedPerson.name}</h6>
+                    {selectedPerson.description && (
+                      <p className="text-navy small">{selectedPerson.description}</p>
+                    )}
+                    {selectedPerson.username && (
+                      <p className="text-navy small">@{selectedPerson.username}</p>
+                    )}
+                    <div className="mt-3">
+                      <button 
+                        className="btn btn-outline-primary btn-sm me-2"
+                        onClick={() => handleSendFriendRequest(selectedPerson.username || selectedPerson.name)}
+                      >
+                        Add Friend
+                      </button>
+                      <Link 
+                        to={`/profile/${selectedPerson.username || selectedPerson.name}`}
+                        className="btn btn-outline-secondary btn-sm"
+                      >
+                        View Profile
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ) : rightPanelView === 'friendSearch' ? (
+                // ───── Show friend search panel ───
+                <div className="card">
+                  <div className="card-header bg-purple text-grey">
+                    <h6 className="mb-0">Find Friends</h6>
+                    <button 
+                      className="btn btn-sm btn-outline-light float-end"
+                      onClick={closeFriendSearchPanel}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="card-body" style={{ backgroundColor: 'var(--grey)' }}>
+                    <div className="mb-3">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Search users..."
+                        className="form-control form-control-sm"
+                      />
+                      <button
+                        onClick={handleSearch}
+                        className="btn btn-primary btn-sm mt-2 w-100"
+                      >
+                        Search
+                      </button>
+                    </div>
+
+                    {searchResults.length > 0 && (
+                      <div className="mb-3">
+                        <h6 className="text-navy">Search Results:</h6>
+                        <ul className="list-group list-group-flush">
+                          {searchResults.map(result => (
+                            <li key={result.id} className="list-group-item d-flex justify-content-between align-items-center bg-light">
+                              <span className="text-navy">{result.name || result.username}</span>
+                              <button
+                                className="btn btn-outline-primary btn-sm"
+                                onClick={() => handleSendFriendRequest(result.username)}
+                              >
+                                Add
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {friendResults.length > 0 && (
+                      <div>
+                        <h6 className="text-navy">Your Friends:</h6>
+                        <ul className="list-group list-group-flush">
+                          {friendResults.map(friend => (
+                            <li key={friend.id} className="list-group-item bg-light">
+                              <div className="d-flex align-items-center">
+                                <img
+                                  src={friend.profileImage || logo}
+                                  alt={friend.username}
+                                  className="rounded-circle me-2"
+                                  style={{ width: '30px', height: '30px' }}
+                                />
+                                <span className="text-navy">{friend.username}</span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ) : (
-                // ───── Otherwise, show default membership/events/suggested friends cards ─
+                // ───── Default right panel content ───
                 <>
                   {/* Membership card */}
                   <div className="card text-center mb-4" style={{ backgroundColor: 'var(--purple)', color: 'var(--grey)' }}>
@@ -692,17 +981,60 @@ function HomePage({ handleLogout, user, setUser }) {
                     )}
                   </section>
 
+                  {/* Past Events */}
+                  {pastEvents.length > 0 && (
+                    <div className="card mb-4">
+                      <div className="card-header bg-purple text-grey">
+                        <h6 className="mb-0">Past Events</h6>
+                      </div>
+                      <div className="card-body" style={{ backgroundColor: 'var(--grey)' }}>
+                        <ul className="list-unstyled">
+                          {pastEvents.slice(0, 3).map((event, index) => (
+                            <li key={index} className="mb-2">
+                              <strong className="text-navy">{event.eventName || 'Unnamed Event'}</strong><br />
+                              <small className="text-navy">
+                                {event.year ? Number(event.year.low ?? event.year) : 'Unknown Year'}
+                              </small><br />
+                              {event.location && <small className="text-navy">{event.location}</small>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Calendar Embed */}
+                  <div className="card mb-4">
+                    <div className="card-header bg-purple text-grey">
+                      <h6 className="mb-0">Calendar</h6>
+                    </div>
+                    <div className="card-body p-0">
+                      <iframe
+                        src="https://calendar.google.com/calendar/embed?src=c_e0a01a47aff1ecc1da77e5822cd3d63bc054f441ae359c05fae0552aee58c3cc%40group.calendar.google.com&ctz=America%2FNew_York"
+                        style={{ border: 0 }}
+                        width="100%"
+                        height="300"
+                        frameBorder="0"
+                        scrolling="no"
+                        title="Google Calendar"
+                      />
+                    </div>
+                  </div>
+
                   {/* Suggested Friends */}
                   <div className="card">
                     <div className="card-header d-flex justify-content-between align-items-center bg-purple text-grey">
                       <span>Suggested Friends</span>
-                      <Link to="/friends" className="text-grey" style={{ fontSize: '14px', textDecoration: 'underline' }}>
-                        See all
-                      </Link>
+                      <button 
+                        className="btn btn-sm btn-outline-light"
+                        onClick={openFriendSearchPanel}
+                      >
+                        Search
+                      </button>
                     </div>
                     <ul className="list-group list-group-flush">
                       {suggestedFriends.length > 0 ? (
-                        suggestedFriends.map((person) => (
+                        suggestedFriends.slice(0, 3).map((person) => (
                           <li
                             key={person.username}
                             className="list-group-item d-flex align-items-center justify-content-between"
@@ -720,14 +1052,17 @@ function HomePage({ handleLogout, user, setUser }) {
                                 <div className="text-navy small">Suggested for you</div>
                               </div>
                             </div>
-                            <button className="btn btn-outline-light btn-sm" onClick={() => { /* send request */ }}>
-                              Add Friend
+                            <button 
+                              className="btn btn-outline-primary btn-sm" 
+                              onClick={() => handleSendFriendRequest(person.username)}
+                            >
+                              Add
                             </button>
                           </li>
                         ))
                       ) : (
                         <li className="list-group-item text-center" style={{ backgroundColor: 'var(--grey)' }}>
-                          No suggestions.
+                          <span className="text-navy">No suggestions.</span>
                         </li>
                       )}
                     </ul>

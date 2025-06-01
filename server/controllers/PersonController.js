@@ -29,7 +29,7 @@ class PersonController {
         this.createOrUpdatePerson = this.createOrUpdatePerson.bind(this);
         this.listAthletes = this.listAthletes.bind(this);
         this.searchAthletes = this.searchAthletes.bind(this);
-        this.linkAthleteToTeam = this.linkAthleteToTeam.bind(this);
+        this.linkAthleteToOrg = this.linkAthleteToOrg.bind(this);
         this.removeAthleteOrganisation = this.removeAthleteOrganisation.bind(this);
 
 
@@ -52,7 +52,7 @@ class PersonController {
 
     async createOrUpdatePerson(req, res, next) {
         try {
-            const person = await this.service.createOrUpdatePerson(req.body);
+            const person = await this.personService.createOrUpdatePerson(req.body);
 
             res.status(201).json(person);
         } catch (err) {
@@ -165,11 +165,11 @@ class PersonController {
     }
 
 
-    async linkAthleteToTeam(req, res, next) {
+    async linkAthleteToOrg(req, res, next) {
         try {
-            const { athleteName, teamName, sport, sportLabel } = req.body;
-            await this.service.linkAthleteToTeam(athleteName, teamName, sport, sportLabel);
-            res.json({ message: `${athleteName} linked to ${teamName}` });
+            const { athleteName, organisationName, sport, sportLabel } = req.body;
+            await this.personService.linkAthleteToOrg(athleteName, organisationName, sport, sportLabel);
+            res.json({ message: `${athleteName} linked to ${organisationName}` });
         } catch (err) {
             next(err);
         }

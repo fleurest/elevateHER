@@ -142,7 +142,7 @@ const loginAndGetCookies = async (page) => {
           console.log(`✅ Uploaded: ${athlete.name}`);
           await axios.post(`${API_BASE}/team/link-athlete`, {
             athleteName: athlete.name,
-            teamName: teamMeta.name,
+            organisationName: teamMeta.name,
             sport: teamMeta.sport,
             sportLabel: "Sport"
           }, {

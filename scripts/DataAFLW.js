@@ -72,7 +72,7 @@ const loginAndGetCookies = async (page) => {
             try {
                 await axios.post(`${API_BASE}/api/athlete/link`, {
                     athleteName: teamMeta.name,
-                    teamName: teamMeta.name,
+                    organisationName: teamMeta.name,
                     sport: "Australian Rules Football",
                     sportLabel: "Sport"
                 }, {
@@ -145,7 +145,7 @@ const loginAndGetCookies = async (page) => {
 
                     await axios.post(`${API_BASE}/api/athlete/link`, {
                         athleteName: athlete.name,
-                        teamName: teamMeta.name,
+                        organisationName: teamMeta.name,
                         sport: teamMeta.sport,
                         sportLabel: "Sport"
                     }, {

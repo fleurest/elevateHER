@@ -35,10 +35,10 @@ class OrganisationController {
   }
 
   async link(req, res, next) {
-    const { athleteName, teamName, sport = 'unknown', sportLabel = 'Sport' } = req.body;
+    const { athleteName, organisationName, sport = 'unknown', sportLabel = 'Sport' } = req.body;
     try {
-      await this.service.linkAthleteToTeam(athleteName, teamName, sport, sportLabel);
-      res.json({ message: `${athleteName} linked to ${teamName}` });
+      await this.service.linkAthleteToOrg(athleteName, organisationName, sport, sportLabel);
+      res.json({ message: `${athleteName} linked to ${organisationName}` });
     } catch (err) {
       console.error('[OrganisationController.link] Error:', err);
       next(err);
@@ -46,13 +46,13 @@ class OrganisationController {
   }
 
   async linkTeamToLeague(req, res, next) {
-    const { teamName, leagueName } = req.body;
-    if (!teamName || !leagueName) {
-      return res.status(400).json({ error: 'teamName and leagueName are required' });
+    const { organisationName, leagueName } = req.body;
+    if (!organisationName || !leagueName) {
+      return res.status(400).json({ error: 'organisationName and leagueName are required' });
     }
     try {
-      await this.service.linkTeamToLeague(teamName, leagueName);
-      res.json({ message: `${teamName} linked to league ${leagueName}` });
+      await this.service.linkTeamToLeague(organisationName, leagueName);
+      res.json({ message: `${organisationName} linked to league ${leagueName}` });
     } catch (err) {
       console.error('[OrganisationController.linkTeamToLeague] Error:', err);
       next(err);

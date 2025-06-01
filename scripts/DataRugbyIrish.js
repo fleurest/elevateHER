@@ -85,15 +85,15 @@ const loginAndGetCookies = async (page) => {
         `${API_BASE}/team/link-athlete`,
         {
           athleteName: teamMeta.name,
-          teamName: teamMeta.name,
+          organisationName: teamMeta.name,
           sport: teamMeta.sport,
           sportLabel: 'Sport'
         },
         { headers: { 'Content-Type': 'application/json' }, withCredentials: true }
       );
-      console.log(`🔗 Linked team '${teamMeta.name}' to ${teamMeta.sport}`);
+      console.log(`Linked team '${teamMeta.name}' to ${teamMeta.sport}`);
     } catch (err) {
-      console.error('❌ Failed to link team to sport:', err.response?.data || err.message);
+      console.error('Failed to link team to sport:', err.response?.data || err.message);
       throw err;
     }
 
@@ -163,7 +163,7 @@ const loginAndGetCookies = async (page) => {
         console.log(`Uploaded: ${athlete.name}`);
         await axios.post(
           `${API_BASE}/team/link-athlete`,
-          { athleteName: athlete.name, teamName: teamMeta.name, sport: teamMeta.sport, sportLabel: 'Sport' },
+          { athleteName: athlete.name, organisationName: teamMeta.name, sport: teamMeta.sport, sportLabel: 'Sport' },
           { headers: { 'Content-Type': 'application/json' }, withCredentials: true }
         );
         console.log(`Linked ${athlete.name} to ${teamMeta.name}`);

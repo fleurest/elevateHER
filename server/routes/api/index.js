@@ -5,6 +5,7 @@ const graphRoutes = require('./graph/graphRoutes')
 const meRoutes = require('./me/meRoutes')
 const usersRoutes = require('./users/usersRoutes')
 const orgRoutes = require('./organisations/orgRoutes')
+const sportsRoutes = require('./sports/sportsRoutes')
 
 
 router.use('/athletes', athletesRoutes)
@@ -13,6 +14,7 @@ router.use('/graph', graphRoutes)
 router.use('/me', meRoutes)
 router.use('/users', usersRoutes)
 router.use('/organisations', orgRoutes)
+router.use('/sports', sportsRoutes)
 router.use('/auth', require('../auth/authRoutes'));
 
 module.exports = router;

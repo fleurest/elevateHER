@@ -25,6 +25,12 @@ function getPlaceholderIcon(nodeType) {
   return icons[nodeType] || icons['default'];
 }
 
+function getWikipediaImageUrl(name) {
+  if (!name) return null;
+  const safeName = name.replace(/ /g, '_');
+  return `https://en.wikipedia.org/wiki/Special:FilePath/${safeName}.jpg`;
+}
+
 function getAvatarSrc(src) {
   if (
     src &&
@@ -147,19 +153,20 @@ function HomePage({ handleLogout, user, setUser }) {
       .catch((err) => console.error('Error loading top friends:', err));
   }, [user?.username]);
 
-  const handleSpotlightProfile = () => {
-    if (!spotlightAthlete) return;
+  const handleSpotlightProfile = (athleteObj) => {
+    const athlete = athleteObj || spotlightAthlete;
+    if (!athlete) return;
     setActiveView('spotlightPlayer');
     setSelectedPerson({
-      name: spotlightAthlete.name,
-      description: spotlightAthlete.description,
-      profileImage: spotlightAthlete.profileImage,
-      username: spotlightAthlete.username,
-      email: spotlightAthlete.email,
-      location: spotlightAthlete.nationality || spotlightAthlete.location || '',
-      sport: spotlightAthlete.sport,
-      gender: spotlightAthlete.gender,
-      uuid: spotlightAthlete.uuid
+      name: athlete.name,
+      description: athlete.description,
+      profileImage: athlete.profileImage,
+      username: athlete.username,
+      email: athlete.email,
+      location: athlete.nationality || athlete.location || '',
+      sport: athlete.sport,
+      gender: athlete.gender,
+      uuid: athlete.uuid
     });
     setRightPanelView('personDetails');
     setEditProfile(false);
@@ -167,6 +174,18 @@ function HomePage({ handleLogout, user, setUser }) {
     setFilterType(null);
     setSelectedNode(null);
   };
+
+  const handleFeelingSporty = () => {
+    fetch(`${API_BASE}/api/athletes?random=true&athleteCount=1`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setSpotlightAthlete(data[0]);
+          handleSpotlightProfile(data[0]);
+        }
+      });
+  };
+
 
   const handleLikePlayer = async (username) => {
     try {
@@ -182,12 +201,10 @@ function HomePage({ handleLogout, user, setUser }) {
       const data = await res.json();
       if (res.ok) {
         setLikeMessage('Player Liked!');
-        // Auto-hide after 2 seconds
         setTimeout(() => setLikeMessage(''), 2000);
 
-        // If you're on the liked athletes view, refresh the graph!
         if (activeView === 'players') {
-          handleMyPlayers(); // Call your existing function to refetch liked athletes graph
+          handleMyPlayers();
         }
       } else {
         setLikeMessage(data.error || 'Could not like player.');
@@ -852,7 +869,11 @@ function HomePage({ handleLogout, user, setUser }) {
               <div className="card mb-4">
                 <div className="card-body text-center">
                   <img
-                    src={getAvatarSrc(selectedPerson.profileImage, API_BASE, logo)}
+                    src={
+                      selectedPerson.profileImage
+                        ? getAvatarSrc(selectedPerson.profileImage, API_BASE, logo)
+                        : getWikipediaImageUrl(selectedPerson.name)
+                    }
                     alt={selectedPerson.name}
                     className="rounded-circle mb-2"
                     style={{ width: '80px', height: '80px', border: '2px solid var(--purple)' }}
@@ -955,12 +976,12 @@ function HomePage({ handleLogout, user, setUser }) {
                         Like Player
                       </button>
 
-                      <Link
-                        to={`/profile/${selectedPerson.username || selectedPerson.name}`}
+                      <button
                         className="btn btn-outline-secondary btn-sm"
+                        onClick={handleFeelingSporty}
                       >
-                        View Profile
-                      </Link>
+                        Scout's Choice
+                      </button>
                     </div>
                   </div>
                 </div>

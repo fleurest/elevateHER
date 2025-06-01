@@ -247,18 +247,32 @@ class Person {
     async likePlayer(username, playerName) {
         const session = this.driver.session();
         try {
-            await session.run(
+            console.log('[LIKE PLAYER] Attempting to like:', { username, playerName });
+            const result = await session.run(
                 `
-                MERGE (u:User {username: $username})
-                MERGE (p:Person {name: $playerName})
-                MERGE (u)-[:LIKED]->(p)
+                MATCH (u:Person {username: $username})
+                MATCH (p:Person {name: $playerName})
+                MERGE (u)-[r:LIKES]->(p)
+                RETURN u, r, p
                 `,
                 { username, playerName }
             );
+            if (result.records.length === 0) {
+                console.warn('[LIKE PLAYER] No match for user or athlete!');
+            } else {
+                console.log('[LIKE PLAYER] Result:', result.records.map(r => ({
+                    user: r.get('u').properties,
+                    athlete: r.get('p').properties,
+                    rel: r.get('r').type
+                })));
+            }
+        } catch (err) {
+            console.error('[LIKE PLAYER] Error:', err);
         } finally {
             await session.close();
         }
     }
+    
 
     // friend request
     async sendFriendRequest(fromUsername, toUsername) {

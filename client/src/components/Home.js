@@ -11,7 +11,7 @@ const API_BASE = process.env.API_BASE;
 
 function getPlaceholderIcon(nodeType) {
   const iconUrl = 'https://img.icons8.com/color/150/';
-  
+
   const icons = {
     'Event': `${iconUrl}calendar.png`,
     'Organisation': `${iconUrl}office-building.png`,
@@ -21,7 +21,7 @@ function getPlaceholderIcon(nodeType) {
     'Player': `${iconUrl}running.png`,
     'default': `${iconUrl}question-mark.png`
   };
-  
+
   return icons[nodeType] || icons['default'];
 }
 
@@ -52,20 +52,20 @@ function HomePage({ handleLogout, user, setUser }) {
   // Upcoming/past events for right pane
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
-  
+
   // Selected node details (shows in right panel when node is clicked)
   const [selectedNode, setSelectedNode] = useState(null);
-  
+
   // Selected person details (shows when person node is clicked)
   const [selectedPerson, setSelectedPerson] = useState(null);
-  
+
   // Friend search functionality
   const [showAddFriendPanel, setShowAddFriendPanel] = useState(false);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [friendResults, setFriendResults] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  
+
   // Right panel view state: 'default' | 'nodeDetails' | 'personDetails' | 'friendSearch'
   const [rightPanelView, setRightPanelView] = useState('default');
 
@@ -124,7 +124,7 @@ function HomePage({ handleLogout, user, setUser }) {
       .then((data) => setTopFriends(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Error loading top friends:', err));
   }, [user?.username]);
-  
+
   const handleSearch = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/users/search?query=${encodeURIComponent(searchQuery)}`,
@@ -152,7 +152,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const handleSendFriendRequest = async (username) => {
     try {
-      const res = await fetch(`${API_BASE}/api/users/sendfriendrequest/${user.username}/${username}`, { 
+      const res = await fetch(`${API_BASE}/api/users/sendfriendrequest/${user.username}/${username}`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -315,9 +315,9 @@ function HomePage({ handleLogout, user, setUser }) {
           elements: [
             ...dataToRender.nodes.map((n) => {
               console.log('🔍 Processing node:', n.data.label, 'type:', n.data.type, 'profileImage:', n.data.profileImage);
-              
+
               let img = n.data.profileImage || n.data.image;
-              
+
               if (!img) {
                 if (n.data.type === 'user' || (n.data.label && n.data.label.includes('@'))) {
                   // Use app logo for user nodes
@@ -335,12 +335,12 @@ function HomePage({ handleLogout, user, setUser }) {
                 // Proxy external images for CORS issues
                 img = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(img)}`;
               }
-              
+
               if (!img) {
                 console.warn('Image is null for node:', n.data.label, 'using fallback');
                 img = logo;
               }
-              
+
               console.log('🔍 Final image URL for', n.data.label, ':', img);
               n.data.image = img;
               return n;
@@ -394,7 +394,7 @@ function HomePage({ handleLogout, user, setUser }) {
         // ========== NEW: Enhanced click handlers for right panel ==========
         cy.on('tap', 'node', (evt) => {
           const nodeData = evt.target.data();
-          
+
           // Visual effects
           cy.elements().addClass('faded');
           evt.target.removeClass('faded');
@@ -402,7 +402,7 @@ function HomePage({ handleLogout, user, setUser }) {
           evt.target.connectedEdges().connectedNodes().removeClass('faded');
           cy.center(evt.target);
           cy.zoom({ level: 2, position: evt.target.position() });
-          
+
           // Update right panel based on node type
           if (nodeData.label === "Person" || nodeData.type === "user") {
             setSelectedPerson({
@@ -631,22 +631,27 @@ function HomePage({ handleLogout, user, setUser }) {
                       <span className="text-[10px] mt-1 text-center truncate w-full">{user.username}</span>
                     </Link>
                   )}
-                  {topFriends.slice(0, showAllFriends ? 5 : 2).map((friend) => (
-                    <Link
-                      key={friend.username}
-                      to={`/profile/${friend.username}`}
-                      className="flex flex-col items-center mx-1 w-12"
-                    >
-                      <img
-                        src={friend.profileImage || logo}
-                        alt={friend.username}
-                        className="small-logo w-7 h-7 rounded-full object-cover"
-                      />
-                      <span className="text-[10px] mt-1 text-center truncate w-full">
-                        {friend.username}
-                      </span>
-                    </Link>
-                  ))}
+                  {topFriends.slice(0, 5).map((friend) => {
+                    // Use username if available, otherwise use email (and encodeURIComponent for safety)
+                    const friendId = friend.username || encodeURIComponent(friend.email || '');
+                    return (
+                      <Link
+                        key={friendId}
+                        to={`/profile/${friendId}`}
+                        className="flex flex-col items-center mx-1 w-12"
+                      >
+                        <img
+                          src={friend.profileImage || logo}
+                          alt={friend.username || friend.email}
+                          className="small-logo w-7 h-7 rounded-full object-cover"
+                        />
+                        <span className="text-[10px] mt-1 text-center truncate w-full">
+                          {friend.username || friend.email}
+                        </span>
+                      </Link>
+                    );
+                  })}
+
                   {topFriends.length > 2 && (
                     <button
                       className="text-[10px] text-navy mt-1 ml-2"
@@ -747,13 +752,13 @@ function HomePage({ handleLogout, user, setUser }) {
                 <p className="text-muted small">Click on nodes to see details in the right panel →</p>
                 {filterType === 'Friends' && (
                   <div className="mt-3">
-                    <button 
+                    <button
                       className="btn btn-outline-primary me-2"
                       onClick={openFriendSearchPanel}
                     >
                       Search Friends
                     </button>
-                    <button 
+                    <button
                       className="btn btn-outline-secondary"
                       onClick={fetchSuggestedFriends}
                     >
@@ -784,7 +789,7 @@ function HomePage({ handleLogout, user, setUser }) {
                 <div className="card">
                   <div className="card-header bg-purple text-grey">
                     <h6 className="mb-0">Node Details</h6>
-                    <button 
+                    <button
                       className="btn btn-sm btn-outline-light float-end"
                       onClick={() => setRightPanelView('default')}
                     >
@@ -804,7 +809,7 @@ function HomePage({ handleLogout, user, setUser }) {
                 <div className="card">
                   <div className="card-header bg-purple text-grey">
                     <h6 className="mb-0">Person Details</h6>
-                    <button 
+                    <button
                       className="btn btn-sm btn-outline-light float-end"
                       onClick={() => setRightPanelView('default')}
                     >
@@ -826,13 +831,13 @@ function HomePage({ handleLogout, user, setUser }) {
                       <p className="text-navy small">@{selectedPerson.username}</p>
                     )}
                     <div className="mt-3">
-                      <button 
+                      <button
                         className="btn btn-outline-primary btn-sm me-2"
                         onClick={() => handleSendFriendRequest(selectedPerson.username || selectedPerson.name)}
                       >
                         Add Friend
                       </button>
-                      <Link 
+                      <Link
                         to={`/profile/${selectedPerson.username || selectedPerson.name}`}
                         className="btn btn-outline-secondary btn-sm"
                       >
@@ -846,7 +851,7 @@ function HomePage({ handleLogout, user, setUser }) {
                 <div className="card">
                   <div className="card-header bg-purple text-grey">
                     <h6 className="mb-0">Find Friends</h6>
-                    <button 
+                    <button
                       className="btn btn-sm btn-outline-light float-end"
                       onClick={closeFriendSearchPanel}
                     >
@@ -1025,7 +1030,7 @@ function HomePage({ handleLogout, user, setUser }) {
                   <div className="card">
                     <div className="card-header d-flex justify-content-between align-items-center bg-purple text-grey">
                       <span>Suggested Friends</span>
-                      <button 
+                      <button
                         className="btn btn-sm btn-outline-light"
                         onClick={openFriendSearchPanel}
                       >
@@ -1052,8 +1057,8 @@ function HomePage({ handleLogout, user, setUser }) {
                                 <div className="text-navy small">Suggested for you</div>
                               </div>
                             </div>
-                            <button 
-                              className="btn btn-outline-primary btn-sm" 
+                            <button
+                              className="btn btn-outline-primary btn-sm"
                               onClick={() => handleSendFriendRequest(person.username)}
                             >
                               Add

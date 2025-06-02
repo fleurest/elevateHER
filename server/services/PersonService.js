@@ -115,7 +115,7 @@ class PersonService {
     }
 
     async generateUsernameFromEmail(email) {
-        const { sanitizeUsername } = require('../inputSanitizers');
+        const { sanitizeUsername } = require('../utils/inputSanitizers');
         const prefix = sanitizeUsername(email.split('@')[0].toLowerCase());
         let username = prefix;
         let counter = 0;

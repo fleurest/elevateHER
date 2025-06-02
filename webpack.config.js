@@ -73,9 +73,6 @@ module.exports = {
   },
   plugins: [
     new Dotenv({ path: '.env', safe: false, systemvars: false, silent: true }),
-    new webpack.DefinePlugin({
-      'process.env.API_BASE': JSON.stringify(process.env.API_BASE),
-    }),
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, 'client/public/index.html'),
       filename: 'index.html',

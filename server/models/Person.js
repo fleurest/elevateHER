@@ -10,14 +10,14 @@ class Person {
                 `
                 MERGE (u:Person { email: $email })
                 ON CREATE SET u.username = $username, 
-                             u.password = $passwordHash, 
+                             u.passwordHash = $passwordHash,   
                              u.roles = $roles, 
                              u.uuid = randomUUID(),
                              u.location = $location,
                              u.bio = $bio,
                              u.profileImage = $profileImage
                 ON MATCH SET u.username = $username, 
-                            u.password = coalesce($passwordHash, u.password), 
+                            u.passwordHash = coalesce($passwordHash, u.passwordHash), 
                             u.roles = $roles,
                             u.location = $location,
                             u.bio = $bio,
@@ -165,7 +165,7 @@ class Person {
         const session = this.driver.session();
         try {
             const result = await session.run(
-                'MATCH (p:Person {email: $email}) WHERE p.password IS NOT NULL RETURN p.password AS hash',
+                'MATCH (p:Person {email: $email}) WHERE p.passwordHash IS NOT NULL RETURN p.passwordHash AS hash',
                 { email }
             );
             if (result.records.length === 0) return null;

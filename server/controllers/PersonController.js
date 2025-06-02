@@ -67,11 +67,24 @@ class PersonController {
 
             const email = sanitizeEmail(req.body.email);
             const password = req.body.password;
+
+            console.log('>>> Sanitized email:', email);
+            console.log('>>> Password length:', password ? password.length : 0);
+
             if (!email || !password) {
                 return res.status(400).json({ error: 'Missing credentials' });
             }
 
             const userProps = await this.personService.findByEmail(email);
+            console.log('>>> User found:', !!userProps);
+            console.log('>>> User properties:', userProps ? {
+                username: userProps.username,
+                email: userProps.email,
+                hasPasswordHash: !!userProps.passwordHash,
+                hasPassword: !!userProps.password,
+                roles: userProps.roles
+            } : 'null');
+
             if (!userProps || !userProps.passwordHash) {
                 return res.status(401).json({ error: 'Invalid credentials' });
             }
@@ -248,7 +261,8 @@ class PersonController {
 
     async register(req, res, next) {
         try {
-            const { username, email, password } = req.body;
+            const { username, email, password, location = '', bio = '', profileImage = '' } = req.body;
+
             const user = sanitizeUsername(username);
             const mail = sanitizeEmail(email);
             const pass = sanitizePassword(password);
@@ -259,10 +273,14 @@ class PersonController {
             }
 
             const hash = await bcrypt.hash(pass, 10);
+
             const person = await this.personService.createOrUpdateUser({
                 username: user,
                 email: mail,
-                password: hash,
+                passwordHash: hash, 
+                location: location || '',
+                bio: bio || '',
+                profileImage: profileImage || '',
                 roles: ['user']
             });
 
@@ -278,27 +296,27 @@ class PersonController {
             if (!req.session?.user?.username) {
                 return res.status(401).json({ error: 'Not authenticated' });
             }
-    
+
             const { email, location, bio, profileImage } = req.body;
             const currentUsername = req.session.user.username;
-    
+
             const currentUser = await this.personService.findByEmail(email);
             if (!currentUser) {
                 return res.status(404).json({ error: 'User not found' });
             }
-    
+
             const updatedUser = await this.personService.createOrUpdateUser({
                 username: currentUsername,
                 email: email,
-                passwordHash: currentUser.password || currentUser.passwordHash, // Preserve password
+                passwordHash: currentUser.password || currentUser.passwordHash,
                 roles: currentUser.roles || ['user'],
                 location: location,
                 bio: bio,
                 profileImage: profileImage
             });
-    
+
             res.json(updatedUser);
-    
+
         } catch (err) {
             console.error('Error updating profile:', err);
             res.status(500).json({ error: 'Failed to update user profile' });

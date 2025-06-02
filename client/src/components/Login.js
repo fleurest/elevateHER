@@ -8,6 +8,8 @@ const Login = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [location, setLocation] = useState('');
+  const [bio, setBio] = useState('');
   const [error, setError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const navigate = useNavigate();
@@ -19,8 +21,13 @@ const Login = ({ onLogin }) => {
 
   const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};':"\\|,.<>\/?]).{8,}$/;
 
+  const API_BASE = process.env.REACT_APP_API_BASE || 
+                   process.env.API_BASE || 
+                   'http://localhost:3001' || 
+                   '';
+
   const validateUsername = (value) => {
-    const cleaned = value.replace(/@/g, ''); // strip @
+    const cleaned = value.replace(/@/g, '');
     const sanitizedValue = sanitizeUsername(cleaned);
     setUsername(sanitizedValue);
     setUsernameTouched(true);
@@ -49,6 +56,7 @@ const Login = ({ onLogin }) => {
 
   const handleRegister = async () => {
     setError('');
+    
     if (!email || email.length < 5) {
       return setError('Email is required');
     }
@@ -56,22 +64,79 @@ const Login = ({ onLogin }) => {
       return setError('Username must be at least 4 characters');
     }
 
+    const registrationURL = `${API_BASE}/api/users/register`;
+    const requestData = { 
+      email, 
+      username, 
+      password,
+      location: location || '',
+      bio: bio || '',
+      profileImage: ''
+    };
+    
+    console.log('Attempting registration...');
+    console.log('URL:', registrationURL);
+
     try {
-      const response = await fetch(`${API_BASE}/api/users/register`, {
+      const response = await fetch(registrationURL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, username, password }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(requestData),
       });
+
+      console.log('Response received:', response);
+      console.log('Response status:', response.status);
 
       if (response.ok) {
         alert('Registration successful! Please log in.');
         setIsRegistering(false);
+        setEmail('');
+        setUsername('');
+        setPassword('');
+        setLocation('');
+        setBio('');
       } else {
-        const err = await response.json();
-        setError(err.error || 'Registration failed');
+        let errorMessage = 'Registration failed';
+        
+        try {
+          const err = await response.json();
+          console.log('Error response body:', err);
+          errorMessage = err.error || err.message || errorMessage;
+        } catch (parseError) {
+          console.log('Could not parse error response as JSON:', parseError);
+          errorMessage = `Registration failed (Status: ${response.status})`;
+        }
+        
+        if (response.status === 409 || 
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('user exists') ||
+            errorMessage.toLowerCase().includes('email already') ||
+            errorMessage.toLowerCase().includes('username already')) {
+          
+          setError('An account with this email or username already exists. Please log in instead.');
+          setTimeout(() => {
+            setIsRegistering(false);
+            setError('');
+          }, 2000);
+        } else {
+          setError(errorMessage);
+        }
       }
     } catch (err) {
-      setError('Network error during registration');
+      console.error('=== FETCH ERROR DETAILS ===');
+      console.error('Error message:', err.message);
+      console.error('Network state:', navigator.onLine ? 'Online' : 'Offline');
+      
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError(`Cannot connect to server at ${registrationURL}. Is your backend running?`);
+      } else if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+        setError('Connection failed. Check if your backend server is running and CORS is configured.');
+      } else {
+        setError(`Network error: ${err.message}. Please check your connection and backend server.`);
+      }
     }
   };
 
@@ -97,14 +162,36 @@ const Login = ({ onLogin }) => {
 
         {/* Username shown only during registration */}
         {isRegistering && (
-          <input
-            type="text"
-            placeholder="Username"
-            name="username"
-            value={username}
-            onChange={(e) => validateUsername(e.target.value)}
-            className="auth-input auth-input-user"
-          />
+          <>
+            <input
+              type="text"
+              placeholder="Username"
+              name="username"
+              value={username}
+              onChange={(e) => validateUsername(e.target.value)}
+              className="auth-input auth-input-user"
+            />
+            
+            {/* Optional profile fields */}
+            <input
+              type="text"
+              placeholder="Location (optional)"
+              name="location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="auth-input"
+            />
+            
+            <textarea
+              placeholder="Bio (optional)"
+              name="bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              className="auth-input"
+              rows="3"
+              style={{ resize: 'vertical', minHeight: '60px' }}
+            />
+          </>
         )}
 
         {/* Password field */}
@@ -138,7 +225,7 @@ const Login = ({ onLogin }) => {
         {/* Google login */}
         <button
           type="button"
-          onClick={() => window.location.href = `${process.env.API_BASE}/auth/google`}
+          onClick={() => window.location.href = `${API_BASE}/auth/google`}
           className="auth-button-alt flex items-center justify-center"
         >
           <span>Sign in with Google </span>
@@ -167,7 +254,10 @@ const Login = ({ onLogin }) => {
 
         {/* Toggle form */}
         <button
-          onClick={() => setIsRegistering(!isRegistering)}
+          onClick={() => {
+            setIsRegistering(!isRegistering);
+            setError('');
+          }}
           className="auth-switch-link"
         >
           {isRegistering ? '← Back to Login' : 'Create an account →'}

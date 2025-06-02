@@ -28,6 +28,21 @@ export const validateRegistration = [
     .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
     .matches(/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).*$/)
     .withMessage('Password must include a letter, number, and symbol'),
+  
+  body('location')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 100 }).withMessage('Location must be less than 100 characters'),
+  body('bio')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 500 }).withMessage('Bio must be less than 500 characters'),
+  body('profileImage')
+    .optional()
+    .isString()
+    .trim()
 ];
 
 export const validateLogin = [

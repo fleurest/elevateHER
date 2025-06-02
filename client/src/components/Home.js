@@ -868,16 +868,34 @@ function HomePage({ handleLogout, user, setUser }) {
             {activeView === 'spotlightPlayer' && selectedPerson && (
               <div className="card mb-4">
                 <div className="card-body text-center">
-                  <img
-                    src={
-                      selectedPerson.profileImage
-                        ? getAvatarSrc(selectedPerson.profileImage, API_BASE, logo)
-                        : getWikipediaImageUrl(selectedPerson.name)
-                    }
-                    alt={selectedPerson.name}
-                    className="rounded-circle mb-2"
-                    style={{ width: '80px', height: '80px', border: '2px solid var(--purple)' }}
-                  />
+                  <div
+                    style={{
+                      width: 80,
+                      height: 80,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "#fff",
+                      border: "2px solid var(--purple)",
+                      borderRadius: "12px",
+                      overflow: "hidden"
+                    }}
+                  >
+                    <img
+                      src={
+                        selectedPerson.profileImage
+                          ? getAvatarSrc(selectedPerson.profileImage, API_BASE, logo)
+                          : getWikipediaImageUrl(selectedPerson.name)
+                      }
+                      alt={selectedPerson.name}
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        objectFit: "contain",
+                        borderRadius: 0
+                      }}
+                    />
+                  </div>
                   <h5 className="text-navy">{selectedPerson.name}</h5>
                   <p className="mb-1"><strong>Sport:</strong> {selectedPerson.sport || 'N/A'}</p>
                   <p className="mb-1"><strong>Location:</strong> {selectedPerson.location || 'N/A'}</p>

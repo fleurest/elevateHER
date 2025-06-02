@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import '../style.css';
-import HamburgerMenu from './HamburgerMenu';
 
 function Search({ user }) {
     const [query, setQuery] = useState('');
@@ -115,7 +114,6 @@ function Search({ user }) {
     return (
         <div className="auth-container">
             <div className="auth-card" style={{ width: '100%', maxWidth: '800px' }}>
-                <HamburgerMenu user={user} />
                 <h2 className="auth-title">Search & Manage</h2>
 
                 <form onSubmit={handleSearch} style={{ width: '100%' }}>

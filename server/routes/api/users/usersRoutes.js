@@ -244,17 +244,37 @@ router.get('/top-friends/:username', async (req, res) => {
 
 // friend request
 router.post('/friend-request', isAuthenticated, async (req, res) => {
-  const { fromUsername, toUsername } = req.body;
+  let toUsername;
+
+  if (req.body && req.body.toUsername) {
+    toUsername = req.body.toUsername;
+  }
+  else if (req.params && req.params.toUsername) {
+    toUsername = decodeURIComponent(req.params.toUsername);
+  }
+  else {
+    return res.status(400).json({ error: 'toUsername is required' });
+  }
+
+  console.log(`🤝 Friend request: ${req.session.user.username} → ${toUsername}`);
 
   try {
     await personModel.sendFriendRequest(req.session.user.username, toUsername);
-    res.json({ message: 'Friend request sent' });
+    res.json({
+      message: 'Friend request sent',
+      from: req.session.user.username,
+      to: toUsername
+    });
   } catch (err) {
     console.error('Error sending friend request:', err);
     res.status(500).json({ error: 'Failed to send friend request' });
   }
 });
 
+router.post('/sendfriendrequest/:fromUsername/:toUsername', isAuthenticated, (req, res) => {
+  req.body = { toUsername: decodeURIComponent(req.params.toUsername) };
+  return router.handle({ ...req, method: 'POST', url: '/friend-request' }, res);
+});
 
 // POST /api/users/update - Update user profile
 router.post('/update', isAuthenticated, personController.updateProfile);

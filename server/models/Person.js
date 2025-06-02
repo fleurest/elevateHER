@@ -276,8 +276,8 @@ class Person {
 
     // friend request
     async sendFriendRequest(fromUsername, toUsername) {
-        const session = driver.session();
-
+        const session = this.driver.session();
+        
         try {
             const query = `
         MATCH (p1:Person {username: $fromUsername})

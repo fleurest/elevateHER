@@ -69,28 +69,29 @@ app.get('/api/image-proxy', async (req, res) => {
   try {
     const { url } = req.query;
     
-    if (!url) {
-      return res.status(400).send('URL parameter required');
-    }
+    // Set CORS headers
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET');
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
     
-    console.log('[IMAGE-PROXY] Fetching:', url);
-    
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; ImageProxy/1.0)'
+      }
+    });
     
     if (!response.ok) {
-      console.log('[IMAGE-PROXY] Failed to fetch:', response.status);
-      return res.status(404).send('Image not found');
+      throw new Error(`HTTP ${response.status}`);
     }
     
-    // Setting CORS headers so frontend can access the image
-    res.set('Access-Control-Allow-Origin', 'http://localhost:3000');
-    res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
-    res.set('Cache-Control', 'public, max-age=86400');
+    res.header('Content-Type', response.headers.get('content-type') || 'image/jpeg');
     
     response.body.pipe(res);
+    
   } catch (error) {
-    console.error('[IMAGE-PROXY] Error:', error);
-    res.status(500).send('Failed to fetch image');
+    console.error('Image proxy error:', error);
+    res.status(404).send('Image not found');
   }
 });
 

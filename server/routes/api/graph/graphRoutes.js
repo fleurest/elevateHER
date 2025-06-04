@@ -45,35 +45,8 @@ router.get('/liked/:email/summary', graphController.getLikedSummary);
 // NEW: GET /api/graph/friends/:email - Get friends for a user
 router.get('/friends/:email', graphController.getFriendsByEmail);
 
-module.exports = router;
 
-
-
-
-
-// router.post('/knn/setup', async (req, res) => {
-//     const { dim, iterations, topK } = req.body;
-//     try {
-//         await graphService.projectGraph();
-//         await graphService.computeEmbeddings({ dim, iterations });
-//         await graphService.writeKnn({ topK });
-//         res.json({ message: 'kNN setup complete' });
-//     } catch (err) {
-//         console.error('kNN setup error:', err);
-//         res.status(500).json({ error: 'Failed to setup kNN' });
-//     }
-// });
-
-
-// router.get('/pagerank', async (req, res) => {
-//     try {
-//         const result = await graphService.getPageRankScoresFromProperty();
-//         res.json(result);
-//     } catch (err) {
-//         console.error('PageRank error:', err);
-//         res.status(500).json({ error: 'Failed to retrieve PageRank' });
-//     }
-// });
-
+// POST /graph/pagerank - Calculate and store PageRank scores
+router.post('/pagerank', graphController.calculatePageRank);
 
 module.exports = router;

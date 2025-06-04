@@ -75,6 +75,17 @@ class GraphService {
     }));
   }
 
+  /**
+   * Generate Wikipedia image URL for a person's name
+   * @param {string} name - Person's name
+   * @returns {string} Wikipedia image URL
+   */
+  getWikipediaImageUrl(name) {
+    if (!name) return null;
+    const encodedName = encodeURIComponent(name.replace(/ /g, '_'));
+    return `https://en.wikipedia.org/wiki/Special:Redirect/file/${encodedName}.jpg`;
+  }
+
   async buildGraph(limit = 100, filterByType = null) {
     const records = await this.graphModel.getAllConnections(
       Number.isInteger(limit) ? limit : parseInt(limit, 10)
@@ -86,15 +97,24 @@ class GraphService {
       const m = record.get('m');
       const r = record.get('r');
       if (filterByType && r.type !== filterByType) return;
-      const mapNode = node => ({
-        data: {
-          id: node.identity.toString(),
-          label: node.properties.name || node.labels[0],
-          image: node.properties.profileImage || null, 
-          type: node.labels[0]?.toLowerCase() || 'unknown',
-                    ...node.properties
-        }
-      });
+      
+      const mapNode = node => {
+        const name = node.properties.name;
+        const profileImage = node.properties.profileImage;
+        
+        return {
+          data: {
+            id: node.identity.toString(),
+            label: name || node.labels[0],
+            name: name,
+            image: profileImage || this.getWikipediaImageUrl(name),
+            profileImage: profileImage || this.getWikipediaImageUrl(name),
+            type: node.labels[0]?.toLowerCase() || 'unknown',
+            ...node.properties
+          }
+        };
+      };
+      
       if (!nodesMap.has(n.identity.toString())) nodesMap.set(n.identity.toString(), mapNode(n));
       if (!nodesMap.has(m.identity.toString())) nodesMap.set(m.identity.toString(), mapNode(m));
       edges.push({
@@ -110,21 +130,136 @@ class GraphService {
     return { nodes: Array.from(nodesMap.values()), edges };
   }
 
-  async getPageRankScoresFromProperty() {
+  // ========== PAGERANK FUNCTIONALITY ==========
+  
+  /**
+   * Get PageRank scores from stored property - ENHANCED VERSION
+   * @param {Object} options - Options object
+   * @param {number} options.limit - Maximum number of results
+   * @param {number} options.threshold - Minimum score threshold
+   * @returns {Promise<Array>} Array of PageRank results
+   */
+  async getPageRankScores({ limit = 20, threshold = 0.0 } = {}) {
     const session = this.driver.session();
-    const result = await session.run(
-      `MATCH (p:Person)
-       WHERE p.pagerank IS NOT NULL
-       RETURN p.name AS name, p.pagerank AS score
-       ORDER BY score DESC
-       LIMIT 20`
-    );
-    await session.close();
-    return result.records.map(r => ({
-      name: r.get('name'),
-      score: r.get('score')
-    }));
+    try {
+      const result = await session.run(
+        `MATCH (p:Person)
+         WHERE p.pagerank IS NOT NULL AND p.pagerank >= $threshold
+         RETURN p.name AS name, 
+                p.pagerank AS score,
+                p.profileImage AS profileImage,
+                p.sport AS sport,
+                p.nationality AS nationality,
+                p
+         ORDER BY score DESC
+         LIMIT $limit`,
+        { limit: neo4j.int(limit), threshold }
+      );
+      
+      return result.records.map(r => {
+        const person = r.get('p');
+        const name = r.get('name');
+        const profileImage = r.get('profileImage');
+        
+        return {
+          name,
+          score: r.get('score'),
+          sport: r.get('sport'),
+          nationality: r.get('nationality'),
+          profileImage: profileImage || this.getWikipediaImageUrl(name),
+          id: person.identity.toString(),
+          ...person.properties
+        };
+      });
+    } finally {
+      await session.close();
+    }
   }
+
+  /**
+   * Calculate PageRank using GDS library
+   * @param {Object} options - PageRank calculation options
+   * @returns {Promise<Object>} Calculation results
+   */
+  async calculatePageRank({ 
+    maxIterations = 20, 
+    dampingFactor = 0.85, 
+    tolerance = 0.0001,
+    writeProperty = 'pagerank'
+  } = {}) {
+    const session = this.driver.session();
+    
+    try {
+      await this.ensureGraphProjection();
+      
+      // Calculate PageRank and write to neo4j
+      const result = await session.run(
+        `CALL gds.pageRank.write($graphName, {
+           maxIterations: $maxIterations,
+           dampingFactor: $dampingFactor,
+           tolerance: $tolerance,
+           writeProperty: $writeProperty
+         })
+         YIELD nodePropertiesWritten, ranIterations, didConverge`,
+        { 
+          graphName: this.graphName,
+          maxIterations: neo4j.int(maxIterations),
+          dampingFactor,
+          tolerance,
+          writeProperty
+        }
+      );
+      
+      const record = result.records[0];
+      return {
+        nodePropertiesWritten: record.get('nodePropertiesWritten').toNumber(),
+        ranIterations: record.get('ranIterations').toNumber(),
+        didConverge: record.get('didConverge'),
+        writeProperty
+      };
+    } finally {
+      await session.close();
+    }
+  }
+
+  /**
+   * Ensure graph projection exists for GDS operations
+   */
+  async ensureGraphProjection() {
+    const session = this.driver.session();
+    
+    try {
+      // Check if projection exists
+      const checkResult = await session.run(
+        `CALL gds.graph.exists($graphName)
+         YIELD exists`,
+        { graphName: this.graphName }
+      );
+      
+      const exists = checkResult.records[0].get('exists');
+      
+      if (!exists) {
+        // Create graph projection
+        await session.run(
+          `CALL gds.graph.project(
+             $graphName,
+             ['Person', 'Organization'],
+             {
+               FRIENDS_WITH: { orientation: 'UNDIRECTED' },
+               PARTICIPATES_IN: { orientation: 'UNDIRECTED' },
+               LIKES: { orientation: 'UNDIRECTED' }
+             }
+           )`,
+          { graphName: this.graphName }
+        );
+        console.log(`Created graph projection: ${this.graphName}`);
+      }
+    } finally {
+      await session.close();
+    }
+  }
+
+  // ========== EXISTING METHODS (UNCHANGED) ==========
 
   async detectCommunities() {
     const session = this.driver.session();
@@ -202,17 +337,22 @@ class GraphService {
       const target = record.get('target') || record.get('person') || record.get('org');
       const relationship = record.get('r');
 
-
-      const mapNode = node => ({
-        data: {
-          id: node.identity.toString(),
-          label: node.properties.name || node.properties.email || node.labels[0],
-          image: node.properties.profileImage || null ,
-          type: node.labels[0]?.toLowerCase() || 'unknown',
-          ...node.properties
-        }
+      const mapNode = node => {
+        const name = node.properties.name || node.properties.email;
+        const profileImage = node.properties.profileImage;
         
-      });
+        return {
+          data: {
+            id: node.identity.toString(),
+            label: name || node.labels[0],
+            name: name,
+            image: profileImage || this.getWikipediaImageUrl(name),
+            profileImage: profileImage || this.getWikipediaImageUrl(name),
+            type: node.labels[0]?.toLowerCase() || 'unknown',
+            ...node.properties
+          }
+        };
+      };
 
       // Add user node
       if (!nodesMap.has(user.identity.toString())) {
@@ -267,64 +407,71 @@ class GraphService {
   }
 
   /**
- * Get friends for a user by email
- * @param {string} email - User's email
- * @param {Object} options - Options object
- * @param {number} options.limit - Maximum number of results
- * @returns {Promise<Object>} Graph structure with nodes and edges
- */
-async getFriendsByEmail(email, { limit = 50 } = {}) {
-  const records = await this.graphModel.getFriendsByEmail(email, limit);
+   * Get friends for a user by email
+   * @param {string} email - User's email
+   * @param {Object} options - Options object
+   * @param {number} options.limit - Maximum number of results
+   * @returns {Promise<Object>} Graph structure with nodes and edges
+   */
+  async getFriendsByEmail(email, { limit = 50 } = {}) {
+    const records = await this.graphModel.getFriendsByEmail(email, limit);
 
-  const nodesMap = new Map();
-  const edges = [];
+    const nodesMap = new Map();
+    const edges = [];
 
-  records.forEach(record => {
-      const user = record.get('user');
-      const friend = record.get('friend');
-      const relationship = record.get('r');
+    records.forEach(record => {
+        const user = record.get('user');
+        const friend = record.get('friend');
+        const relationship = record.get('r');
 
-      const mapNode = node => ({
-          data: {
+        const mapNode = node => {
+          const name = node.properties.name || node.properties.email;
+          const profileImage = node.properties.profileImage;
+          
+          return {
+            data: {
               id: node.identity.toString(),
-              label: node.properties.name || node.properties.email || node.labels[0],
-              image: node.properties.profileImage || null,
+              label: name || node.labels[0],
+              name: name,
+              image: profileImage || this.getWikipediaImageUrl(name),
+              profileImage: profileImage || this.getWikipediaImageUrl(name),
               type: node.labels[0]?.toLowerCase() || 'unknown',
               ...node.properties
-          }
-      });
+            }
+          };
+        };
 
-      // Add user node
-      if (!nodesMap.has(user.identity.toString())) {
-          nodesMap.set(user.identity.toString(), mapNode(user));
-      }
+        // Add user node
+        if (!nodesMap.has(user.identity.toString())) {
+            nodesMap.set(user.identity.toString(), mapNode(user));
+        }
 
-      // Add friend node
-      if (!nodesMap.has(friend.identity.toString())) {
-          nodesMap.set(friend.identity.toString(), mapNode(friend));
-      }
+        // Add friend node
+        if (!nodesMap.has(friend.identity.toString())) {
+            nodesMap.set(friend.identity.toString(), mapNode(friend));
+        }
 
-      // Add friendship edge
-      edges.push({
-          data: {
-              id: relationship.identity.toString(),
-              source: user.identity.toString(),
-              target: friend.identity.toString(),
-              label: 'friends',
-              title: 'friends',
-              relationshipType: 'FRIENDS_WITH',
-              createdAt: relationship.properties.createdAt,
-              ...relationship.properties
-          }
-      });
-  });
+        // Add friendship edge
+        edges.push({
+            data: {
+                id: relationship.identity.toString(),
+                source: user.identity.toString(),
+                target: friend.identity.toString(),
+                label: 'friends',
+                title: 'friends',
+                relationshipType: 'FRIENDS_WITH',
+                createdAt: relationship.properties.createdAt,
+                ...relationship.properties
+            }
+        });
+    });
 
-  return {
-      nodes: Array.from(nodesMap.values()),
-      edges,
-      totalCount: records.length
-  };
-}
+    return {
+        nodes: Array.from(nodesMap.values()),
+        edges,
+        totalCount: records.length
+    };
+  }
 
 }
 

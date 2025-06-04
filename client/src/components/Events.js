@@ -38,6 +38,23 @@ function Events() {
     fetchEvents();
   }, []);
 
+  const parseEventDate = (event) => {
+    const dateValue = event.start?.dateTime || event.start || event.date;
+    
+    if (!dateValue) {
+      return null;
+    }
+    
+    const eventDate = new Date(dateValue);
+    
+    // Check if the date is valid
+    if (isNaN(eventDate.getTime())) {
+      return null;
+    }
+    
+    return eventDate;
+  };
+
   const renderEventList = (events) => {
     if (events.length === 0) {
       return (
@@ -50,26 +67,39 @@ function Events() {
     return (
       <div className="row">
         {events.map((event, index) => {
-          const eventDate = new Date(event.start?.dateTime || event.start || event.date);
-          const day = eventDate.getDate();
-          const month = eventDate.toLocaleString('default', { month: 'short' });
-          const year = eventDate.getFullYear();
-          const time = eventDate.toLocaleTimeString('default', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          });
+          const eventDate = parseEventDate(event);
+          
+          let day, month, year, time;
+          if (eventDate) {
+            day = eventDate.getDate();
+            month = eventDate.toLocaleString('default', { month: 'short' });
+            year = eventDate.getFullYear();
+            time = eventDate.toLocaleTimeString('default', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+          }
 
           return (
             <div key={index} className="col-md-6 col-lg-4 mb-4">
               <div className="card event-card h-100">
                 <div className="card-body event-card-body">
                   <div className="d-flex align-items-start mb-3">
-                    <div className="event-date-box me-3">
-                      <div className="event-date-day">{day}</div>
-                      <div className="event-date-month">
-                        {month} {year}
+                    {eventDate ? (
+                      <div className="event-date-box me-3">
+                        <div className="event-date-day">{day}</div>
+                        <div className="event-date-month">
+                          {month} {year}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="event-date-box me-3">
+                        <div className="event-date-day">-</div>
+                        <div className="event-date-month">
+                          No Date
+                        </div>
+                      </div>
+                    )}
                     <div className="flex-grow-1">
                       <h5 className="event-title">
                         {event.summary || event.title}
@@ -79,9 +109,11 @@ function Events() {
                           📍 {event.location}
                         </p>
                       )}
-                      <p className="event-meta">
-                        🕒 {time}
-                      </p>
+                      {eventDate && (
+                        <p className="event-meta">
+                          🕒 {time}
+                        </p>
+                      )}
                     </div>
                   </div>
                   

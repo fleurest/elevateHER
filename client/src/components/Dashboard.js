@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 
 const BackToHome = ({ onBackToHome }) => (
   <button 
-    onClick={onBackToHome} 
+    onClick={() => window.location.href = '/home'} 
     style={{ 
       padding: '8px 16px', 
       backgroundColor: '#575a7b', 
@@ -92,33 +92,55 @@ const HeartIcon = () => (
   </svg>
 );
 
-// Helper function to debug authentication
-const debugAuth = () => {
-  console.log('🔍 AUTHENTICATION DEBUG:');
-  console.log('📦 localStorage:', Object.fromEntries(Object.entries(localStorage)));
-  console.log('📦 sessionStorage:', Object.fromEntries(Object.entries(sessionStorage)));
-  console.log('🌐 window.currentUser:', window.currentUser);
-  console.log('🌐 window.user:', window.user);
-  console.log('🌐 window.authUser:', window.authUser);
-  
-  alert('Authentication debug info logged to console. Check developer tools -> Console tab.');
-};
+const PlusIcon = () => (
+  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  </svg>
+);
 
-// Mock athlete data for demonstration - will be replaced by real API data
-const mockAthletes = [];
-
-const ModeSelector = ({ currentMode, onModeChange, userEmail }) => {
+const ModeSelector = ({ currentMode, onModeChange, user }) => {
   const modes = [
-    { id: 'general', label: 'General Network', icon: NetworkIcon, description: 'View the complete network graph', requiresAuth: false },
-    { id: 'liked', label: 'Liked Entities', icon: HeartIcon, description: 'View your liked people and organizations', requiresAuth: true },
-    { id: 'friends', label: 'Friends Network', icon: UsersIcon, description: 'View your friends network', requiresAuth: true },
-    { id: 'similar', label: 'Network Explorer', icon: TrendingUpIcon, description: 'Explore connections radiating out from your likes', requiresAuth: true }
+    { 
+      id: 'general', 
+      label: 'General Network', 
+      icon: NetworkIcon, 
+      description: 'View the complete network graph', 
+      requiresAuth: false 
+    },
+    { 
+      id: 'dynamic', 
+      label: 'Dynamic Mode', 
+      icon: PlusIcon, 
+      description: 'Add individuals and view their connections', 
+      requiresAuth: false 
+    },
+    { 
+      id: 'liked', 
+      label: 'Liked Entities', 
+      icon: HeartIcon, 
+      description: 'View your liked people and organizations', 
+      requiresAuth: false
+    },
+    { 
+      id: 'friends', 
+      label: 'Friends Network', 
+      icon: UsersIcon, 
+      description: 'View your friends network', 
+      requiresAuth: false
+    },
+    { 
+      id: 'similar', 
+      label: 'Network Explorer', 
+      icon: TrendingUpIcon, 
+      description: 'Explore connections radiating out from your likes', 
+      requiresAuth: false
+    }
   ];
 
   return (
     <div className="network-mode-selector">
       {modes.map(({ id, label, icon: Icon, description, requiresAuth }) => {
-        const isDisabled = requiresAuth && !userEmail;
+        const isDisabled = requiresAuth && !user;
         const displayDescription = isDisabled ? 'Login required for this feature' : description;
         
         return (
@@ -139,8 +161,41 @@ const ModeSelector = ({ currentMode, onModeChange, userEmail }) => {
   );
 };
 
-const SearchPanel = ({ searchTerm, setSearchTerm, athletes, onAddAthlete, isVisible, onToggle, mode }) => {
-  const filteredAthletes = athletes.filter(athlete =>
+const SearchPanel = ({ searchTerm, setSearchTerm, athletes, onAddAthlete, isVisible, onToggle, mode, onSearch }) => {
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      if (onSearch) {
+        const results = await onSearch(searchTerm);
+        setSearchResults(results || []);
+      } else {
+        const filtered = athletes.filter(athlete =>
+          (athlete.name || athlete.label || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (athlete.sport || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (athlete.nationality || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setSearchResults(filtered);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  const displayItems = searchResults.length > 0 ? searchResults : athletes.filter(athlete =>
     (athlete.name || athlete.label || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (athlete.sport || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (athlete.nationality || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -161,7 +216,11 @@ const SearchPanel = ({ searchTerm, setSearchTerm, athletes, onAddAthlete, isVisi
   return (
     <div className="network-search-panel">
       <div className="network-search-header">
-        <h3>{mode === 'general' ? 'Add to Network' : 'Search Network'}</h3>
+        <h3>
+          {mode === 'dynamic' ? 'Add to Network' : 
+           mode === 'general' ? 'Search Network' : 
+           'Search & Filter'}
+        </h3>
         <button onClick={onToggle} className="network-panel-close">
           <XIcon />
         </button>
@@ -170,37 +229,58 @@ const SearchPanel = ({ searchTerm, setSearchTerm, athletes, onAddAthlete, isVisi
         <SearchIcon />
         <input
           type="text"
-          placeholder="Search athletes..."
+          placeholder={
+            mode === 'dynamic' ? 'Search athletes to add...' :
+            mode === 'similar' ? 'Search for similar athletes...' :
+            'Search athletes...'
+          }
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyPress={handleKeyPress}
           className="network-search-input"
+          disabled={isSearching}
         />
+        <button 
+          onClick={handleSearch}
+          className="network-search-btn"
+          disabled={isSearching || !searchTerm.trim()}
+        >
+          {isSearching ? '⏳' : 'Search'}
+        </button>
       </div>
       <div className="network-search-results">
-        {filteredAthletes.map((athlete, index) => (
-          <div
-            key={`${athlete.id || athlete.name}-${index}`}
-            onClick={() => onAddAthlete(athlete)}
-            className="network-search-item"
-          >
-            <img
-              src={athlete.image || iconPlayer}
-              alt={athlete.name || athlete.label}
-              className="network-search-avatar"
-              onError={(e) => { e.target.src = iconPlayer; }}
-            />
-            <div className="network-search-info">
-              <p className="network-search-name">{athlete.name || athlete.label}</p>
-              <p className="network-search-details">
-                {athlete.sport && `${athlete.sport} • `}
-                {athlete.nationality || athlete.type || 'Unknown'}
-              </p>
+        {isSearching ? (
+          <div className="network-search-loading">Searching...</div>
+        ) : displayItems.length > 0 ? (
+          displayItems.map((athlete, index) => (
+            <div
+              key={`${athlete.id || athlete.name}-${index}`}
+              onClick={() => onAddAthlete(athlete)}
+              className="network-search-item"
+            >
+              <img
+                src={athlete.image || athlete.profileImage || iconPlayer}
+                alt={athlete.name || athlete.label}
+                className="network-search-avatar"
+                onError={(e) => { e.target.src = iconPlayer; }}
+              />
+              <div className="network-search-info">
+                <p className="network-search-name">{athlete.name || athlete.label}</p>
+                <p className="network-search-details">
+                  {athlete.sport && `${athlete.sport} • `}
+                  {athlete.nationality || athlete.type || 'Unknown'}
+                </p>
+              </div>
+              {mode === 'dynamic' && (
+                <button className="network-search-add-btn">
+                  <PlusIcon />
+                </button>
+              )}
             </div>
-          </div>
-        ))}
-        {filteredAthletes.length === 0 && (
+          ))
+        ) : (
           <div className="network-search-empty">
-            No results found matching your search.
+            {searchTerm ? 'No results found matching your search.' : 'Enter a search term to find athletes.'}
           </div>
         )}
       </div>
@@ -208,10 +288,27 @@ const SearchPanel = ({ searchTerm, setSearchTerm, athletes, onAddAthlete, isVisi
   );
 };
 
-const ControlPanel = ({ onCommunities, onExport, onLoadSimilar, isOpen, setIsOpen, userEmail }) => {
+const ControlPanel = ({ onCommunities, onExport, onLoadSimilar, onPageRank, isOpen, setIsOpen, user }) => {
   const controls = [
-    { label: 'Detect Communities', action: onCommunities, icon: UsersIcon, description: 'Run Louvain algorithm to find communities' },
-    { label: 'Explore My Network', action: onLoadSimilar, icon: TrendingUpIcon, needsUserEmail: true, description: 'Start from your likes and expand 1-2 hops outward' },
+    { 
+      label: 'PageRank Analysis', 
+      action: onPageRank, 
+      icon: TrendingUpIcon, 
+      description: 'Calculate PageRank to find most influential nodes' 
+    },
+    { 
+      label: 'Detect Communities', 
+      action: onCommunities, 
+      icon: UsersIcon, 
+      description: 'Run Louvain algorithm to find communities' 
+    },
+    { 
+      label: 'Explore My Network', 
+      action: onLoadSimilar, 
+      icon: TrendingUpIcon, 
+      needsUser: true, 
+      description: 'Start from your likes and expand 1-2 hops outward' 
+    },
   ];
 
   const exportOptions = [
@@ -241,12 +338,12 @@ const ControlPanel = ({ onCommunities, onExport, onLoadSimilar, isOpen, setIsOpe
           
           <div className="network-control-section">
             <h4>AI Analysis</h4>
-            {controls.map(({ label, action, icon: Icon, needsUserEmail, description }) => (
+            {controls.map(({ label, action, icon: Icon, needsUser, description }) => (
               <button
                 key={label}
                 onClick={action}
-                disabled={needsUserEmail && !userEmail}
-                className={`network-control-button ${needsUserEmail && !userEmail ? 'disabled' : ''}`}
+                disabled={needsUser && !user}
+                className={`network-control-button ${needsUser && !user ? 'disabled' : ''}`}
                 title={description}
               >
                 <Icon />
@@ -301,7 +398,7 @@ const InfoTooltip = ({ person, position, isHover = false }) => {
       <div className="network-tooltip-content">
         <div className="network-tooltip-header">
           <img
-            src={person.image || iconPlayer}
+            src={person.image || person.profileImage || iconPlayer}
             alt={person.name || person.label}
             className="network-tooltip-avatar"
             onError={(e) => { e.target.src = iconPlayer; }}
@@ -333,8 +430,7 @@ const InfoTooltip = ({ person, position, isHover = false }) => {
   );
 };
 
-// Real Network Visualization Component that works with your Cytoscape data
-const NetworkVisualization = ({ mode, data, onNodeClick, onNodeHover, onNodeLeave, loading }) => {
+const NetworkVisualization = ({ mode, data, onNodeClick, onNodeHover, onNodeLeave, loading, addedNodes = [] }) => {
   const nodes = data?.nodes || [];
   const edges = data?.edges || [];
 
@@ -348,23 +444,21 @@ const NetworkVisualization = ({ mode, data, onNodeClick, onNodeHover, onNodeLeav
     onNodeHover(node.data, { x: rect.left + rect.width / 2, y: rect.top });
   };
 
-  // Debug info for development
   console.log(`NetworkVisualization - Mode: ${mode}, Nodes: ${nodes.length}, Edges: ${edges.length}`);
-  if (nodes.length > 0) {
-    console.log('Sample node structure:', nodes[0]);
-  }
-  if (edges.length > 0) {
-    console.log('Sample edge structure:', edges[0]);
-  }
 
   return (
     <div className="mock-network-container">
       <div className="mock-network-title">
-        <h3>Athletic Network - {mode.charAt(0).toUpperCase() + mode.slice(1)} Mode</h3>
+        <h3>Athlete Network - {mode.charAt(0).toUpperCase() + mode.slice(1)} Mode</h3>
         <p>{nodes.length} entities • {edges.length} connections</p>
+        {mode === 'dynamic' && addedNodes.length > 0 && (
+          <small style={{ color: '#575a7b', display: 'block', marginTop: '4px' }}>
+            Added {addedNodes.length} athletes to dynamic network
+          </small>
+        )}
         {mode === 'liked' && nodes.length > 0 && (
           <small style={{ color: '#575a7b', display: 'block', marginTop: '4px' }}>
-            Showing entities you have LIKED in the database
+            Showing athletes and organisations you have LIKED
           </small>
         )}
         {mode === 'friends' && nodes.length > 0 && (
@@ -382,12 +476,12 @@ const NetworkVisualization = ({ mode, data, onNodeClick, onNodeHover, onNodeLeav
         </div>
       ) : nodes.length > 0 ? (
         <div className="mock-network-grid">
-          {nodes.slice(0, 12).map((node, index) => { // Show up to 12 nodes in demo view
+          {nodes.slice(0, 16).map((node, index) => {
             const nodeData = node.data || node;
             return (
               <div
                 key={nodeData.id}
-                className={`mock-node`}
+                className={`mock-node ${mode === 'dynamic' && addedNodes.includes(nodeData.id) ? 'added-node' : ''}`}
                 onClick={(e) => handleNodeClick(node, e)}
                 onMouseEnter={(e) => handleNodeHover(node, e)}
                 onMouseLeave={onNodeLeave}
@@ -411,13 +505,12 @@ const NetworkVisualization = ({ mode, data, onNodeClick, onNodeHover, onNodeLeav
           {/* Display connection lines for edges */}
           {edges.length > 0 && (
             <svg className="mock-connections">
-              {edges.slice(0, 8).map((edge, index) => {
+              {edges.slice(0, 12).map((edge, index) => {
                 const edgeData = edge.data || edge;
-                // Find source and target node positions
                 const sourceIndex = nodes.findIndex(n => (n.data?.id || n.id) === edgeData.source);
                 const targetIndex = nodes.findIndex(n => (n.data?.id || n.id) === edgeData.target);
                 
-                if (sourceIndex === -1 || targetIndex === -1 || sourceIndex > 11 || targetIndex > 11) return null;
+                if (sourceIndex === -1 || targetIndex === -1 || sourceIndex > 15 || targetIndex > 15) return null;
                 
                 return (
                   <line
@@ -435,9 +528,9 @@ const NetworkVisualization = ({ mode, data, onNodeClick, onNodeHover, onNodeLeav
             </svg>
           )}
           
-          {nodes.length > 12 && (
+          {nodes.length > 16 && (
             <div className="mock-network-overflow">
-              <p>+ {nodes.length - 12} more entities in network</p>
+              <p>+ {nodes.length - 16} more entities in network</p>
               <small>This is a preview. The full network will be displayed in Cytoscape when integrated.</small>
             </div>
           )}
@@ -445,28 +538,26 @@ const NetworkVisualization = ({ mode, data, onNodeClick, onNodeHover, onNodeLeav
       ) : (
         <div className="mock-network-empty">
           <NetworkIcon />
-          <h4>No data available</h4>
+          <h4>
+            {mode === 'dynamic' ? 'Dynamic Network' :
+             mode === 'general' ? 'No data available' :
+             mode === 'liked' ? 'No liked entities' :
+             mode === 'friends' ? 'No friends' : 'No data available'}
+          </h4>
           <p>
+            {mode === 'dynamic' && "Use the search panel to add athletes to your dynamic network"}
             {mode === 'general' && "No network data found in the database"}
             {mode === 'liked' && "No LIKES relationships found for this user"}
             {mode === 'friends' && "No FRIENDS_WITH relationships found for this user"}
             {mode === 'similar' && "Click 'Explore My Network' to start from your likes and expand outward"}
           </p>
-          {mode === 'liked' && (
-            <small style={{ color: '#797ca0', marginTop: '8px', display: 'block' }}>
-            </small>
-          )}
-          {mode === 'similar' && (
-            <small style={{ color: '#797ca0', marginTop: '8px', display: 'block' }}>
-            </small>
-          )}
         </div>
       )}
     </div>
   );
 };
 
-const Dashboard = ({ onBackToHome = () => console.log('Back to home'), containerStyle = { width: '100%', height: '500px' } }) => {
+const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = null, containerStyle = { width: '100%', height: '500px' } }) => {
   const [mode, setMode] = useState('general');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchPanelVisible, setSearchPanelVisible] = useState(false);
@@ -477,12 +568,11 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
   const [hoverPosition, setHoverPosition] = useState(null);
   const [athletes, setAthletes] = useState([]);
   const [allNodes, setAllNodes] = useState([]);
-  const [graphData, setGraphData] = useState({ nodes: [], edges: [] }); // Store current graph data
-  const [userEmail, setUserEmail] = useState('');
+  const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
+  const [addedNodes, setAddedNodes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Format date helper function
   const fmt = d => {
     if (!d) return '';
     if (typeof d.toString === 'function') {
@@ -500,120 +590,75 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
     return '';
   };
 
-  // Initialize user email from authentication - more aggressive detection
-  useEffect(() => {
-    const getLoggedInUserEmail = () => {
-      // Check for common authentication patterns
-      const sources = [
-        // Direct email storage
-        () => localStorage.getItem('userEmail'),
-        () => localStorage.getItem('email'),
-        () => sessionStorage.getItem('userEmail'),
-        () => sessionStorage.getItem('email'),
-        
-        // User objects
-        () => {
-          const user = localStorage.getItem('user');
-          if (user && user !== 'null') {
-            try {
-              const parsed = JSON.parse(user);
-              return parsed.email || parsed.emailAddress || parsed.username;
-            } catch (e) { return null; }
-          }
-          return null;
-        },
-        
-        // Current user patterns
-        () => {
-          const currentUser = localStorage.getItem('currentUser');
-          if (currentUser && currentUser !== 'null') {
-            try {
-              const parsed = JSON.parse(currentUser);
-              return parsed.email || parsed.emailAddress;
-            } catch (e) { return null; }
-          }
-          return null;
-        },
-        
-        // Auth user patterns
-        () => {
-          const authUser = localStorage.getItem('authUser');
-          if (authUser && authUser !== 'null') {
-            try {
-              const parsed = JSON.parse(authUser);
-              return parsed.email || parsed.emailAddress;
-            } catch (e) { return null; }
-          }
-          return null;
-        },
-        
-        // JWT tokens
-        () => {
-          const token = localStorage.getItem('token') || localStorage.getItem('authToken') || localStorage.getItem('accessToken');
-          if (token && token.includes('.')) {
-            try {
-              const payload = JSON.parse(atob(token.split('.')[1]));
-              return payload.email || payload.sub || payload.username;
-            } catch (e) { return null; }
-          }
-          return null;
-        },
-        
-        // Global window objects
-        () => window.currentUser?.email,
-        () => window.user?.email,
-        () => window.authUser?.email,
-        
-        // Firebase patterns
-        () => {
-          const firebaseUser = localStorage.getItem('firebase:authUser');
-          if (firebaseUser) {
-            try {
-              const parsed = JSON.parse(firebaseUser);
-              return parsed.email;
-            } catch (e) { return null; }
-          }
-          return null;
-        }
-      ];
-
-      for (let i = 0; i < sources.length; i++) {
-        try {
-          const email = sources[i]();
-          if (email && typeof email === 'string' && email.includes('@') && email !== 'null' && email !== 'undefined') {
-            console.log(`✅ Found user email from source ${i}:`, email);
-            return email;
-          }
-        } catch (e) {
-          // Continue to next source
-        }
-      }
-
-      // Debug: Show what's available
-      console.log('🔍 Available localStorage keys:', Object.keys(localStorage));
-      console.log('🔍 Available sessionStorage keys:', Object.keys(sessionStorage));
-      console.log('🔍 Window.currentUser:', window.currentUser);
-      console.log('🔍 Window.user:', window.user);
-      
-      return null;
-    };
-
-    const email = getLoggedInUserEmail();
-    console.log('🎯 Final user email:', email);
-    setUserEmail(email || '');
-  }, []);
-
-  // Load initial data based on mode
   useEffect(() => {
     loadGraphData();
-  }, [mode, userEmail]);
+  }, [mode, user]);
+
+  // Load athletes for search
+  useEffect(() => {
+    const loadAthletes = async () => {
+      try {
+        const apiBase = process.env.REACT_APP_API_BASE || '';
+        
+        // First try to get athletes from the general graph
+        const graphResponse = await fetch(`${apiBase}/api/graph?limit=200`);
+        if (graphResponse.ok) {
+          const graphData = await graphResponse.json();
+          
+          // Filter for Person nodes (athletes)
+          const athleteNodes = (graphData.nodes || []).filter(node => {
+            const nodeData = node.data || node;
+            return nodeData.label === 'Person' && nodeData.name && 
+                   (nodeData.sport || nodeData.roles?.includes('athlete'));
+          }).map(node => {
+            const nodeData = node.data || node;
+            return {
+              id: nodeData.id,
+              name: nodeData.name,
+              label: nodeData.name,
+              sport: nodeData.sport,
+              nationality: nodeData.nationality,
+              type: 'athlete',
+              image: nodeData.image || nodeData.profileImage,
+              ...nodeData
+            };
+          });
+          
+          console.log('Loaded athletes from graph:', athleteNodes.length);
+          setAthletes(athleteNodes);
+          return;
+        }
+        
+        // Fallback to athletes API
+        const response = await fetch(`${apiBase}/api/athletes`);
+        if (response.ok) {
+          const data = await response.json();
+          const formattedAthletes = (Array.isArray(data) ? data : []).map(athlete => ({
+            id: athlete.id || athlete.uuid,
+            name: athlete.name,
+            label: athlete.name,
+            sport: athlete.sport,
+            nationality: athlete.nationality,
+            type: 'athlete',
+            image: athlete.image || athlete.profileImage,
+            ...athlete
+          }));
+          setAthletes(formattedAthletes);
+        }
+      } catch (err) {
+        console.error('Error loading athletes:', err);
+        setAthletes([]);
+      }
+    };
+    loadAthletes();
+  }, []);
 
   const loadGraphData = async () => {
-    // Check if user email is required for the current mode
-    if ((mode === 'liked' || mode === 'friends') && !userEmail) {
-      setError('Please log in to view your personal network data');
+    // Dynamic mode starts empty
+    if (mode === 'dynamic') {
       setGraphData({ nodes: [], edges: [] });
-      drawGraph({ nodes: [], edges: [] });
+      setAddedNodes([]);
+      setError(null);
       return;
     }
 
@@ -626,8 +671,8 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
       const apiBase = process.env.REACT_APP_API_BASE || '';
       
       console.log(`Loading ${mode} data...`);
-      if (userEmail) {
-        console.log(`Using user email: ${userEmail}`);
+      if (user) {
+        console.log(`Using user:`, user.username, user.email);
       }
 
       switch (mode) {
@@ -635,65 +680,64 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
           console.log('Fetching general network...');
           response = await fetch(`${apiBase}/api/graph?limit=100`);
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('General network API error:', response.status, errorText);
-            throw new Error(`Failed to load network: ${response.status} ${errorText}`);
+            throw new Error(`Failed to load network: ${response.status}`);
           }
           data = await response.json();
-          console.log('General network data:', data);
           break;
           
         case 'liked':
-          console.log(`Fetching liked entities for user: ${userEmail}`);
-          const likedUrl = `${apiBase}/api/graph/liked/${encodeURIComponent(userEmail)}?limit=100`;
-          console.log('Liked entities URL:', likedUrl);
+          if (!user) {
+            setError('Please log in to view your liked entities');
+            setGraphData({ nodes: [], edges: [] });
+            return;
+          }
           
-          response = await fetch(likedUrl);
-          console.log('Liked entities response status:', response.status);
+          // Use email if available, fallback to username
+          const likedIdentifier = user.email || user.username;
+          console.log(`Fetching liked entities for: ${likedIdentifier}`);
           
+          response = await fetch(`${apiBase}/api/graph/liked/${encodeURIComponent(likedIdentifier)}`, {
+            credentials: 'include'
+          });
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Liked entities API error:', response.status, errorText);
-            
             if (response.status === 404) {
               data = { nodes: [], edges: [], totalCount: 0, message: 'No liked entities found for this user' };
-            } else if (response.status === 400) {
-              throw new Error('Invalid email format or missing email parameter');
             } else {
-              throw new Error(`Failed to load liked entities: ${response.status} ${errorText}`);
+              throw new Error(`Failed to load liked entities: ${response.status}`);
             }
           } else {
             data = await response.json();
-            console.log('Liked entities data:', data);
           }
           break;
           
         case 'friends':
-          console.log(`Fetching friends for user: ${userEmail}`);
-          const friendsUrl = `${apiBase}/api/graph/friends/${encodeURIComponent(userEmail)}?limit=100`;
-          console.log('Friends URL:', friendsUrl);
+          if (!user || !user.username) {
+            setError('Please log in to view your friends network');
+            setGraphData({ nodes: [], edges: [] });
+            return;
+          }
+                    console.log(`Fetching friends for username: ${user.username}`);
           
-          response = await fetch(friendsUrl);
-          console.log('Friends response status:', response.status);
-          
+          response = await fetch(`${apiBase}/api/graph/friends/${user.username}`, {
+            credentials: 'include'
+          });
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Friends API error:', response.status, errorText);
-            
             if (response.status === 404) {
               data = { nodes: [], edges: [], totalCount: 0, message: 'No friends found for this user' };
-            } else if (response.status === 400) {
-              throw new Error('Invalid email format or missing email parameter');
             } else {
-              throw new Error(`Failed to load friends: ${response.status} ${errorText}`);
+              throw new Error(`Failed to load friends: ${response.status}`);
             }
           } else {
             data = await response.json();
-            console.log('Friends data:', data);
           }
           break;
           
         case 'similar':
+          if (!user) {
+            setError('Please log in to explore your network connections');
+            setGraphData({ nodes: [], edges: [] });
+            return;
+          }
           // Start with empty graph for similar mode
           data = { nodes: [], edges: [] };
           console.log('Similar mode - starting with empty graph');
@@ -706,43 +750,168 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
       if (data.nodes && data.nodes.length > 0) {
         console.log(`Successfully loaded ${data.nodes.length} nodes and ${data.edges?.length || 0} edges`);
         setAllNodes(data.nodes);
-        setAthletes(data.nodes);
-        setGraphData(data); // Store the complete graph data for visualization
-        drawGraph(data);
+        setGraphData(data);
         setError(null);
       } else {
         const message = data.message || `No data available for ${mode} mode`;
         console.log('No data found:', message);
         setError(message);
         setGraphData({ nodes: [], edges: [] });
-        drawGraph({ nodes: [], edges: [] });
         setAllNodes([]);
-        setAthletes([]);
       }
     } catch (err) {
       console.error(`Error loading ${mode} data:`, err);
       setError(`Failed to load ${mode} data: ${err.message}`);
       setGraphData({ nodes: [], edges: [] });
-      drawGraph({ nodes: [], edges: [] });
       setAllNodes([]);
-      setAthletes([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Placeholder drawGraph function (in real implementation, this would initialize Cytoscape)
-  const drawGraph = (data) => {
-    console.log('Drawing graph with data:', data);
-    // In real implementation, this would:
-    // - Initialize or update Cytoscape instance
-    // - Apply styling and layout
-    // - Set up event handlers
+  const handleSearch = async (searchTerm) => {
+    try {
+      const apiBase = process.env.REACT_APP_API_BASE || '';
+      const response = await fetch(`${apiBase}/api/athletes?search=${encodeURIComponent(searchTerm)}`);
+      if (response.ok) {
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      }
+      return [];
+    } catch (error) {
+      console.error('Search error:', error);
+      return [];
+    }
   };
 
   const handleAddAthlete = (athlete) => {
     console.log('Adding athlete to network:', athlete);
-    // In real implementation, this would add the node to Cytoscape
+    
+    if (mode === 'dynamic') {
+      const newNode = {
+        data: {
+          id: athlete.id || athlete.name || `athlete-${Date.now()}`,
+          label: athlete.name,
+          name: athlete.name,
+          sport: athlete.sport,
+          nationality: athlete.nationality,
+          type: 'athlete',
+          image: athlete.image || athlete.profileImage,
+          roles: ['athlete'],
+          ...athlete
+        }
+      };
+
+      const nodeId = newNode.data.id;
+      if (graphData.nodes.some(n => (n.data?.id || n.id) === nodeId)) {
+        console.log('Athlete already in network');
+        alert(`${athlete.name} is already in the network!`);
+        return;
+      }
+
+      const updatedGraphData = {
+        nodes: [...graphData.nodes, newNode],
+        edges: [...graphData.edges]
+      };
+
+      setGraphData(updatedGraphData);
+      setAddedNodes([...addedNodes, nodeId]);
+      setAllNodes(updatedGraphData.nodes);
+      
+      console.log(`Added ${athlete.name} to dynamic network`);
+      
+      alert(`Added ${athlete.name} (${athlete.sport || 'Unknown sport'}) to your network!`);
+    } else {
+      alert(`ℹ${athlete.name} selected. In dynamic mode, this would add them to your network.`);
+    }
+  };
+
+  const handlePageRank = async () => {
+    try {
+      setLoading(true);
+      const apiBase = process.env.REACT_APP_API_BASE || '';
+      
+      console.log('🔍 Starting PageRank analysis...');
+      
+      let pageRankResponse = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
+      
+      if (!pageRankResponse.ok) {
+        if (pageRankResponse.status === 404) {
+          console.log('No existing PageRank scores found, calculating new ones...');
+          
+          const calculateResponse = await fetch(`${apiBase}/api/graph/pagerank`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              maxIterations: 20,
+              dampingFactor: 0.85,
+              writeProperty: 'pagerank'
+            })
+          });
+          
+          if (!calculateResponse.ok) {
+            const errorText = await calculateResponse.text();
+            throw new Error(`Failed to calculate PageRank: ${calculateResponse.status} ${errorText}`);
+          }
+          
+          const calculationResult = await calculateResponse.json();
+          console.log('PageRank calculated:', calculationResult);
+          
+          pageRankResponse = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
+          
+          if (!pageRankResponse.ok) {
+            throw new Error('Failed to fetch PageRank scores after calculation');
+          }
+        } else {
+          throw new Error(`Failed to get PageRank: ${pageRankResponse.status}`);
+        }
+      }
+      
+      const pageRankData = await pageRankResponse.json();
+      console.log('PageRank data retrieved:', pageRankData);
+      
+      if (Array.isArray(pageRankData) && pageRankData.length > 0) {
+        const pageRankNodes = pageRankData.map((person, index) => ({
+          data: {
+            id: person.id || `pagerank-${index}`,
+            label: person.name,
+            name: person.name,
+            sport: person.sport,
+            nationality: person.nationality,
+            type: 'person',
+            image: person.profileImage || person.image,
+            profileImage: person.profileImage || person.image,
+            pagerank: person.score,
+            ...person
+          }
+        }));
+        
+        const pageRankGraph = {
+          nodes: pageRankNodes.slice(0, 20),
+          edges: []
+        };
+        
+        console.log('✅ PageRank graph created:', pageRankGraph);
+        
+        setGraphData(pageRankGraph);
+        setAllNodes(pageRankNodes);
+        setError(null);
+        
+        const topPersons = pageRankData.slice(0, 5).map(p => `${p.name} (${p.score.toFixed(4)})`).join('\n');
+        
+        alert(`🎯 PageRank Analysis Complete!\n\n📊 Results:\n• Analyzed ${pageRankData.length} people\n• Found most influential individuals\n• Scores range from ${pageRankData[pageRankData.length-1]?.score.toFixed(4)} to ${pageRankData[0]?.score.toFixed(4)}\n\n🏆 Top 5 Most Influential:\n${topPersons}\n\n💡 Higher PageRank scores indicate more influential people in the network!`);
+        
+      } else {
+        alert('No PageRank data found.\n\n💡 This could mean:\n• No Person nodes in the database\n• PageRank has not been calculated\n• Insufficient connections in the graph');
+      }
+    } catch (err) {
+      console.error('PageRank analysis error:', err);
+      alert(`Failed to analyze PageRank: ${err.message}\n\n💡 Make sure:\n• Your Neo4j database has the Graph Data Science library installed\n• Person nodes exist with connections\n• The database is accessible`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCommunities = async () => {
@@ -750,60 +919,80 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
       setLoading(true);
       const apiBase = process.env.REACT_APP_API_BASE || '';
       
-      console.log('🔍 Starting community detection...');
-      const response = await fetch(`${apiBase}/api/graph/communities`);
+      console.log('🔍 Starting sport-based community detection...');
+      
+      const response = await fetch(`${apiBase}/api/graph?limit=300`);
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Communities API error:', response.status, errorText);
-        throw new Error(`Failed to detect communities: ${response.status} ${errorText}`);
+        throw new Error(`Failed to load network: ${response.status}`);
       }
       
-      const communities = await response.json();
-      console.log('✅ Communities detected:', communities);
+      const networkData = await response.json();
+      console.log('Network data loaded for sport analysis');
       
-      if (Array.isArray(communities) && communities.length > 0) {
-        // Group communities by ID
-        const communityGroups = communities.reduce((acc, member) => {
-          const id = member.communityId.toString();
-          if (!acc[id]) {
-            acc[id] = [];
-          }
-          acc[id].push(member.name);
-          return acc;
-        }, {});
-        
-        const numCommunities = Object.keys(communityGroups).length;
-        const totalMembers = communities.length;
-        const largestCommunity = Math.max(...Object.values(communityGroups).map(g => g.length));
-        
-        // Create detailed community breakdown
-        const communityDetails = Object.entries(communityGroups)
-          .sort((a, b) => b[1].length - a[1].length)
-          .slice(0, 5) // Show top 5 communities
-          .map(([id, members]) => `Community ${id}: ${members.length} members (${members.slice(0, 3).join(', ')}${members.length > 3 ? '...' : ''})`)
-          .join('\n');
-        
-        alert(`🎯 Community Detection Complete!\n\n📊 Results:\n• ${numCommunities} communities found\n• ${totalMembers} total members\n• Largest community: ${largestCommunity} members\n\n🏆 Top Communities:\n${communityDetails}\n\n💡 Communities are detected using the Louvain algorithm in your Neo4j database.`);
-        
-        // Update the current view to show community info if we have current data
-        if (graphData.nodes && graphData.nodes.length > 0) {
-          console.log('💡 In a real implementation, nodes would be colored by community');
+      const athletes = (networkData.nodes || []).filter(node => {
+        const nodeData = node.data || node;
+        return nodeData.label === 'Person' && nodeData.sport && nodeData.name;
+      });
+      
+      if (athletes.length === 0) {
+        alert('❌ No athletes with sports found in the network.');
+        return;
+      }
+      
+      const sportGroups = athletes.reduce((acc, athlete) => {
+        const sport = (athlete.data || athlete).sport;
+        if (!acc[sport]) {
+          acc[sport] = [];
         }
-      } else {
-        alert('❌ No communities detected in the current network.\n\n💡 This could mean:\n• The graph is too small\n• Nodes are not well connected\n• The Louvain algorithm couldn\'t find distinct communities');
+        acc[sport].push(athlete);
+        return acc;
+      }, {});
+      
+      const validSports = Object.entries(sportGroups).filter(([sport, athletes]) => athletes.length >= 2);
+      
+      if (validSports.length === 0) {
+        alert('❌ No sports with multiple athletes found.');
+        return;
       }
+      
+      const [selectedSport, sportAthletes] = validSports[Math.floor(Math.random() * validSports.length)];
+      
+      console.log(`🎯 Selected sport: ${selectedSport} with ${sportAthletes.length} athletes`);
+      
+      const athleteIds = new Set(sportAthletes.map(athlete => (athlete.data || athlete).id));
+      const relevantEdges = (networkData.edges || []).filter(edge => {
+        const edgeData = edge.data || edge;
+        return athleteIds.has(edgeData.source) && athleteIds.has(edgeData.target);
+      });
+      
+      const sportCommunityGraph = {
+        nodes: sportAthletes,
+        edges: relevantEdges
+      };
+      
+      console.log('Sport community graph created:', sportCommunityGraph);
+      
+      setGraphData(sportCommunityGraph);
+      setAllNodes(sportAthletes);
+      setError(null);
+      
+      const athleteNames = sportAthletes.slice(0, 5).map(a => (a.data || a).name).join(', ');
+      const moreCount = sportAthletes.length > 5 ? ` and ${sportAthletes.length - 5} more` : '';
+      
+      alert(`Sport Community Detected!\n\n🏆 Sport: ${selectedSport}\n👥 Athletes: ${sportAthletes.length}\n🔗 Connections: ${relevantEdges.length}\n\n🏃‍♂️ Sample Athletes:\n${athleteNames}${moreCount}\n\n💡 Now showing all ${selectedSport} athletes and their connections!`);
+      
     } catch (err) {
-      console.error('❌ Community detection error:', err);
-      alert(`❌ Failed to detect communities: ${err.message}\n\n💡 Make sure your Neo4j database has the Graph Data Science library installed.`);
+      console.error('Sport community detection error:', err);
+      alert(`Failed to detect sport communities: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleLoadSimilar = async () => {
-    if (!userEmail) {
-      alert('❌ Please log in to explore your network connections.\n\nThis feature starts with your LIKED entities and expands outward.');
+    if (!user) {
+      alert('Please log in to explore your network connections.\n\nThis feature starts with your LIKED entities and expands outward.');
       return;
     }
 
@@ -813,115 +1002,31 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
       
       console.log('🔍 Step 1: Getting your liked entities...');
       
-      // Step 1: Get user's liked entities as starting points
-      const likedResponse = await fetch(`${apiBase}/api/graph/liked/${encodeURIComponent(userEmail)}?limit=50`);
+      const likedIdentifier = user.email || user.username;
+      const likedResponse = await fetch(`${apiBase}/api/graph/liked/${encodeURIComponent(likedIdentifier)}`, {
+        credentials: 'include'
+      });
       
       if (!likedResponse.ok) {
         throw new Error('Failed to get your liked entities. Make sure you have LIKES relationships in the database.');
       }
       
       const likedData = await likedResponse.json();
-      console.log('✅ Your liked entities:', likedData);
       
       if (!likedData.nodes || likedData.nodes.length === 0) {
         alert('❌ No liked entities found.\n\nTo use this feature:\n1. First like some people/organizations in your app\n2. This will create LIKES relationships in Neo4j\n3. Then this feature will show connections radiating out from your likes');
         return;
       }
       
-      console.log('🔍 Step 2: Getting the full network to calculate expansions...');
+      setGraphData(likedData);
+      setAllNodes(likedData.nodes);
+      setMode('similar');
       
-      // Step 2: Get the full network to calculate 1-2 hop expansions
-      const networkResponse = await fetch(`${apiBase}/api/graph?limit=500`);
-      
-      if (!networkResponse.ok) {
-        throw new Error('Failed to get network data for expansion calculation');
-      }
-      
-      const fullNetwork = await networkResponse.json();
-      console.log('✅ Full network loaded:', fullNetwork);
-      
-      // Step 3: Calculate 1-2 hop expansion from liked entities
-      const likedNodeIds = new Set(likedData.nodes.map(n => (n.data?.id || n.id)));
-      const expandedNodeIds = new Set(likedNodeIds);
-      const relevantEdges = [];
-      
-      console.log('🔍 Step 3: Calculating 1-2 hop expansions...');
-      console.log('Starting with liked node IDs:', Array.from(likedNodeIds));
-      
-      // Find 1-hop connections (directly connected to liked entities)
-      fullNetwork.edges?.forEach(edge => {
-        const edgeData = edge.data || edge;
-        const sourceId = edgeData.source;
-        const targetId = edgeData.target;
-        
-        if (likedNodeIds.has(sourceId) || likedNodeIds.has(targetId)) {
-          expandedNodeIds.add(sourceId);
-          expandedNodeIds.add(targetId);
-          relevantEdges.push(edge);
-        }
-      });
-      
-      const oneHopIds = new Set(expandedNodeIds);
-      console.log('After 1-hop expansion:', Array.from(oneHopIds));
-      
-      // Find 2-hop connections (connected to 1-hop nodes)
-      fullNetwork.edges?.forEach(edge => {
-        const edgeData = edge.data || edge;
-        const sourceId = edgeData.source;
-        const targetId = edgeData.target;
-        
-        if (oneHopIds.has(sourceId) || oneHopIds.has(targetId)) {
-          expandedNodeIds.add(sourceId);
-          expandedNodeIds.add(targetId);
-          relevantEdges.push(edge);
-        }
-      });
-      
-      console.log('After 2-hop expansion:', Array.from(expandedNodeIds));
-      
-      // Step 4: Build the subgraph with expanded nodes
-      const expandedNodes = fullNetwork.nodes?.filter(node => {
-        const nodeId = node.data?.id || node.id;
-        return expandedNodeIds.has(nodeId);
-      }) || [];
-      
-      // Remove duplicate edges
-      const uniqueEdges = relevantEdges.filter((edge, index, self) => 
-        index === self.findIndex(e => 
-          (e.data?.id || e.id) === (edge.data?.id || edge.id)
-        )
-      );
-      
-      const expandedGraph = {
-        nodes: expandedNodes,
-        edges: uniqueEdges
-      };
-      
-      console.log('✅ Expanded graph calculated:', expandedGraph);
-      
-      // Step 5: Update the visualization
-      if (expandedNodes.length > 0) {
-        setAllNodes(expandedNodes);
-        setAthletes(expandedNodes);
-        setGraphData(expandedGraph);
-        drawGraph(expandedGraph);
-        setError(null);
-        
-        // Switch to similar mode to show the results
-        setMode('similar');
-        
-        const likedCount = likedData.nodes.length;
-        const totalNodes = expandedNodes.length;
-        const totalEdges = uniqueEdges.length;
-        
-        alert(`🎯 Network Expansion Complete!\n\n📊 Results:\n• Started with ${likedCount} entities you liked\n• Expanded to ${totalNodes} connected entities\n• Found ${totalEdges} relationships\n\n💡 This shows your personal network:\n• Green nodes: Your direct likes\n• Blue nodes: 1-hop connections\n• Gray nodes: 2-hop connections\n\n🖱️ Click any node to further expand from that point!`);
-      } else {
-        alert('❌ No expanded network found.\n\nThis could mean your liked entities are isolated or the network data is incomplete.');
-      }
+      alert(`🎯 Network Exploration Started!\n\n📊 Results:\n• Found ${likedData.nodes.length} entities you liked\n• Showing your personal network\n\n🖱️ Click any node to explore connections!`);
       
     } catch (err) {
-      console.error('❌ Network expansion error:', err);
-      alert(`❌ Failed to expand your network: ${err.message}\n\n💡 Make sure:\n• You have liked some entities\n• The database has sufficient connections\n• Your LIKES relationships exist in Neo4j`);
+      console.error('Network expansion error:', err);
+      alert(`Failed to expand your network: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -1014,7 +1119,6 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
   const handleNodeClick = (node, position) => {
     const nodeData = node || {};
     
-    // Show popup for all modes
     setPopupData({
       name: nodeData.label || nodeData.name,
       sport: nodeData.sport,
@@ -1023,97 +1127,6 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
       image: nodeData.image || nodeData.profileImage
     });
     setPopupPosition(position);
-    
-    // In similar mode, also expand the network from this node
-    if (mode === 'similar' && userEmail) {
-      expandFromNode(nodeData);
-    }
-  };
-
-  const expandFromNode = async (nodeData) => {
-    try {
-      console.log('🔍 Expanding network from node:', nodeData);
-      const apiBase = process.env.REACT_APP_API_BASE || '';
-      
-      // Get the full network to calculate expansion
-      const networkResponse = await fetch(`${apiBase}/api/graph?limit=500`);
-      if (!networkResponse.ok) return;
-      
-      const fullNetwork = await networkResponse.json();
-      const clickedNodeId = nodeData.id;
-      
-      // Get current nodes in view
-      const currentNodeIds = new Set(graphData.nodes?.map(n => (n.data?.id || n.id)) || []);
-      
-      // Find 1-2 hop connections from the clicked node
-      const expandedNodeIds = new Set([clickedNodeId]);
-      const newEdges = [];
-      
-      // 1-hop expansion
-      fullNetwork.edges?.forEach(edge => {
-        const edgeData = edge.data || edge;
-        const sourceId = edgeData.source;
-        const targetId = edgeData.target;
-        
-        if (sourceId === clickedNodeId || targetId === clickedNodeId) {
-          expandedNodeIds.add(sourceId);
-          expandedNodeIds.add(targetId);
-          newEdges.push(edge);
-        }
-      });
-      
-      const oneHopIds = new Set(expandedNodeIds);
-      
-      // 2-hop expansion
-      fullNetwork.edges?.forEach(edge => {
-        const edgeData = edge.data || edge;
-        const sourceId = edgeData.source;
-        const targetId = edgeData.target;
-        
-        if (oneHopIds.has(sourceId) || oneHopIds.has(targetId)) {
-          expandedNodeIds.add(sourceId);
-          expandedNodeIds.add(targetId);
-          newEdges.push(edge);
-        }
-      });
-      
-      // Combine with existing nodes
-      const allNodeIds = new Set([...currentNodeIds, ...expandedNodeIds]);
-      
-      // Build expanded graph
-      const expandedNodes = fullNetwork.nodes?.filter(node => {
-        const nodeId = node.data?.id || node.id;
-        return allNodeIds.has(nodeId);
-      }) || [];
-      
-      const allEdges = [...(graphData.edges || []), ...newEdges];
-      const uniqueEdges = allEdges.filter((edge, index, self) => 
-        index === self.findIndex(e => 
-          (e.data?.id || e.id) === (edge.data?.id || edge.id)
-        )
-      );
-      
-      const expandedGraph = {
-        nodes: expandedNodes,
-        edges: uniqueEdges
-      };
-      
-      console.log('✅ Expanded from node:', expandedGraph);
-      
-      // Update the view
-      setAllNodes(expandedNodes);
-      setAthletes(expandedNodes);
-      setGraphData(expandedGraph);
-      drawGraph(expandedGraph);
-      
-      const newNodesCount = expandedNodes.length - (graphData.nodes?.length || 0);
-      if (newNodesCount > 0) {
-        console.log(`🎯 Added ${newNodesCount} new nodes to the network`);
-      }
-      
-    } catch (err) {
-      console.error('❌ Error expanding from node:', err);
-    }
   };
 
   const handleNodeHover = (node, position) => {
@@ -1132,6 +1145,12 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
     setHoverPosition(null);
   };
 
+  useEffect(() => {
+    if (mode === 'dynamic') {
+      setSearchPanelVisible(true);
+    }
+  }, [mode]);
+
   return (
     <div className="network-dashboard" data-mode={mode}>
       {/* Header */}
@@ -1141,74 +1160,10 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
             <h1>Athletic Network Explorer</h1>
             <p>
               Discover connections in the world of sports
-              {userEmail ? (
-                <span> • ✅ Logged in as <strong>{userEmail}</strong> 
-                  <button 
-                    onClick={() => {
-                      if (confirm('Change user email?')) {
-                        const email = prompt('Enter your email:', userEmail);
-                        if (email && email.includes('@')) {
-                          setUserEmail(email);
-                          localStorage.setItem('userEmail', email);
-                        }
-                      }
-                    }}
-                    style={{
-                      marginLeft: '8px',
-                      padding: '2px 6px',
-                      fontSize: '10px',
-                      backgroundColor: '#797ca0',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    change
-                  </button>
-                </span>
+              {user ? (
+                <span> • Logged in as <strong>{user.username || user.email}</strong></span>
               ) : (
-                <span> • <span style={{color: '#c62828', fontWeight: 'bold'}}>❌ Not logged in</span> 
-                  <button 
-                    onClick={() => {
-                      const email = prompt('Please enter your email to access personal features:');
-                      if (email && email.includes('@')) {
-                        setUserEmail(email);
-                        localStorage.setItem('userEmail', email);
-                        console.log('✅ Manually set user email:', email);
-                      }
-                    }}
-                    style={{
-                      marginLeft: '8px',
-                      padding: '4px 12px',
-                      fontSize: '12px',
-                      backgroundColor: '#575a7b',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    Login Here
-                  </button>
-                  <button 
-                    onClick={debugAuth}
-                    style={{
-                      marginLeft: '4px',
-                      padding: '4px 8px',
-                      fontSize: '10px',
-                      backgroundColor: '#797ca0',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer'
-                    }}
-                    title="Debug authentication storage"
-                  >
-                    🔍 debug
-                  </button>
-                </span>
+                <span> </span>
               )}
             </p>
           </div>
@@ -1219,7 +1174,7 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
       </header>
 
       {/* Mode Selector */}
-      <ModeSelector currentMode={mode} onModeChange={setMode} userEmail={userEmail} />
+      <ModeSelector currentMode={mode} onModeChange={setMode} user={user} />
 
       {/* Main Content */}
       <div className="network-main-content">
@@ -1245,6 +1200,7 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
           mode={mode}
           data={graphData}
           loading={loading}
+          addedNodes={addedNodes}
           onNodeClick={handleNodeClick}
           onNodeHover={handleNodeHover}
           onNodeLeave={handleNodeLeave}
@@ -1256,6 +1212,7 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
           setSearchTerm={setSearchTerm}
           athletes={athletes}
           onAddAthlete={handleAddAthlete}
+          onSearch={handleSearch}
           isVisible={searchPanelVisible}
           onToggle={() => setSearchPanelVisible(!searchPanelVisible)}
           mode={mode}
@@ -1263,12 +1220,13 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
 
         {/* Control Panel */}
         <ControlPanel
+          onPageRank={handlePageRank}
           onCommunities={handleCommunities}
           onExport={handleExport}
           onLoadSimilar={handleLoadSimilar}
           isOpen={controlPanelOpen}
           setIsOpen={setControlPanelOpen}
-          userEmail={userEmail}
+          user={user}
         />
 
         {/* Zoom Controls */}
@@ -1298,6 +1256,7 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), container
         {/* Instructions */}
         <div className="network-instructions">
           <p>
+            {mode === 'dynamic' && "🔍 Use the search panel to add athletes and view their connections"}
             {mode === 'general' && "Click on nodes to explore connections"}
             {mode === 'liked' && "Your liked people and organizations"}
             {mode === 'friends' && "Your friends network"}

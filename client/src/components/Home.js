@@ -5,12 +5,15 @@ import cytoscape from 'cytoscape';
 import logo from '../assets/logo-default-profile.png';
 import EditProfileForm from './EditProfileForm';
 import '../style.css';
+import Search from './Search';
 
 import coseBilkent from 'cytoscape-cose-bilkent';
 
 cytoscape.use(coseBilkent);
 
+const BASE_URL = process.env.BASE_URL;
 const API_BASE = process.env.API_BASE;
+
 
 function getPlaceholderIcon(nodeType) {
   const iconUrl = 'https://img.icons8.com/color/150/';
@@ -180,6 +183,16 @@ function HomePage({ handleLogout, user, setUser }) {
     setSelectedNode(null);
   };
 
+  const handleDashboardClick = () => {
+    const baseUrl = process.env.BASE_URL;
+    if (baseUrl) {
+      const fullUrl = `${BASE_URL}/dashboard`;
+      window.location.href = fullUrl;
+    } else {
+      console.error("BASE_URL is not defined in the environment.");
+    }
+  };
+
   const handleFeelingSporty = () => {
     fetch(`${API_BASE}/api/athletes?random=true&athleteCount=1`)
       .then(res => res.json())
@@ -236,19 +249,19 @@ function HomePage({ handleLogout, user, setUser }) {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (res.status === 401) {
         alert('Your session has expired. Please log in again.');
         navigate('/login');
         return;
       }
-      
+
       if (!res.ok) {
         const errorText = await res.text();
         console.error('Search error:', res.status, errorText);
         throw new Error(`Search failed: ${res.status}`);
       }
-      
+
       const data = await res.json();
       setSearchResults(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -354,27 +367,27 @@ function HomePage({ handleLogout, user, setUser }) {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (res.status === 401) {
         console.error('Authentication failed - redirecting to login');
         const sessionValid = await checkSession();
         if (!sessionValid) return;
       }
-      
+
       if (!res.ok) {
         const errorText = await res.text();
         console.error('Search API Error:', res.status, errorText);
-        
+
         if (res.status === 404) {
           console.log('Search endpoint not found, falling back to suggested friends');
           handleExplore('Friends');
           alert('Search feature is not available. Showing suggested friends instead.');
           return;
         }
-        
+
         throw new Error(`Search failed: ${res.status} - ${errorText}`);
       }
-      
+
       const searchResults = await res.json();
       console.log('Friend search results:', searchResults);
 
@@ -419,7 +432,7 @@ function HomePage({ handleLogout, user, setUser }) {
       console.log(`Friend search: ${nodes.length} users found`);
     } catch (err) {
       console.error('Friend search error:', err);
-      
+
       if (err.message.includes('401')) {
         alert('Authentication failed. Please log in again.');
         navigate('/login');
@@ -429,7 +442,7 @@ function HomePage({ handleLogout, user, setUser }) {
       } else {
         alert('Search failed. Please check your connection and try again.');
       }
-      
+
       // Show error state in graph
       setCenterGraphData({
         nodes: [{
@@ -828,8 +841,8 @@ function HomePage({ handleLogout, user, setUser }) {
       try {
         console.log('🤝 Loading Friend Suggestions...');
 
-        const res = await fetch(`${API_BASE}/api/users/top`, { 
-          credentials: 'include' 
+        const res = await fetch(`${API_BASE}/api/users/top`, {
+          credentials: 'include'
         });
 
         if (!res.ok) {
@@ -837,9 +850,9 @@ function HomePage({ handleLogout, user, setUser }) {
           const generalRes = await fetch(`${API_BASE}/api/graph?limit=100`, {
             credentials: 'include'
           });
-          
+
           if (!generalRes.ok) throw new Error(`Failed: ${generalRes.status}`);
-          
+
           const generalData = await generalRes.json();
 
           // Filter for Person nodes with roles = user (potential friends)
@@ -907,10 +920,10 @@ function HomePage({ handleLogout, user, setUser }) {
           const nodeData = node.data || node;
           const roles = nodeData.roles;
           const label = nodeData.label || '';
-          
-          return label === 'Organisation' && 
-                 (roles === 'sponsor' || 
-                  (Array.isArray(roles) && roles.includes('sponsor')));
+
+          return label === 'Organisation' &&
+            (roles === 'sponsor' ||
+              (Array.isArray(roles) && roles.includes('sponsor')));
         });
 
         console.log(`💼 Found ${sponsorNodes.length} sponsor organizations`);
@@ -1345,12 +1358,13 @@ function HomePage({ handleLogout, user, setUser }) {
             </ul>
           </div>
 
-          {/* ── News Section ───────────────────────────────────────────────────── */}
+          {/* ── Dashboard Section ───────────────────────────────────────────────────── */}
           <div className="mb-4">
-            <h5 className="text-navy">News</h5>
+            <h5 className="text-navy">Dashboard</h5>
             <ul className="list-unstyled">
-              <li className="menu-item">My News</li>
-            </ul>
+              <li className="menu-item" onClick={handleDashboardClick}>
+                My Dashboard
+              </li>            </ul>
             <div style={{ textAlign: "center", marginTop: "20px" }}>
               <button
                 onClick={handleLogout}
@@ -1789,7 +1803,7 @@ function HomePage({ handleLogout, user, setUser }) {
                         {selectedPerson.location}
                       </p>
                     )}
-                    
+
                     {/* Debug info */}
                     <div style={{ fontSize: '10px', color: '#ccc', marginBottom: '8px' }}>
                       Debug: email={selectedPerson.email || 'none'}, username={selectedPerson.username || 'none'}

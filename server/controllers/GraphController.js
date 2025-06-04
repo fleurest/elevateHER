@@ -1,4 +1,3 @@
-// server/controllers/GraphController.js
 const GraphService = require('../services/GraphService');
 const Graph = require('../models/Graph');
 const { driver } = require('../neo4j');
@@ -13,6 +12,8 @@ class GraphController {
         this.getParticipationGraph = this.getParticipationGraph.bind(this);
         this.getLikedByEmail = this.getLikedByEmail.bind(this);
         this.getLikedSummary = this.getLikedSummary.bind(this);
+        this.getPageRank = this.getPageRank.bind(this);
+        this.calculatePageRank = this.calculatePageRank.bind(this);
     }
 }
 
@@ -72,6 +73,89 @@ async function getCommunities(req, res, next) {
     }
 };
 
+/**
+ * GET /api/graph/pagerank - Get PageRank scores
+ * Query parameters:
+ * - limit: Maximum number of results (default: 20)
+ * - threshold: Minimum PageRank score threshold (default: 0.0)
+ */
+async function getPageRank(req, res) {
+    try {
+        const { limit = 20, threshold = 0.0 } = req.query;
+        
+        const pageRankData = await graphService.getPageRankScores({
+            limit: parseInt(limit),
+            threshold: parseFloat(threshold)
+        });
+        
+        if (pageRankData.length === 0) {
+            return res.status(404).json({ 
+                error: 'No PageRank scores found',
+                message: 'PageRank may not have been calculated yet. Try POST /api/graph/pagerank to calculate scores first.'
+            });
+        }
+        
+        res.json(pageRankData);
+    } catch (error) {
+        console.error('PageRank retrieval error:', error);
+        res.status(500).json({ 
+            error: 'Failed to get PageRank scores',
+            message: error.message 
+        });
+    }
+}
+
+/**
+ * POST /api/graph/pagerank - Calculate and store PageRank scores
+ * Body parameters:
+ * - maxIterations: Maximum iterations for calculation (default: 20)
+ * - dampingFactor: Damping factor for PageRank (default: 0.85)
+ * - tolerance: Convergence tolerance (default: 0.0001)
+ * - writeProperty: Property name to store results (default: 'pagerank')
+ */
+async function calculatePageRank(req, res) {
+    try {
+        const { 
+            maxIterations = 20, 
+            dampingFactor = 0.85,
+            tolerance = 0.0001,
+            writeProperty = 'pagerank'
+        } = req.body;
+        
+        console.log('Calculating PageRank with parameters:', { maxIterations, dampingFactor, tolerance, writeProperty });
+        
+        const result = await graphService.calculatePageRank({
+            maxIterations: parseInt(maxIterations),
+            dampingFactor: parseFloat(dampingFactor),
+            tolerance: parseFloat(tolerance),
+            writeProperty
+        });
+        
+        console.log('PageRank calculation completed:', result);
+        
+        res.json({
+            success: true,
+            message: 'PageRank calculation completed successfully',
+            ...result
+        });
+    } catch (error) {
+        console.error('PageRank calculation error:', error);
+        
+        let errorMessage = error.message;
+        if (error.message.includes('Graph does not exist')) {
+            errorMessage = 'Graph projection not found. The system will attempt to create it automatically.';
+        } else if (error.message.includes('gds.pageRank')) {
+            errorMessage = 'Neo4j Graph Data Science library not available. Please ensure GDS is installed and enabled.';
+        }
+        
+        res.status(500).json({ 
+            error: 'Failed to calculate PageRank',
+            message: errorMessage,
+            details: error.message
+        });
+    }
+}
+
 // GET /graph/export
 async function exportEdges(req, res, next) {
     try {
@@ -96,15 +180,22 @@ async function getParticipationGraph(req, res, next) {
             const m = record.get('m');
             const rel = record.get('r');
 
-            const mapNode = node => ({
-                data: {
-                    id: node.identity.toString(),
-                    label: node.properties.name || node.labels[0],
-                    image: node.properties.profileImage || './images/logo-default-profile.png',
-                    type: node.labels[0]?.toLowerCase() || 'unknown',
-                    ...node.properties
-                }
-            });
+            const mapNode = node => {
+                const name = node.properties.name;
+                const profileImage = node.properties.profileImage;
+                
+                return {
+                    data: {
+                        id: node.identity.toString(),
+                        label: name || node.labels[0],
+                        name: name,
+                        image: profileImage || graphService.getWikipediaImageUrl(name) || './images/logo-default-profile.png',
+                        profileImage: profileImage || graphService.getWikipediaImageUrl(name),
+                        type: node.labels[0]?.toLowerCase() || 'unknown',
+                        ...node.properties
+                    }
+                };
+            };
 
             if (!nodesMap.has(n.identity.toString())) nodesMap.set(n.identity.toString(), mapNode(n));
             if (!nodesMap.has(m.identity.toString())) nodesMap.set(m.identity.toString(), mapNode(m));
@@ -232,6 +323,7 @@ async function getFriendsByEmail(req, res, next) {
     }
 }
 
+
 module.exports = {
     getGraph,
     postEmbeddings,
@@ -242,5 +334,7 @@ module.exports = {
     getParticipationGraph,
     getLikedByEmail,
     getLikedSummary,
-    getFriendsByEmail
+    getFriendsByEmail,
+    getPageRank,
+    calculatePageRank
 };

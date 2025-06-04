@@ -1,7 +1,14 @@
 const router = require('express').Router();
 const { isAuthenticated } = require('../../../authentication');
-const { getCalendarEvents, listPastEvents, listUpcomingEvents } = require('../../../services/EventCalService');
+const { getCalendarEvents } = require('../../../services/EventCalService');
+const { listPastEvents } = require('../../../services/EventService');
 const axios = require('axios');
+const neo4j = require('neo4j-driver');
+
+const driver = neo4j.driver(
+  process.env.NEO4J_URI,
+  neo4j.auth.basic(process.env.NEO4J_USER, process.env.NEO4J_PASSWORD)
+);
 
 const calendarId = process.env.GOOGLE_CALENDAR_ID;
 const apiKey    = process.env.GOOGLE_API_KEY;
@@ -39,7 +46,7 @@ router.post('/', async (req, res) => {
       name,
       sport: sport || null,
       location: location || null,
-      roles: roles || null, // Changed: no default value, can be null
+      roles: roles || null,
       year: year || null,
       sameAs: sameAs || null
     });
@@ -74,7 +81,7 @@ router.post('/:eventId/sport', async (req, res) => {
       MATCH (e:Event {uuid: $eventId})
       MERGE (s:Sport {name: $sportName})
       ON CREATE SET s.label = 'Sport', s.createdAt = datetime()
-      MERGE (e)-[:PART_OF_SPORT]->(s)
+      MERGE (e)-[:PARTICIPATES_IN]->(s)
       RETURN e, s
     `;
 
@@ -135,16 +142,37 @@ router.get('/list', async (req, res) => {
   }
 });
 
+// GET PAST EVENTS USING EVENT SERVICE
 router.get('/past-events', async (req, res) => {
+  const session = driver.session();
   try {
-    const events = await listPastEvents();
+    const eventProperties = await listPastEvents(session);
+    
+    const events = eventProperties.map(eventProps => {
+      return {
+        id: eventProps.uuid || Math.random().toString(36),
+        title: eventProps.name,
+        summary: eventProps.name,
+        location: eventProps.location,
+        roles: eventProps.roles,
+        year: eventProps.year,
+        eventType: eventProps.eventType,
+        description: `${eventProps.eventType || 'Event'} - ${eventProps.year || 'Year not specified'}`,
+
+        date: eventProps.year ? `${eventProps.year}-01-01` : null,
+        start: eventProps.year ? `${eventProps.year}-01-01` : null
+      };
+    });
+
     res.json(events);
+
   } catch (err) {
     console.error('Failed to fetch past events:', err);
     res.status(500).json({ error: 'Past event fetch error' });
+  } finally {
+    await session.close();
   }
 });
-
 
 //events calendar
 router.get('/calendar-events', async (req, res) => {
@@ -157,9 +185,12 @@ router.get('/calendar-events', async (req, res) => {
       const response = await axios.get(url);
   
       const events = response.data.items.map(event => ({
+        id: event.id,
         summary: event.summary,
         start: event.start.dateTime || event.start.date,
         end: event.end.dateTime || event.end.date,
+        location: event.location,
+        description: event.description
       }));
   
       res.json(events);

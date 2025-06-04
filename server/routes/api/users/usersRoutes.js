@@ -53,15 +53,6 @@ router.post(
 );
 
 
-//     res.status(201).json({ message: 'User registered successfully' });
-//   } catch (err) {
-//     console.error('Registration error:', err);
-//     res.status(500).json({ error: 'Registration failed' });
-//   } finally {
-//     if (session) await session.close();
-//   }
-// });
-
 router.delete('/uuid/:uuid', isAdmin, async (req, res) => {
   const { uuid } = req.params;
   const session = driver.session();

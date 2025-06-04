@@ -5,7 +5,6 @@ import cytoscape from 'cytoscape';
 import logo from '../assets/logo-default-profile.png';
 import EditProfileForm from './EditProfileForm';
 import '../style.css';
-import 'bootstrap/dist/css/bootstrap.min.css';
 
 import coseBilkent from 'cytoscape-cose-bilkent';
 
@@ -54,7 +53,7 @@ function HomePage({ handleLogout, user, setUser }) {
   const [graphData, setGraphData] = useState(null);
   const [centerGraphData, setCenterGraphData] = useState(null);
 
-  // activeView: 'profile' | 'players' | 'friends' | 'verify' | 'explore'
+  // activeView: 'profile' | 'players' | 'friends' | 'verify' | 'explore' | 'spotlightPlayer' | 'viewingLikedPlayers'
   const [activeView, setActiveView] = useState('profile');
 
   // If editing profile, show EditProfileForm in right column
@@ -87,7 +86,7 @@ function HomePage({ handleLogout, user, setUser }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
-  // Right panel view state: 'default' | 'nodeDetails' | 'personDetails' | 'friendSearch'
+  // Right panel view state: 'default' | 'nodeDetails' | 'personDetails' | 'friendSearch' | 'userProfile'
   const [rightPanelView, setRightPanelView] = useState('default');
   const [spotlightAthlete, setSpotlightAthlete] = useState(null);
   const [likeMessage, setLikeMessage] = useState('');
@@ -192,7 +191,6 @@ function HomePage({ handleLogout, user, setUser }) {
       });
   };
 
-
   const handleLikePlayer = async (username) => {
     try {
       const res = await fetch(`${API_BASE}/api/users/likes`, {
@@ -222,17 +220,41 @@ function HomePage({ handleLogout, user, setUser }) {
     }
   };
 
-
-
   const handleSearch = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/users/search?query=${encodeURIComponent(searchQuery)}`,
-        { credentials: 'include' }
-      );
+      // Check authentication first
+      if (!user || !user.username) {
+        alert('Please log in to search for users');
+        navigate('/login');
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/api/users/search?query=${encodeURIComponent(searchQuery)}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (res.status === 401) {
+        alert('Your session has expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Search error:', res.status, errorText);
+        throw new Error(`Search failed: ${res.status}`);
+      }
+      
       const data = await res.json();
-      setSearchResults(data);
+      setSearchResults(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Search error:', err);
+      alert('Search failed. Please try again.');
+      setSearchResults([]);
     }
   };
 
@@ -291,6 +313,335 @@ function HomePage({ handleLogout, user, setUser }) {
     }
   };
 
+  const checkSession = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/session`, { credentials: 'include' });
+      if (!res.ok) {
+        console.log('Session invalid, redirecting to login');
+        navigate('/login');
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Session check failed:', err);
+      navigate('/login');
+      return false;
+    }
+  };
+
+  // Add friend search functionality for Friends explore
+  const handleFriendDiscoverySearch = async (query) => {
+    setLoading(true);
+    try {
+      console.log('🔍 Searching for friends:', query);
+
+      if (!user || !user.username) {
+        console.error('User not authenticated');
+        alert('Please log in again to search for friends');
+        navigate('/login');
+        return;
+      }
+
+      if (!query || query.trim().length === 0) {
+        alert('Please enter a username to search');
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/api/users/search?query=${encodeURIComponent(query.trim())}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (res.status === 401) {
+        console.error('Authentication failed - redirecting to login');
+        const sessionValid = await checkSession();
+        if (!sessionValid) return;
+      }
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Search API Error:', res.status, errorText);
+        
+        if (res.status === 404) {
+          console.log('Search endpoint not found, falling back to suggested friends');
+          handleExplore('Friends');
+          alert('Search feature is not available. Showing suggested friends instead.');
+          return;
+        }
+        
+        throw new Error(`Search failed: ${res.status} - ${errorText}`);
+      }
+      
+      const searchResults = await res.json();
+      console.log('Friend search results:', searchResults);
+
+      // Handle empty results
+      if (!Array.isArray(searchResults) || searchResults.length === 0) {
+        console.log('No search results found');
+        setCenterGraphData({
+          nodes: [{
+            data: {
+              id: 'no-results',
+              label: 'No Results',
+              name: `No users found for "${query}"`,
+              type: 'placeholder'
+            }
+          }],
+          edges: []
+        });
+        return;
+      }
+
+      // Transform search results to cytoscape format
+      const nodes = searchResults.map((searchResult, index) => ({
+        data: {
+          id: searchResult.uuid || searchResult.username || searchResult.email || `search-${index}`,
+          label: 'Person',
+          name: searchResult.name || searchResult.username,
+          username: searchResult.username,
+          email: searchResult.email,
+          profileImage: searchResult.profileImage,
+          location: searchResult.location,
+          type: 'user',
+          roles: ['user'],
+          ...searchResult
+        }
+      }));
+
+      setCenterGraphData({
+        nodes: nodes,
+        edges: []
+      });
+
+      console.log(`Friend search: ${nodes.length} users found`);
+    } catch (err) {
+      console.error('Friend search error:', err);
+      
+      if (err.message.includes('401')) {
+        alert('Authentication failed. Please log in again.');
+        navigate('/login');
+      } else if (err.message.includes('404')) {
+        alert('Search service is not available. Showing suggested friends instead.');
+        handleExplore('Friends');
+      } else {
+        alert('Search failed. Please check your connection and try again.');
+      }
+      
+      // Show error state in graph
+      setCenterGraphData({
+        nodes: [{
+          data: {
+            id: 'search-error',
+            label: 'Search Error',
+            name: 'Search temporarily unavailable',
+            type: 'placeholder'
+          }
+        }],
+        edges: []
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add function to explore connections around a specific athlete
+  const handleExploreAthleteConnections = async (athlete) => {
+    try {
+      console.log('🔍 Exploring connections for:', athlete.name);
+      setLoading(true);
+
+      // Get 2-hop connections from the general graph and filter around the athlete
+      const res = await fetch(`${API_BASE}/api/graph?limit=150`, {
+        credentials: 'include'
+      });
+
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+
+      const data = await res.json();
+      console.log('📊 Graph data received, looking for athlete:', athlete.name);
+
+      // Find the athlete in the graph
+      const athleteNode = data.nodes.find(node => {
+        const nodeData = node.data || node;
+        return nodeData.name === athlete.name ||
+          nodeData.id === athlete.uuid ||
+          nodeData.label === athlete.name ||
+          (nodeData.name && athlete.name &&
+            nodeData.name.toLowerCase() === athlete.name.toLowerCase());
+      });
+
+      if (athleteNode) {
+        // Get all nodes connected to this athlete (1-hop)
+        const athleteId = (athleteNode.data || athleteNode).id;
+        const connectedEdges = data.edges.filter(edge => {
+          const edgeData = edge.data || edge;
+          return edgeData.source === athleteId || edgeData.target === athleteId;
+        });
+
+        // Get all connected node IDs (1-hop)
+        const connectedNodeIds = new Set([athleteId]);
+        connectedEdges.forEach(edge => {
+          const edgeData = edge.data || edge;
+          connectedNodeIds.add(edgeData.source);
+          connectedNodeIds.add(edgeData.target);
+        });
+
+        // Now get 2-hop: find nodes connected to the 1-hop nodes
+        const twoHopEdges = data.edges.filter(edge => {
+          const edgeData = edge.data || edge;
+          return connectedNodeIds.has(edgeData.source) || connectedNodeIds.has(edgeData.target);
+        });
+
+        // Collect all relevant node IDs (1-hop + 2-hop)
+        const allRelevantNodeIds = new Set(connectedNodeIds);
+        twoHopEdges.forEach(edge => {
+          const edgeData = edge.data || edge;
+          allRelevantNodeIds.add(edgeData.source);
+          allRelevantNodeIds.add(edgeData.target);
+        });
+
+        // Filter nodes to include
+        const relevantNodes = data.nodes.filter(node => {
+          const nodeData = node.data || node;
+          return allRelevantNodeIds.has(nodeData.id);
+        });
+
+        setCenterGraphData({
+          nodes: relevantNodes,
+          edges: twoHopEdges
+        });
+
+        console.log(`Player network: ${relevantNodes.length} nodes, ${twoHopEdges.length} edges`);
+      } else {
+        console.log('Athlete not found in graph, showing original athlete only');
+        setCenterGraphData({
+          nodes: [{
+            data: {
+              id: athlete.uuid || 'selected-athlete',
+              label: athlete.name,
+              name: athlete.name,
+              sport: athlete.sport,
+              nationality: athlete.nationality,
+              type: 'athlete',
+              profileImage: athlete.profileImage,
+              roles: ['athlete']
+            }
+          }],
+          edges: []
+        });
+      }
+
+    } catch (error) {
+      console.error('Error exploring athlete connections:', error);
+      alert('Could not load athlete connections');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNewRandomPlayerForExplore = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/athletes?random=true&athleteCount=1`);
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setSpotlightAthlete(data[0]);
+
+        setTimeout(() => handleExplore('Player'), 300);
+      }
+    } catch (err) {
+      console.error('Error getting new random athlete:', err);
+    }
+  };
+
+  const handleViewLikedPlayers = async (userEmail) => {
+    try {
+      console.log('👀 Loading liked players for:', userEmail);
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!userEmail || !emailRegex.test(userEmail)) {
+        console.error('Invalid email format:', userEmail);
+        alert('Cannot load liked players - invalid email format');
+        return;
+      }
+
+      const res = await fetch(
+        `${API_BASE}/api/graph/liked/${encodeURIComponent(userEmail)}`,
+        { credentials: 'include' }
+      );
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('API Error:', res.status, errorText);
+        throw new Error(`Error ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
+      console.log('Liked players response:', data);
+
+      // Transform the response to cytoscape format if needed
+      if (data.nodes && data.edges) {
+        setActiveView('viewingLikedPlayers');
+        setCenterGraphData(data);
+      } else {
+        const nodesMap = new Map();
+        const edges = [];
+
+        data.forEach(record => {
+          const user = record.user;
+          const target = record.target;
+          const relationship = record.r;
+
+          const mapNode = (node, labels) => ({
+            data: {
+              id: node.identity?.toString() || node.uuid || node.email,
+              label: labels ? labels[0] : (node.roles ? node.roles[0] : 'Person'),
+              name: node.name || node.username,
+              username: node.username,
+              email: node.email,
+              profileImage: node.profileImage,
+              sport: node.sport,
+              nationality: node.nationality,
+              type: labels ? labels[0].toLowerCase() : 'person',
+              roles: node.roles || [],
+              ...node
+            }
+          });
+
+          const userId = user.identity?.toString() || user.uuid || user.email;
+          const targetId = target.identity?.toString() || target.uuid || target.email;
+
+          if (!nodesMap.has(userId)) nodesMap.set(userId, mapNode(user));
+          if (!nodesMap.has(targetId)) nodesMap.set(targetId, mapNode(target, record.targetLabels));
+
+          edges.push({
+            data: {
+              id: relationship.identity?.toString() || `${userId}-${targetId}`,
+              source: userId,
+              target: targetId,
+              label: 'LIKES',
+              type: 'LIKES'
+            }
+          });
+        });
+
+        setActiveView('viewingLikedPlayers');
+        setCenterGraphData({
+          nodes: Array.from(nodesMap.values()),
+          edges: edges
+        });
+      }
+
+      setRightPanelView('default');
+
+    } catch (err) {
+      console.error('Error fetching liked players:', err);
+      alert('Could not load their liked players');
+    }
+  };
+
   // ─── Left‐Menu Handlers ───────────────────────────────────────────────────────
 
   const handleMyProfile = () => {
@@ -312,8 +663,15 @@ function HomePage({ handleLogout, user, setUser }) {
     setSelectedPerson(null);
 
     try {
-      const encodedIdentifier = encodeURIComponent(user.username);
-      console.log('Original user.username:', user.username);
+      // Use email if available, fallback to username
+      const identifier = user.email || user.username;
+
+      if (!identifier) {
+        throw new Error('No user identifier available');
+      }
+
+      const encodedIdentifier = encodeURIComponent(identifier);
+      console.log('Using identifier:', identifier);
       console.log('Encoded identifier:', encodedIdentifier);
       console.log('Full URL:', `${API_BASE}/api/graph/liked/${encodedIdentifier}`);
 
@@ -371,7 +729,6 @@ function HomePage({ handleLogout, user, setUser }) {
     setSelectedPerson(null);
   };
 
-
   const handleExplore = async (category) => {
     setActiveView('explore');
     setEditProfile(false);
@@ -380,114 +737,61 @@ function HomePage({ handleLogout, user, setUser }) {
     setSelectedNode(null);
     setSelectedPerson(null);
 
+    if (category !== 'Friends') {
+      setSearchQuery('');
+    }
+
     console.log(`🔍 Exploring: ${category}`);
 
     if (category === 'Player') {
       try {
-        const res = await fetch(
-          `${API_BASE}/api/athletes?random=true&athleteCount=1`,
-          { credentials: 'include' }
-        );
+        console.log('🏃‍♂️ Loading Player explore with 15 athletes...');
 
-        if (!res.ok) throw new Error(`Failed: ${res.status}`);
-
-        const athletes = await res.json();
-
-        if (athletes && athletes.length > 0) {
-          const athlete = athletes[0];
-          console.log('🏃‍♂️ Found athlete:', athlete);
-
-          const playerData = {
-            nodes: [{
-              data: {
-                id: athlete.uuid || 'athlete-1',
-                label: athlete.name || 'Unknown Athlete',
-                name: athlete.name,
-                sport: athlete.sport,
-                nationality: athlete.nationality,
-                type: 'athlete',
-                profileImage: athlete.profileImage,
-                roles: athlete.roles
-              }
-            }],
-            edges: []
-          };
-
-          setCenterGraphData(playerData);
-
-          setSelectedPerson({
-            name: athlete.name,
-            sport: athlete.sport,
-            nationality: athlete.nationality,
-            profileImage: athlete.profileImage
-          });
-          setRightPanelView('personDetails');
-
-          console.log('✅ Player data set');
-        }
-
-      } catch (error) {
-        console.error('Player error:', error);
-        setCenterGraphData(null);
-      }
-
-    } else if (category === 'Friends') {
-      try {
-        // Friends explore
-        console.log('🤝 Loading friends...');
-
-        // Get general graph data
-        const res = await fetch(`${API_BASE}/api/graph?limit=50`, {
+        // Fetch 15 random athletes as starting point
+        const res = await fetch(`${API_BASE}/api/athletes?random=true&athleteCount=15`, {
           credentials: 'include'
         });
 
         if (!res.ok) throw new Error(`Failed: ${res.status}`);
 
-        const data = await res.json();
-        console.log('📊 Graph data received:', data);
+        const athletesData = await res.json();
+        console.log('📊 Athletes data received:', athletesData);
 
-        // Filter for person/user nodes
-        const peopleNodes = (data.nodes || []).filter(node => {
-          const nodeData = node.data || node;
-          const label = nodeData.label || '';
-          const type = nodeData.type || '';
-          const roles = nodeData.roles || [];
+        if (Array.isArray(athletesData) && athletesData.length > 0) {
+          // Transform athletes to cytoscape format
+          const athleteNodes = athletesData.map((athlete, index) => ({
+            data: {
+              id: athlete.uuid || `athlete-${index}`,
+              label: athlete.name,
+              name: athlete.name,
+              sport: athlete.sport,
+              nationality: athlete.nationality,
+              type: 'athlete',
+              profileImage: athlete.profileImage,
+              roles: ['athlete'],
+              username: athlete.username,
+              email: athlete.email,
+              description: athlete.description,
+              gender: athlete.gender,
+              ...athlete
+            }
+          }));
 
-          return (
-            label === 'Person' ||
-            type === 'user' ||
-            type === 'person' ||
-            roles.includes('user') ||
-            label.includes('@')
-          );
-        });
-
-        console.log(`👥 Found ${peopleNodes.length} people nodes`);
-
-        if (peopleNodes.length > 0) {
-          // Get connections between people
-          const nodeIds = new Set(peopleNodes.map(n => (n.data || n).id));
-          const peopleEdges = (data.edges || []).filter(edge => {
-            const edgeData = edge.data || edge;
-            return nodeIds.has(edgeData.source) && nodeIds.has(edgeData.target);
+          // Show athletes as individual nodes (no connections initially)
+          setCenterGraphData({
+            nodes: athleteNodes,
+            edges: []
           });
 
-          const friendsData = {
-            nodes: peopleNodes,
-            edges: peopleEdges
-          };
-
-          setCenterGraphData(friendsData);
-          console.log(`Friends network: ${peopleNodes.length} nodes, ${peopleEdges.length} edges`);
+          console.log(`Player explore: ${athleteNodes.length} athletes loaded`);
         } else {
-          // No people found, create placeholder
-          console.log('No people nodes found, creating placeholder');
+          console.log('No athletes returned from API');
           setCenterGraphData({
             nodes: [{
               data: {
-                id: 'placeholder-1',
-                label: 'No Friends Found',
-                name: 'Add some friends to see them here!',
+                id: 'no-athletes',
+                label: 'No Athletes Found',
+                name: 'No athletes available',
                 type: 'placeholder'
               }
             }],
@@ -496,7 +800,152 @@ function HomePage({ handleLogout, user, setUser }) {
         }
 
       } catch (error) {
-        console.error('Friends error:', error);
+        console.error('Player error:', error);
+        // Fallback: use spotlight athlete if API fails
+        if (spotlightAthlete) {
+          console.log('Using fallback spotlight athlete');
+          setCenterGraphData({
+            nodes: [{
+              data: {
+                id: spotlightAthlete.uuid || 'spotlight-athlete',
+                label: spotlightAthlete.name,
+                name: spotlightAthlete.name,
+                sport: spotlightAthlete.sport,
+                nationality: spotlightAthlete.nationality,
+                type: 'athlete',
+                profileImage: spotlightAthlete.profileImage,
+                roles: ['athlete']
+              }
+            }],
+            edges: []
+          });
+        } else {
+          setCenterGraphData(null);
+        }
+      }
+
+    } else if (category === 'Friends') {
+      try {
+        console.log('🤝 Loading Friend Suggestions...');
+
+        const res = await fetch(`${API_BASE}/api/users/top`, { 
+          credentials: 'include' 
+        });
+
+        if (!res.ok) {
+          console.log('Suggested friends API failed, using fallback');
+          const generalRes = await fetch(`${API_BASE}/api/graph?limit=100`, {
+            credentials: 'include'
+          });
+          
+          if (!generalRes.ok) throw new Error(`Failed: ${generalRes.status}`);
+          
+          const generalData = await generalRes.json();
+
+          // Filter for Person nodes with roles = user (potential friends)
+          const userNodes = generalData.nodes.filter(node => {
+            const nodeData = node.data || node;
+            const roles = nodeData.roles || [];
+            const label = nodeData.label || '';
+            return label === 'Person' && roles.includes('user');
+          });
+
+          // No edges for friend suggestions - just show the users
+          setCenterGraphData({
+            nodes: userNodes,
+            edges: []
+          });
+
+          console.log(`Friend suggestions (fallback): ${userNodes.length} user nodes`);
+        } else {
+          const suggestedUsers = await res.json();
+          console.log('Suggested friends response:', suggestedUsers);
+
+          // Transform suggested users to cytoscape format
+          const nodes = suggestedUsers.map((suggestedUser, index) => ({
+            data: {
+              id: suggestedUser.uuid || suggestedUser.username || suggestedUser.email || `suggested-${index}`,
+              label: 'Person',
+              name: suggestedUser.name || suggestedUser.username,
+              username: suggestedUser.username,
+              email: suggestedUser.email,
+              profileImage: suggestedUser.profileImage,
+              location: suggestedUser.location,
+              type: 'user',
+              roles: ['user'],
+              ...suggestedUser
+            }
+          }));
+
+          setCenterGraphData({
+            nodes: nodes,
+            edges: []
+          });
+
+          console.log(`Friend suggestions loaded: ${nodes.length} suggested users`);
+        }
+
+      } catch (error) {
+        console.error('Friends suggestion error:', error);
+        setCenterGraphData(null);
+      }
+
+    } else if (category === 'Sponsor') {
+      try {
+        console.log('Loading Sponsors...');
+
+        const res = await fetch(`${API_BASE}/api/graph?limit=100`, {
+          credentials: 'include'
+        });
+
+        if (!res.ok) throw new Error(`Failed: ${res.status}`);
+
+        const data = await res.json();
+        console.log('📊 Graph data received, filtering for sponsors');
+
+        const sponsorNodes = data.nodes.filter(node => {
+          const nodeData = node.data || node;
+          const roles = nodeData.roles;
+          const label = nodeData.label || '';
+          
+          return label === 'Organisation' && 
+                 (roles === 'sponsor' || 
+                  (Array.isArray(roles) && roles.includes('sponsor')));
+        });
+
+        console.log(`💼 Found ${sponsorNodes.length} sponsor organizations`);
+
+        if (sponsorNodes.length > 0) {
+          // Get edges between sponsor nodes if any exist
+          const sponsorNodeIds = new Set(sponsorNodes.map(n => (n.data || n).id));
+          const sponsorEdges = data.edges.filter(edge => {
+            const edgeData = edge.data || edge;
+            return sponsorNodeIds.has(edgeData.source) && sponsorNodeIds.has(edgeData.target);
+          });
+
+          setCenterGraphData({
+            nodes: sponsorNodes,
+            edges: sponsorEdges
+          });
+
+          console.log(`Sponsors: ${sponsorNodes.length} nodes, ${sponsorEdges.length} edges`);
+        } else {
+          // No sponsors found
+          setCenterGraphData({
+            nodes: [{
+              data: {
+                id: 'no-sponsors',
+                label: 'No Sponsors Found',
+                name: 'No sponsor organizations available',
+                type: 'placeholder'
+              }
+            }],
+            edges: []
+          });
+        }
+
+      } catch (error) {
+        console.error('Sponsors error:', error);
         setCenterGraphData(null);
       }
 
@@ -510,7 +959,8 @@ function HomePage({ handleLogout, user, setUser }) {
     if (
       activeView !== 'players' &&
       activeView !== 'friends' &&
-      activeView !== 'explore'
+      activeView !== 'explore' &&
+      activeView !== 'viewingLikedPlayers'
     ) {
       if (cyInstanceRef.current) {
         cyInstanceRef.current.destroy();
@@ -518,17 +968,17 @@ function HomePage({ handleLogout, user, setUser }) {
       }
       return;
     }
-  
+
     let dataToRender = null;
-  
-    if (activeView === 'players' || activeView === 'friends') {
+
+    if (activeView === 'players' || activeView === 'friends' || activeView === 'viewingLikedPlayers') {
       if (!centerGraphData) return;
       dataToRender = {
         nodes: centerGraphData.nodes || [],
         edges: centerGraphData.edges || []
       };
     } else if (activeView === 'explore') {
-      
+
       if (centerGraphData) {
         console.log('🎯 Using centerGraphData for explore:', centerGraphData);
         dataToRender = {
@@ -537,9 +987,9 @@ function HomePage({ handleLogout, user, setUser }) {
         };
       } else if (graphData && filterType) {
         console.log(`Filtering graphData for: ${filterType}`);
-        
+
         let nodes = [];
-        
+
         if (filterType === 'Friends') {
           // Filter for user/person nodes
           nodes = (graphData.nodes || []).filter(n => {
@@ -567,16 +1017,16 @@ function HomePage({ handleLogout, user, setUser }) {
             return nodeData.label === filterType || nodeData.type === filterType.toLowerCase();
           });
         }
-        
+
         console.log(`📊 Filtered nodes: ${nodes.length} for ${filterType}`);
-        
+
         if (nodes.length > 0) {
           const nodeIds = new Set(nodes.map(n => (n.data || n).id));
           const edges = (graphData.edges || []).filter(e => {
             const edgeData = e.data || e;
             return nodeIds.has(edgeData.source) && nodeIds.has(edgeData.target);
           });
-          
+
           dataToRender = { nodes, edges };
           console.log(`Explore data: ${nodes.length} nodes, ${edges.length} edges`);
         } else {
@@ -588,29 +1038,29 @@ function HomePage({ handleLogout, user, setUser }) {
         return;
       }
     }
-  
+
     if (!dataToRender || dataToRender.nodes.length === 0) {
       console.log('No data to render, dataToRender:', dataToRender);
       return;
     }
-  
+
     console.log('Rendering Cytoscape with data:', dataToRender);
-  
+
     const timeout = setTimeout(() => {
       try {
         if (cyInstanceRef.current) {
           cyInstanceRef.current.destroy();
           cyInstanceRef.current = null;
         }
-  
+
         const cy = cytoscape({
           container: cyContainerRef.current,
           elements: [
             ...dataToRender.nodes.map((n) => {
               console.log('🔍 Processing node:', n.data.label, 'type:', n.data.type, 'profileImage:', n.data.profileImage);
-  
+
               let img = n.data.profileImage || n.data.image;
-  
+
               if (!img) {
                 if (n.data.type === 'user' || (n.data.label && n.data.label.includes('@'))) {
                   // Use app logo for user nodes
@@ -628,12 +1078,12 @@ function HomePage({ handleLogout, user, setUser }) {
                 // Proxy external images for CORS issues
                 img = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(img)}`;
               }
-  
+
               if (!img) {
                 console.warn('Image is null for node:', n.data.label, 'using fallback');
                 img = logo;
               }
-  
+
               console.log('🔍 Final image URL for', n.data.label, ':', img);
               n.data.image = img;
               return n;
@@ -674,7 +1124,7 @@ function HomePage({ handleLogout, user, setUser }) {
           ],
           layout: { name: 'cose-bilkent', animate: true }
         });
-  
+
         // pin top 5 for friends
         if (activeView === 'friends') {
           const topFive = cy
@@ -683,19 +1133,48 @@ function HomePage({ handleLogout, user, setUser }) {
             .slice(0, 5);
           topFive.forEach((n) => n.lock());
         }
-  
+
         cy.on('tap', 'node', (evt) => {
           const nodeData = evt.target.data();
-  
+
           cy.elements().addClass('faded');
           evt.target.removeClass('faded');
           evt.target.connectedEdges().removeClass('faded');
           evt.target.connectedEdges().connectedNodes().removeClass('faded');
           cy.center(evt.target);
           cy.zoom({ level: 2, position: evt.target.position() });
-  
-          // Update right panel based on node type
-          if (nodeData.label === "Person" || nodeData.type === "user" || nodeData.type === "athlete") {
+
+          if (nodeData.label === "Person" || nodeData.type === "user") {
+            if (activeView === 'explore' && filterType === 'Friends') {
+              // Show User Profile card for Friends explore
+              console.log('Setting selectedPerson for Friends explore:', nodeData);
+              setSelectedPerson({
+                name: nodeData.name || nodeData.label,
+                description: nodeData.description,
+                profileImage: nodeData.profileImage || nodeData.image,
+                username: nodeData.username,
+                email: nodeData.email,
+                location: nodeData.location,
+                id: nodeData.id,
+                isUser: true
+              });
+              setRightPanelView('userProfile');
+            } else {
+              // Regular person details
+              setSelectedPerson({
+                name: nodeData.name || nodeData.label,
+                description: nodeData.description,
+                profileImage: nodeData.profileImage || nodeData.image,
+                username: nodeData.username,
+                sport: nodeData.sport,
+                nationality: nodeData.nationality,
+                id: nodeData.id
+              });
+              setRightPanelView('personDetails');
+            }
+            setSelectedNode(null);
+          } else if (nodeData.type === "athlete" || nodeData.roles?.includes('athlete')) {
+            // For athletes, show full athlete info with explore option
             setSelectedPerson({
               name: nodeData.name || nodeData.label,
               description: nodeData.description,
@@ -703,31 +1182,34 @@ function HomePage({ handleLogout, user, setUser }) {
               username: nodeData.username,
               sport: nodeData.sport,
               nationality: nodeData.nationality,
-              id: nodeData.id
+              gender: nodeData.gender,
+              id: nodeData.id,
+              uuid: nodeData.uuid,
+              email: nodeData.email,
+              isAthlete: true,
+              athleteData: nodeData
             });
             setRightPanelView('personDetails');
             setSelectedNode(null);
           } else {
-            // For non-person nodes, show general node details
             setSelectedNode(nodeData);
             setRightPanelView('nodeDetails');
             setSelectedPerson(null);
           }
         });
-  
+
         cy.on('tap', (evt) => {
           if (evt.target === cy) {
             cy.elements().removeClass('faded');
-            // Don't clear the right panel when clicking empty space
           }
         });
-  
+
         cyInstanceRef.current = cy;
       } catch (err) {
         console.error('Cytoscape init error:', err);
       }
     }, 100);
-  
+
     return () => {
       clearTimeout(timeout);
       if (cyInstanceRef.current) {
@@ -736,9 +1218,8 @@ function HomePage({ handleLogout, user, setUser }) {
       }
     };
   }, [activeView, centerGraphData, graphData, filterType]);
-  
 
-  // ─── "Suggested Friends" (for Explore Friends) ───────────────────────────────
+  // ─── "Suggested Friends" (for right sidebar) ───────────────────────────────
   const fetchSuggestedFriends = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/users/top`, { credentials: 'include' });
@@ -750,12 +1231,6 @@ function HomePage({ handleLogout, user, setUser }) {
       console.error('Could not fetch suggested friends:', err);
     }
   };
-
-  useEffect(() => {
-    if (activeView === 'explore' && filterType === 'Friends') {
-      fetchSuggestedFriends();
-    }
-  }, [activeView, filterType]);
 
   const openFriendSearchPanel = () => {
     setRightPanelView('friendSearch');
@@ -887,9 +1362,8 @@ function HomePage({ handleLogout, user, setUser }) {
             </div>
           </div>
         </div>
-
         <Split
-          sizes={[75, 25]}
+          sizes={editProfile ? [60, 40] : [75, 25]}
           minSize={200}
           gutterSize={8}
           gutterAlign="center"
@@ -958,10 +1432,7 @@ function HomePage({ handleLogout, user, setUser }) {
                   ))
                 )}
               </div>
-
             </div>
-
-
 
             {/* ── Center Content ────────────────────────────────────────────────── */}
             {/* Profile view */}
@@ -971,10 +1442,19 @@ function HomePage({ handleLogout, user, setUser }) {
                   <h5 className="card-title text-navy">Profile Info</h5>
                   <div className="d-flex align-items-center mb-3">
                     <img
-                      src={logo}
+                      src={user?.profileImage || logo}
                       alt="Profile"
                       className="rounded-circle me-3"
-                      style={{ width: '60px', height: '60px', border: '2px solid var(--purple)' }}
+                      style={{
+                        width: '60px',
+                        height: '60px',
+                        border: '2px solid var(--purple)',
+                        objectFit: 'cover'
+                      }}
+                      onError={(e) => {
+                        e.target.src = logo;
+                        console.log('Profile image failed to load:', user?.profileImage);
+                      }}
                     />
                     <div>
                       <p className="mb-1">
@@ -983,6 +1463,11 @@ function HomePage({ handleLogout, user, setUser }) {
                       <p className="mb-1">
                         <strong>Email:</strong> {user.email || 'Not provided'}
                       </p>
+                      {user.location && (
+                        <p className="mb-1">
+                          <strong>Location:</strong> {user.location}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <button className="btn btn-outline-primary me-2" onClick={handleMyProfile}>
@@ -1040,7 +1525,52 @@ function HomePage({ handleLogout, user, setUser }) {
             {/* Explore graph */}
             {activeView === 'explore' && filterType && (
               <>
-                <h5 className="text-navy">Explore: {filterType}</h5>
+                <h5 className="text-navy">
+                  Explore: {filterType}
+                  {filterType === 'Player' && selectedPerson && selectedPerson.isAthlete && (
+                    <span className="text-muted small"> - {selectedPerson.name} Network</span>
+                  )}
+                  {filterType === 'Player' && (!selectedPerson || !selectedPerson.isAthlete) && (
+                    <span className="text-muted small"> - 15 Random Athletes</span>
+                  )}
+                </h5>
+
+                {/* Friend Search for Friends explore */}
+                {filterType === 'Friends' && (
+                  <div className="mb-3">
+                    <div className="input-group">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Search for friends by username..."
+                        className="form-control"
+                        disabled={loading}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && searchQuery.trim()) {
+                            handleFriendDiscoverySearch(searchQuery.trim());
+                          }
+                        }}
+                      />
+                      <button
+                        className="btn btn-outline-primary"
+                        onClick={() => {
+                          if (searchQuery.trim()) {
+                            handleFriendDiscoverySearch(searchQuery.trim());
+                          } else {
+                            alert('Please enter a username to search');
+                          }
+                        }}
+                        disabled={loading || !searchQuery.trim()}
+                      >
+                        {loading ? '⏳' : '🔍'} Search
+                      </button>
+                    </div>
+                    <small className="text-muted">
+                      Enter a username to find friends, or refresh to see suggestions
+                    </small>
+                  </div>
+                )}
 
                 {/* Debug info */}
                 <div style={{
@@ -1055,7 +1585,101 @@ function HomePage({ handleLogout, user, setUser }) {
                     `${centerGraphData.nodes?.length || 0} nodes, ${centerGraphData.edges?.length || 0} edges` :
                     'No data loaded'
                   }
+                  {filterType === 'Friends' && centerGraphData && centerGraphData.nodes?.length > 0 && (
+                    <span> - {searchQuery ? 'Search results' : 'Suggested friends'}</span>
+                  )}
+                  {filterType === 'Player' && centerGraphData && (
+                    <span> - {centerGraphData.edges?.length > 0 ? 'Connection network' : 'Individual athletes'}</span>
+                  )}
                 </div>
+
+                <div
+                  className="border rounded mb-4"
+                  style={{ height: '400px', overflow: 'hidden', borderColor: 'var(--purple)' }}
+                >
+                  {filterType === 'Friends' && (!centerGraphData || centerGraphData.nodes?.length === 0) ? (
+                    <div className="d-flex align-items-center justify-content-center h-100 text-center">
+                      <div>
+                        <p className="text-navy mb-2">
+                          <strong>Find Friends!</strong>
+                        </p>
+                        <p className="text-muted small">
+                          {searchQuery ? 'No users found for your search.' : 'Search for friends by username above, or refresh to see suggested friends.'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : filterType === 'Player' && (!centerGraphData || centerGraphData.nodes?.length === 0) ? (
+                    <div className="d-flex align-items-center justify-content-center h-100 text-center">
+                      <div>
+                        <p className="text-navy mb-2">
+                          <strong>Loading Athletes...</strong>
+                        </p>
+                        <p className="text-muted small">
+                          Click "New 15 Athletes" to load a fresh set of players to explore.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div ref={cyContainerRef} style={{ height: '100%', width: '100%' }} />
+                  )}
+                </div>
+
+                <div className="mt-3">
+                  {filterType === 'Friends' ? (
+                    <>
+                      <button
+                        className="btn btn-outline-primary me-2"
+                        onClick={() => {
+                          setSearchQuery('');
+                          handleExplore('Friends');
+                        }}
+                      >
+                        🔄 Refresh Suggestions
+                      </button>
+                      <button
+                        className="btn btn-outline-secondary"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setCenterGraphData(null);
+                        }}
+                      >
+                        🗑️ Clear Search
+                      </button>
+                    </>
+                  ) : filterType === 'Player' ? (
+                    <>
+                      <button
+                        className="btn btn-outline-primary me-2"
+                        onClick={() => handleExplore('Player')}
+                      >
+                        🔄 New 15 Athletes
+                      </button>
+                      <button
+                        className="btn btn-outline-secondary"
+                        onClick={handleNewRandomPlayerForExplore}
+                      >
+                        🎲 Update Spotlight
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="btn btn-outline-primary me-2"
+                      onClick={() => handleExplore(filterType)}
+                    >
+                      🔄 Refresh {filterType}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Viewing Liked Players */}
+            {activeView === 'viewingLikedPlayers' && (
+              <>
+                <h5 className="text-navy">
+                  Viewing Liked Players
+                  {selectedPerson && <span className="text-muted small"> - {selectedPerson.name}</span>}
+                </h5>
 
                 <div
                   className="border rounded mb-4"
@@ -1066,22 +1690,19 @@ function HomePage({ handleLogout, user, setUser }) {
 
                 <div className="mt-3">
                   <button
-                    className="btn btn-outline-primary me-2"
-                    onClick={() => handleExplore(filterType)}
+                    className="btn btn-outline-secondary me-2"
+                    onClick={() => {
+                      setActiveView('explore');
+                      setFilterType('Friends');
+                      handleExplore('Friends');
+                    }}
                   >
-                    🔄 Refresh {filterType}
+                    ← Back to Friends
                   </button>
-                  {filterType === 'Player' && (
-                    <button
-                      className="btn btn-outline-secondary"
-                      onClick={() => handleExplore('Player')}
-                    >
-                      🎲 New Random Player
-                    </button>
-                  )}
                 </div>
               </>
             )}
+
             {activeView === 'spotlightPlayer' && selectedPerson && (
               <div className="card mb-4">
                 <div className="card-body text-center">
@@ -1146,6 +1767,58 @@ function HomePage({ handleLogout, user, setUser }) {
                     setEditProfile(false);
                   }}
                 />
+              ) : rightPanelView === 'userProfile' && selectedPerson ? (
+                // ───── Show User Profile card (like Athlete of the Day) ───
+                <div className="card text-center mb-4" style={{ backgroundColor: 'var(--purple)', color: 'var(--grey)' }}>
+                  <div className="card-body">
+                    <img
+                      src={selectedPerson.profileImage || logo}
+                      alt={selectedPerson.name}
+                      className="rounded-circle mb-2"
+                      style={{ width: '60px', height: '60px', border: '2px solid var(--pink)' }}
+                    />
+                    <p className="mb-1">User Profile</p>
+                    <p style={{ fontSize: '14px' }}>{selectedPerson.name || selectedPerson.username}</p>
+                    {selectedPerson.username && (
+                      <p style={{ fontSize: '13px', marginBottom: '8px' }}>
+                        @{selectedPerson.username}
+                      </p>
+                    )}
+                    {selectedPerson.location && (
+                      <p style={{ fontSize: '12px', marginBottom: '8px', fontStyle: 'italic' }}>
+                        {selectedPerson.location}
+                      </p>
+                    )}
+                    
+                    {/* Debug info */}
+                    <div style={{ fontSize: '10px', color: '#ccc', marginBottom: '8px' }}>
+                      Debug: email={selectedPerson.email || 'none'}, username={selectedPerson.username || 'none'}
+                    </div>
+
+                    <div className="mt-2">
+                      <button
+                        className="btn btn-light btn-sm me-2"
+                        onClick={() => handleSendFriendRequest(selectedPerson.username || selectedPerson.name)}
+                      >
+                        Send Friend Request
+                      </button>
+                      {selectedPerson.email && (
+                        <button
+                          className="btn btn-outline-light btn-sm me-2"
+                          onClick={() => handleViewLikedPlayers(selectedPerson.email)}
+                        >
+                          See Their Liked Players
+                        </button>
+                      )}
+                      <button
+                        className="btn btn-outline-light btn-sm"
+                        onClick={() => setRightPanelView('default')}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
               ) : rightPanelView === 'nodeDetails' && selectedNode ? (
                 // ───── Show selected node details ───
                 <div className="card">
@@ -1170,7 +1843,9 @@ function HomePage({ handleLogout, user, setUser }) {
                 // ───── Show selected person details ───
                 <div className="card">
                   <div className="card-header bg-purple text-grey">
-                    <h6 className="mb-0">Person Details</h6>
+                    <h6 className="mb-0">
+                      {selectedPerson.isAthlete ? 'Athlete Details' : 'Person Details'}
+                    </h6>
                     {likeMessage && (
                       <div style={{
                         margin: "8px 0",
@@ -1203,20 +1878,49 @@ function HomePage({ handleLogout, user, setUser }) {
                     {selectedPerson.username && (
                       <p className="text-navy small">@{selectedPerson.username}</p>
                     )}
-                    <div className="mt-3">
-                      <button
-                        className="btn btn-outline-primary btn-sm me-2"
-                        onClick={() => handleLikePlayer(selectedPerson.username || selectedPerson.name)}
-                      >
-                        Like Player
-                      </button>
+                    {selectedPerson.sport && (
+                      <p className="text-navy small"><strong>Sport:</strong> {selectedPerson.sport}</p>
+                    )}
+                    {selectedPerson.nationality && (
+                      <p className="text-navy small"><strong>Nationality:</strong> {selectedPerson.nationality}</p>
+                    )}
+                    {selectedPerson.gender && (
+                      <p className="text-navy small"><strong>Gender:</strong> {selectedPerson.gender}</p>
+                    )}
 
-                      <button
-                        className="btn btn-outline-secondary btn-sm"
-                        onClick={handleFeelingSporty}
-                      >
-                        Scout's Choice
-                      </button>
+                    <div className="mt-3">
+                      {selectedPerson.isAthlete ? (
+                        <>
+                          <button
+                            className="btn btn-outline-primary btn-sm me-2"
+                            onClick={() => handleLikePlayer(selectedPerson.username || selectedPerson.name)}
+                          >
+                            Like Player
+                          </button>
+                          {activeView === 'explore' && filterType === 'Player' && selectedPerson.athleteData && (
+                            <button
+                              className="btn btn-outline-success btn-sm me-2"
+                              onClick={() => handleExploreAthleteConnections(selectedPerson.athleteData)}
+                              disabled={loading}
+                            >
+                              {loading ? '🔄' : '🔗'} Explore Connections
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-outline-secondary btn-sm"
+                            onClick={handleFeelingSporty}
+                          >
+                            Scout's Choice
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => handleSendFriendRequest(selectedPerson.username || selectedPerson.name)}
+                        >
+                          Send Friend Request
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1338,7 +2042,6 @@ function HomePage({ handleLogout, user, setUser }) {
                       )}
                     </div>
                   </div>
-
 
                   {/* Events card */}
                   <section className="right-section-card">

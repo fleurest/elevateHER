@@ -83,7 +83,8 @@ class PersonController {
                 email: userProps.email,
                 hasPasswordHash: !!userProps.passwordHash,
                 hasPassword: !!userProps.password,
-                roles: userProps.roles
+                roles: userProps.roles,
+                profileImage: userProps.profileImage
             } : 'null');
 
             if (!userProps || !userProps.passwordHash) {
@@ -98,11 +99,28 @@ class PersonController {
                 return res.status(401).json({ error: 'Invalid credentials' });
             }
 
-            const { username, roles = [] } = userProps;
+            const { username, roles = [], profileImage, location, bio } = userProps;
 
-            req.session.user = { username, roles };
+            req.session.user = {
+                username,
+                email: userProps.email,
+                profileImage: profileImage || '',
+                location: location || '',
+                bio: bio || '',
+                roles
+            };
 
-            return res.json({ message: 'Login successful', user: { username, roles } });
+            return res.json({
+                message: 'Login successful',
+                user: {
+                    username,
+                    email: userProps.email,
+                    profileImage: profileImage || '',
+                    location: location || '',
+                    bio: bio || '',
+                    roles
+                }
+            });
         } catch (err) {
             console.error('Error in PersonController.login:', err);
             return next(err);
@@ -116,7 +134,7 @@ class PersonController {
         console.log('req.user:', req.user);
         console.log('req.session:', req.session);
         console.log('req.session.user:', req.session?.user);
-
+    
         if (req.user || req.session?.user) {
             const user = req.user || req.session.user;
             return res.status(200).json({
@@ -124,6 +142,9 @@ class PersonController {
                     identifier: user.email || user.username,
                     username: user.username,
                     email: user.email,
+                    profileImage: user.profileImage || '',
+                    location: user.location || '',
+                    bio: user.bio || '',
                     roles: user.roles
                 }
             });
@@ -174,7 +195,7 @@ class PersonController {
                     };
                 });
 
-                console.log(`✅ Found ${users.length} users matching "${query}"`);
+                console.log(`Found ${users.length} users matching "${query}"`);
                 res.json(users);
 
             } finally {
@@ -483,6 +504,13 @@ class PersonController {
 
             const hash = await bcrypt.hash(pass, 10);
 
+            console.log('[SERVER] >>> About to create user with data:', {
+                username: user,
+                email: mail,
+                hasPasswordHash: !!hash,
+                roles: ['user']
+            });
+
             const person = await this.personService.createOrUpdateUser({
                 username: user,
                 email: mail,
@@ -492,6 +520,8 @@ class PersonController {
                 profileImage: profileImage || '',
                 roles: ['user']
             });
+
+            console.log('[SERVER] >>> User creation result:', person);
 
             res.status(201).json({ message: 'Registration successful', person });
         } catch (err) {

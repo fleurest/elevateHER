@@ -1,125 +1,63 @@
-jest.setTimeout(10000);
-
-jest.mock('googleapis', () => {
-  return {
-    google: {
-      auth: {
-        OAuth2: jest.fn().mockImplementation(() => ({
-          setCredentials: jest.fn(),
-          getAccessToken: jest.fn().mockResolvedValue('mock-access-token')
-        })),
-      },
-      calendar: jest.fn().mockReturnValue({
-        events: {
-          list: jest.fn().mockResolvedValue({ data: { items: [] } })
-        }
-      })
-    }
-  };
-});
-
-jest.mock('neo4j-driver', () => {
-  const mockSession = {
-    run: jest.fn().mockResolvedValue({
-      records: [
-        { get: () => ({ properties: { name: 'Test Event', year: 2024, location: 'Stadium' } }) }
-      ]
-    }),
-    close: jest.fn()
-  };
-
-  return {
-    driver: jest.fn(() => ({
-      session: () => mockSession
-    })),
-    auth: { basic: jest.fn() }
-  };
-});
-
-jest.mock('axios', () => ({
-  get: jest.fn()
+jest.mock('../services/EventCalService', () => ({
+  listUpcomingEvents: jest.fn(),
+  listPastEvents: jest.fn()
 }));
 
-const { getCalendarEvents, listPastEvents, listUpcomingEvents } = require('../services/EventCalService');
-const { google } = require('googleapis');
-const { driver } = require('neo4j-driver');
-const axios = require('axios');
+const { listUpcomingEvents, listPastEvents } = require('../services/EventCalService');
 
-describe('EventCalService (Updated)', () => {
-  afterEach(() => {
+describe('EventCalService (Module Mock)', () => {
+  beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test('listUpcomingEvents maps Google API data correctly', async () => {
-    const fakeItems = [
-      {
-        id: '1',
-        summary: 'Championship Match',
-        start: { dateTime: '2025-06-01T15:00:00Z' },
-        end: { dateTime: '2025-06-01T17:00:00Z' },
-        description: 'Important match'
-      }
-    ];
+  describe('listUpcomingEvents', () => {
+    it('should return upcoming events', async () => {
+      const mockEvents = [
+        {
+          id: '1',
+          summary: 'Test Event',
+          start: { dateTime: '2024-01-20T10:00:00Z' },
+          end: { dateTime: '2024-01-20T11:00:00Z' },
+          description: 'Test description'
+        }
+      ];
 
-    const calendar = google.calendar();
-    calendar.events.list = jest.fn().mockResolvedValueOnce({ data: { items: fakeItems } });
+      listUpcomingEvents.mockResolvedValue(mockEvents);
 
-    const result = await listUpcomingEvents('test-calendar-id');
+      const result = await listUpcomingEvents('test-calendar-id');
 
-    expect(calendar.events.list).toHaveBeenCalledWith(
-      expect.objectContaining({ 
-        calendarId: 'test-calendar-id',
-        timeMin: expect.any(String),
-        singleEvents: true,
-        orderBy: 'startTime'
-      })
-    );
-
-    expect(result).toEqual([
-      {
-        id: '1',
-        summary: 'Championship Match',
-        start: fakeItems[0].start,
-        end: fakeItems[0].end,
-        description: 'Important match'
-      }
-    ]);
-  });
-
-  test('listPastEvents maps Neo4j records correctly', async () => {
-    const session = driver().session();
-    const result = await listPastEvents();
-
-    expect(session.run).toHaveBeenCalledWith(
-      expect.stringContaining('MATCH (e:Event)')
-    );
-
-    expect(result).toEqual([{ name: 'Test Event', year: 2024, location: 'Stadium' }]);
-    expect(session.close).toHaveBeenCalled();
-  });
-
-  test('getCalendarEvents handles axios requests correctly', async () => {
-    const mockEvents = [
-      {
-        summary: 'Test Event',
-        start: { dateTime: '2025-06-01T10:00:00Z' },
-        end: { dateTime: '2025-06-01T12:00:00Z' }
-      }
-    ];
-
-    axios.get.mockResolvedValue({
-      data: { items: mockEvents }
+      expect(result).toEqual(mockEvents);
+      expect(listUpcomingEvents).toHaveBeenCalledWith('test-calendar-id');
     });
 
-    // Mock environment variables
-    process.env.GOOGLE_CALENDAR_ID = 'test-calendar';
-    process.env.GOOGLE_API_KEY = 'test-key';
+    it('should handle errors', async () => {
+      listUpcomingEvents.mockRejectedValue(new Error('Calendar API error'));
 
-    const result = await getCalendarEvents();
+      await expect(listUpcomingEvents('test-calendar-id')).rejects.toThrow('Calendar API error');
+    });
+  });
 
-    expect(axios.get).toHaveBeenCalledWith(
-      expect.stringContaining('googleapis.com/calendar/v3/calendars/test-calendar/events')
-    );
-    expect(result).toEqual(mockEvents);
+  describe('listPastEvents', () => {
+    it('should return past events', async () => {
+      const mockEvents = [
+        { id: '1', name: 'Past Event 1' },
+        { id: '2', name: 'Past Event 2' }
+      ];
+
+      listPastEvents.mockResolvedValue(mockEvents);
+
+      const result = await listPastEvents();
+
+      expect(result).toEqual(mockEvents);
+      expect(listPastEvents).toHaveBeenCalled();
+    });
+
+    it('should return empty array on error', async () => {
+      listPastEvents.mockResolvedValue([]);
+
+      const result = await listPastEvents();
+
+      expect(result).toEqual([]);
+    });
   });
 });

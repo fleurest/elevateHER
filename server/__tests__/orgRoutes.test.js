@@ -1,105 +1,116 @@
 const request = require('supertest');
 const express = require('express');
+const orgRoutes = require('../routes/api/org/orgRoutes');
 
-// Mock dependencies for Organisation routes
-jest.mock('../neo4j', () => ({
-  driver: {
-    session: jest.fn(() => ({
-      run: jest.fn(),
-      close: jest.fn()
-    }))
-  }
+jest.mock('../../../neo4j', () => ({
+  driver: {}
 }));
 
-jest.mock('../models/Organisation');
-jest.mock('../services/OrganisationService');
-jest.mock('../controllers/OrganisationController');
+jest.mock('../../../controllers/OrganisationController');
 
-const orgRoutes = require('../routes/orgRoutes');
-const OrganisationController = require('../controllers/OrganisationController');
-
-// Create test app for org routes
-const orgApp = express();
-orgApp.use(express.json());
-orgApp.use('/api/org', orgRoutes);
-
-describe('Organisation Routes', () => {
+describe('Organization Routes', () => {
+  let app;
   let mockOrgController;
 
   beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/org', orgRoutes);
+
+    const OrganisationController = require('../../../controllers/OrganisationController');
+    mockOrgController = OrganisationController.mock.instances[0];
+  });
+
+  afterEach(() => {
     jest.clearAllMocks();
-
-    mockOrgController = {
-      upsert: jest.fn((req, res) => res.json({ success: true })),
-      linkTeamToLeague: jest.fn((req, res) => res.json({ success: true })),
-      list: jest.fn((req, res) => res.json([]))
-    };
-
-    OrganisationController.mockImplementation(() => mockOrgController);
   });
 
   describe('POST /api/org', () => {
     it('should call upsert controller method', async () => {
-      const orgData = {
-        name: 'Test Team',
-        type: 'team',
-        sport: 'Soccer',
-        location: 'City A'
-      };
-
-      mockOrgController.upsert.mockImplementation((req, res) => {
-        res.json({
-          success: true,
-          organisation: { ...orgData, id: '123' }
+      mockOrgController.upsert = jest.fn((req, res) => {
+        res.status(201).json({ 
+          success: true, 
+          organisation: { name: 'Test Org', id: '123' } 
         });
       });
 
-      const res = await request(orgApp)
+      const response = await request(app)
         .post('/api/org')
-        .send(orgData);
+        .send({
+          name: 'Test Org',
+          type: 'Team',
+          sport: 'Basketball'
+        })
+        .expect(201);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.organisation).toMatchObject(orgData);
       expect(mockOrgController.upsert).toHaveBeenCalled();
+      expect(response.body).toEqual({
+        success: true,
+        organisation: { name: 'Test Org', id: '123' }
+      });
     });
   });
 
   describe('POST /api/org/link', () => {
     it('should call linkTeamToLeague controller method', async () => {
-      mockOrgController.linkTeamToLeague.mockImplementation((req, res) => {
-        res.json({
-          message: 'Team linked to league successfully'
+      mockOrgController.linkTeamToLeague = jest.fn((req, res) => {
+        res.json({ 
+          message: 'Team linked to league successfully' 
         });
       });
 
-      const res = await request(orgApp)
+      const response = await request(app)
         .post('/api/org/link')
         .send({
           teamId: 'team-123',
           leagueId: 'league-456'
-        });
+        })
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.message).toContain('Team linked to league');
       expect(mockOrgController.linkTeamToLeague).toHaveBeenCalled();
+      expect(response.body).toEqual({
+        message: 'Team linked to league successfully'
+      });
     });
   });
 
   describe('GET /api/org', () => {
     it('should call list controller method', async () => {
-      mockOrgController.list.mockImplementation((req, res) => {
+      mockOrgController.list = jest.fn((req, res) => {
         res.json([
-          { id: '1', name: 'Team A', type: 'team' },
-          { id: '2', name: 'League B', type: 'league' }
+          { id: '1', name: 'Org 1', type: 'Team' },
+          { id: '2', name: 'Org 2', type: 'League' }
         ]);
       });
 
-      const res = await request(orgApp).get('/api/org');
+      const response = await request(app)
+        .get('/api/org')
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toHaveLength(2);
       expect(mockOrgController.list).toHaveBeenCalled();
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0]).toEqual({
+        id: '1',
+        name: 'Org 1',
+        type: 'Team'
+      });
+    });
+
+    it('should handle query parameters', async () => {
+      mockOrgController.list = jest.fn((req, res) => {
+        expect(req.query.type).toBe('Team');
+        expect(req.query.sport).toBe('Basketball');
+        res.json([
+          { id: '1', name: 'Basketball Team', type: 'Team' }
+        ]);
+      });
+
+      const response = await request(app)
+        .get('/api/org?type=Team&sport=Basketball')
+        .expect(200);
+
+      expect(mockOrgController.list).toHaveBeenCalled();
+      expect(response.body).toHaveLength(1);
     });
   });
 });

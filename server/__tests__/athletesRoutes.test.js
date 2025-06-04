@@ -1,142 +1,128 @@
-jest.mock('../models/Athlete');
-jest.mock('../models/Person');
-jest.mock('../services/PersonService');
-jest.mock('../controllers/PersonController');
+const request = require('supertest');
+const express = require('express');
 
-const athletesRoutes = require('../routes/athletesRoutes');
+const mockSession = {
+  run: jest.fn(),
+  close: jest.fn()
+};
+
+const mockDriver = {
+  session: jest.fn(() => mockSession)
+};
+
+jest.mock('../neo4j', () => ({
+  driver: mockDriver
+}));
+
+jest.mock('../authentication', () => ({
+  isAuthenticated: (req, res, next) => next()
+}));
+
+jest.mock('../models/Athlete', () => {
+  return jest.fn().mockImplementation(() => ({}));
+});
+
+jest.mock('../models/Person', () => {
+  return jest.fn().mockImplementation(() => ({}));
+});
+
+jest.mock('../services/PersonService', () => {
+  return jest.fn().mockImplementation(() => ({}));
+});
+
+jest.mock('../controllers/PersonController', () => {
+  return jest.fn().mockImplementation(() => ({
+    listAthletes: jest.fn(),
+    searchAthletes: jest.fn(),
+    createOrUpdatePerson: jest.fn(),
+    linkAthleteToOrg: jest.fn(),
+    removeAthleteOrganisation: jest.fn(),
+    linkAthletes: jest.fn()
+  }));
+});
+
+const athletesRoutes = require('../routes/api/athletes/athletesRoutes');
 const PersonController = require('../controllers/PersonController');
-const { driver } = require('../neo4j');
-
-// Mock dependencies
-jest.mock('../../../neo4j', () => ({
-  driver: {
-    session: jest.fn(() => ({
-      run: jest.fn(),
-      close: jest.fn()
-    }))
-  }
-}));
-
-jest.mock('../../../authentication', () => ({
-  isAuthenticated: jest.fn((req, res, next) => next())
-}));
-
-jest.mock('../../../models/Athlete');
-jest.mock('../../../models/Person');
-jest.mock('../../../services/PersonService');
-jest.mock('../../../controllers/PersonController');
-
-const athletesRoutes = require('../routes/api/v1/athletesRoutes');
-const PersonController = require('../../../controllers/PersonController');
-const { driver } = require('../../../neo4j');
-
-// Create test app
-const app = express();
-app.use(express.json());
-app.use('/api/athletes', athletesRoutes);
 
 describe('Athletes Routes', () => {
+  let app;
   let mockPersonController;
-  let mockSession;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    app = express();
+    app.use(express.json());
+    app.use('/api/athletes', athletesRoutes);
+
+    mockPersonController = PersonController.mock.results[0].value;
     
-    mockSession = {
-      run: jest.fn(),
-      close: jest.fn()
-    };
-    driver.session.mockReturnValue(mockSession);
-
-    // Mock controller methods
-    mockPersonController = {
-      listAthletes: jest.fn((req, res) => res.json([])),
-      searchAthletes: jest.fn((req, res) => res.json({ players: [] })),
-      createOrUpdatePerson: jest.fn((req, res) => res.json({ success: true })),
-      linkAthleteToOrg: jest.fn((req, res) => res.json({ success: true })),
-      removeAthleteOrganisation: jest.fn((req, res) => res.json({ success: true })),
-      linkAthletes: jest.fn((req, res) => res.json({ success: true }))
-    };
-
-    PersonController.mockImplementation(() => mockPersonController);
+    jest.clearAllMocks();
+    mockSession.run.mockReset();
+    mockSession.close.mockReset();
   });
 
   describe('GET /api/athletes', () => {
     it('should call listAthletes controller method', async () => {
       mockPersonController.listAthletes.mockImplementation((req, res) => {
-        res.json([
-          { id: '1', name: 'Alice', sport: 'Soccer' },
-          { id: '2', name: 'Bob', sport: 'Basketball' }
-        ]);
+        res.json([{ id: 1, name: 'Athlete 1' }]);
       });
 
-      const res = await request(app).get('/api/athletes');
+      const response = await request(app)
+        .get('/api/athletes')
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toHaveLength(2);
-      expect(res.body[0]).toMatchObject({ name: 'Alice', sport: 'Soccer' });
       expect(mockPersonController.listAthletes).toHaveBeenCalled();
+      expect(response.body).toEqual([{ id: 1, name: 'Athlete 1' }]);
     });
   });
 
   describe('GET /api/athletes/search', () => {
     it('should call searchAthletes controller method with authentication', async () => {
       mockPersonController.searchAthletes.mockImplementation((req, res) => {
-        res.json({
-          players: [{ id: '1', name: 'Alice', sport: 'Soccer' }],
-          suggestions: []
-        });
+        res.json({ players: [{ id: 1, name: 'Found Athlete' }] });
       });
 
-      const res = await request(app)
-        .get('/api/athletes/search')
-        .query({ q: 'Alice' });
+      const response = await request(app)
+        .get('/api/athletes/search?q=test')
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toHaveProperty('players');
       expect(mockPersonController.searchAthletes).toHaveBeenCalled();
+      expect(response.body).toEqual({ players: [{ id: 1, name: 'Found Athlete' }] });
     });
   });
 
   describe('POST /api/athletes', () => {
     it('should call createOrUpdatePerson controller method', async () => {
-      const athleteData = {
-        name: 'Charlie',
-        sport: 'Tennis',
-        nationality: 'USA',
-        gender: 'M'
-      };
-
       mockPersonController.createOrUpdatePerson.mockImplementation((req, res) => {
-        res.json({
-          success: true,
-          player: { ...athleteData, id: '3' }
-        });
+        res.status(201).json({ success: true, player: { name: 'New Athlete' } });
       });
 
-      const res = await request(app)
+      const response = await request(app)
         .post('/api/athletes')
-        .send(athleteData);
+        .send({
+          name: 'New Athlete',
+          sport: 'Basketball',
+          nationality: 'USA'
+        })
+        .expect(201);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.player).toMatchObject(athleteData);
       expect(mockPersonController.createOrUpdatePerson).toHaveBeenCalled();
+      expect(response.body).toEqual({ success: true, player: { name: 'New Athlete' } });
     });
   });
 
   describe('POST /api/athletes/:id/organisation', () => {
     it('should call linkAthleteToOrg controller method', async () => {
       mockPersonController.linkAthleteToOrg.mockImplementation((req, res) => {
-        res.json({ message: 'Athlete linked to organisation' });
+        res.json({ message: 'Athlete linked to organization' });
       });
 
-      const res = await request(app)
+      const response = await request(app)
         .post('/api/athletes/123/organisation')
-        .send({ organisationId: 'org456' });
+        .send({ organisationId: 'org-456' })
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
       expect(mockPersonController.linkAthleteToOrg).toHaveBeenCalled();
+      expect(response.body).toEqual({ message: 'Athlete linked to organization' });
     });
   });
 
@@ -146,48 +132,63 @@ describe('Athletes Routes', () => {
         res.json({ message: 'Relationship removed' });
       });
 
-      const res = await request(app)
-        .delete('/api/athletes/123/organisation/org456');
+      const response = await request(app)
+        .delete('/api/athletes/123/organisation/org-456')
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
       expect(mockPersonController.removeAthleteOrganisation).toHaveBeenCalled();
+      expect(response.body).toEqual({ message: 'Relationship removed' });
     });
   });
 
   describe('PUT /api/athletes/uuid/:uuid', () => {
-    it('should update athlete by UUID when authenticated', async () => {
-      const updateData = {
-        name: 'Updated Name',
-        sport: 'Updated Sport',
-        description: 'Updated description'
-      };
-
+    it('should update athlete by UUID', async () => {
       mockSession.run.mockResolvedValue({
-        records: [
-          { get: () => ({ properties: { ...updateData, uuid: 'test-uuid' } }) }
-        ]
+        records: [{
+          get: jest.fn().mockReturnValue({
+            properties: { uuid: 'test-uuid', name: 'Updated Athlete' }
+          })
+        }]
       });
 
-      const res = await request(app)
+      const response = await request(app)
         .put('/api/athletes/uuid/test-uuid')
-        .send(updateData);
+        .send({
+          name: 'Updated Athlete',
+          sport: 'Tennis',
+          description: 'Updated description'
+        })
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.message).toBe('Athlete updated');
-      expect(res.body.person).toMatchObject(updateData);
-      expect(mockSession.run).toHaveBeenCalled();
+      expect(response.body).toEqual({
+        message: 'Athlete updated',
+        person: { uuid: 'test-uuid', name: 'Updated Athlete' }
+      });
       expect(mockSession.close).toHaveBeenCalled();
     });
 
-    it('should return 404 when athlete not found', async () => {
+    it('should return 404 if athlete not found', async () => {
       mockSession.run.mockResolvedValue({ records: [] });
 
-      const res = await request(app)
-        .put('/api/athletes/uuid/nonexistent-uuid')
-        .send({ name: 'Test' });
+      const response = await request(app)
+        .put('/api/athletes/uuid/non-existent')
+        .send({ name: 'Test' })
+        .expect(404);
 
-      expect(res.statusCode).toBe(404);
-      expect(res.body.error).toBe('Person not found');
+      expect(response.body).toEqual({ error: 'Person not found' });
+      expect(mockSession.close).toHaveBeenCalled();
+    });
+
+    it('should handle database errors', async () => {
+      mockSession.run.mockRejectedValue(new Error('DB Error'));
+
+      const response = await request(app)
+        .put('/api/athletes/uuid/test-uuid')
+        .send({ name: 'Test' })
+        .expect(500);
+
+      expect(response.body).toEqual({ error: 'Failed to update athlete' });
+      expect(mockSession.close).toHaveBeenCalled();
     });
   });
 
@@ -197,12 +198,12 @@ describe('Athletes Routes', () => {
         res.json({ linked: true });
       });
 
-      const res = await request(app)
-        .get('/api/athletes/link')
-        .query({ q: 'search term' });
+      const response = await request(app)
+        .get('/api/athletes/link?q=test')
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
       expect(mockPersonController.linkAthletes).toHaveBeenCalled();
+      expect(response.body).toEqual({ linked: true });
     });
   });
 });

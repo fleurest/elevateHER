@@ -1,168 +1,218 @@
-jest.resetModules();
+const request = require('supertest');
+const express = require('express');
+const sportsRoutes = require('../routes/api/sports/sportsRoutes');
 
-const sportsRoutes = require('../routes/sportsRoutes');
-const { driver } = require('../neo4j');
+// Mock dependencies
+jest.mock('../neo4j', () => ({
+  driver: {
+    session: jest.fn()
+  }
+}));
 
-// Create test app for sports routes
-const sportsApp = express();
-sportsApp.use(express.json());
-sportsApp.use('/api/sports', sportsRoutes);
+global.driver = require('../neo4j').driver;
 
 describe('Sports Routes', () => {
-  let mockSession;
+  let app;
 
   beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/sports', sportsRoutes);
     jest.clearAllMocks();
-    
-    mockSession = {
-      run: jest.fn(),
-      close: jest.fn()
-    };
-    driver.session.mockReturnValue(mockSession);
   });
 
   describe('POST /api/sports/create', () => {
-    it('should create a new sport successfully', async () => {
-      const sportData = {
-        name: 'Soccer',
-        type: 'Sport',
-        category: 'Team Sport',
-        description: 'A team sport played with a ball'
+    it('should create or update a sport', async () => {
+      const mockSession = {
+        run: jest.fn().mockResolvedValue({
+          records: [{
+            get: jest.fn().mockReturnValue({
+              properties: {
+                name: 'Basketball',
+                type: 'Team Sport',
+                category: 'Ball Sports'
+              }
+            })
+          }]
+        }),
+        close: jest.fn()
       };
 
-      const mockSport = {
-        properties: {
-          ...sportData,
-          label: 'Sport',
-          createdAt: '2024-01-01T00:00:00Z'
-        }
-      };
+      driver.session.mockReturnValue(mockSession);
 
-      mockSession.run.mockResolvedValue({
-        records: [{ get: () => mockSport }]
-      });
-
-      const res = await request(sportsApp)
+      const response = await request(app)
         .post('/api/sports/create')
-        .send(sportData);
+        .send({
+          name: 'Basketball',
+          type: 'Team Sport',
+          category: 'Ball Sports',
+          description: 'A team sport played with a ball and hoops'
+        })
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.message).toContain('Soccer created/updated successfully');
-      expect(res.body.sport).toMatchObject(sportData);
-      expect(mockSession.run).toHaveBeenCalled();
+      expect(response.body.message).toBe('Sport Basketball created/updated successfully');
+      expect(response.body.sport).toEqual({
+        name: 'Basketball',
+        type: 'Team Sport',
+        category: 'Ball Sports'
+      });
       expect(mockSession.close).toHaveBeenCalled();
     });
 
-    it('should return 400 when sport name is missing', async () => {
-      const res = await request(sportsApp)
+    it('should return 400 if sport name is missing', async () => {
+      const response = await request(app)
         .post('/api/sports/create')
-        .send({ type: 'Sport' });
+        .send({ type: 'Team Sport' })
+        .expect(400);
 
-      expect(res.statusCode).toBe(400);
-      expect(res.body.error).toBe('Sport name is required');
+      expect(response.body).toEqual({ error: 'Sport name is required' });
+    });
+
+    it('should handle database errors', async () => {
+      const mockSession = {
+        run: jest.fn().mockRejectedValue(new Error('DB Error')),
+        close: jest.fn()
+      };
+
+      driver.session.mockReturnValue(mockSession);
+
+      const response = await request(app)
+        .post('/api/sports/create')
+        .send({ name: 'Basketball' })
+        .expect(500);
+
+      expect(response.body).toEqual({ error: 'Failed to create sport' });
+      expect(mockSession.close).toHaveBeenCalled();
     });
   });
 
   describe('POST /api/sports', () => {
-    it('should create sport with alternate names and IOC code', async () => {
-      const sportData = {
-        name: 'Association Football',
-        alternateName: ['Soccer', 'Football'],
-        iocDisciplineCode: 'FB'
+    it('should create a new sport with alternate names', async () => {
+      const mockSession = {
+        run: jest.fn()
+          .mockResolvedValueOnce({ records: [] })
+          .mockResolvedValueOnce({ records: [] }),
+        close: jest.fn()
       };
 
-      // Mock check for existing sport (none found)
-      mockSession.run
-        .mockResolvedValueOnce({ records: [] })
-        .mockResolvedValueOnce({});
+      driver.session.mockReturnValue(mockSession);
 
-      const res = await request(sportsApp)
+      const response = await request(app)
         .post('/api/sports')
-        .send(sportData);
+        .send({
+          name: 'Football',
+          alternateName: ['Soccer', 'Association Football'],
+          iocDisciplineCode: 'FBL'
+        })
+        .expect(201);
 
-      expect(res.statusCode).toBe(201);
-      expect(res.body.message).toContain('Association Football created successfully');
-      expect(mockSession.run).toHaveBeenCalledTimes(2);
-    });
-
-    it('should return 400 for missing required fields', async () => {
-      const res = await request(sportsApp)
-        .post('/api/sports')
-        .send({ name: 'Soccer' });
-
-      expect(res.statusCode).toBe(400);
-      expect(res.body.message).toContain('Missing required fields');
+      expect(response.body).toEqual({
+        message: 'Sport "Football" created successfully.'
+      });
+      expect(mockSession.close).toHaveBeenCalled();
     });
 
     it('should return 409 if sport already exists', async () => {
-      // Mock existing sport found
-      mockSession.run.mockResolvedValue({
-        records: [{ get: () => ({ properties: { name: 'Soccer' } }) }]
-      });
+      const mockSession = {
+        run: jest.fn().mockResolvedValue({
+          records: [{
+            get: jest.fn().mockReturnValue({
+              properties: { name: 'Football' }
+            })
+          }]
+        }),
+        close: jest.fn()
+      };
 
-      const res = await request(sportsApp)
+      driver.session.mockReturnValue(mockSession);
+
+      const response = await request(app)
         .post('/api/sports')
         .send({
-          name: 'Soccer',
-          alternateName: ['Football'],
-          iocDisciplineCode: 'FB'
-        });
+          name: 'Football',
+          alternateName: ['Soccer'],
+          iocDisciplineCode: 'FBL'
+        })
+        .expect(409);
 
-      expect(res.statusCode).toBe(409);
-      expect(res.body.message).toContain('Soccer already exists');
+      expect(response.body).toEqual({
+        message: 'Sport "Football" already exists (by name or alternateName).'
+      });
+    });
+
+    it('should return 400 for missing required fields', async () => {
+      const response = await request(app)
+        .post('/api/sports')
+        .send({ name: 'Football' })
+        .expect(400);
+
+      expect(response.body.message).toContain('Missing required fields');
     });
   });
 
   describe('GET /api/sports', () => {
-    it('should return all sports ordered by name', async () => {
-      const mockSports = [
-        {
-          get: (field) => {
-            const sportData = {
-              name: 'Basketball',
-              alternateName: ['Hoops'],
-              iocDisciplineCode: 'BK'
-            };
-            return sportData[field];
-          }
-        },
-        {
-          get: (field) => {
-            const sportData = {
-              name: 'Soccer',
-              alternateName: ['Football'],
-              iocDisciplineCode: 'FB'
-            };
-            return sportData[field];
-          }
-        }
-      ];
+    it('should fetch all sports sorted by name', async () => {
+      const mockSession = {
+        run: jest.fn().mockResolvedValue({
+          records: [
+            {
+              get: jest.fn((field) => {
+                const data = {
+                  name: 'Basketball',
+                  alternateName: ['Hoops'],
+                  iocDisciplineCode: 'BKB'
+                };
+                return data[field];
+              })
+            },
+            {
+              get: jest.fn((field) => {
+                const data = {
+                  name: 'Football',
+                  alternateName: ['Soccer', 'Association Football'],
+                  iocDisciplineCode: 'FBL'
+                };
+                return data[field];
+              })
+            }
+          ]
+        }),
+        close: jest.fn()
+      };
 
-      mockSession.run.mockResolvedValue({ records: mockSports });
+      driver.session.mockReturnValue(mockSession);
 
-      const res = await request(sportsApp).get('/api/sports');
+      const response = await request(app)
+        .get('/api/sports')
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toHaveLength(2);
-      expect(res.body[0]).toMatchObject({
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0]).toEqual({
         name: 'Basketball',
         alternateName: ['Hoops'],
-        iocDisciplineCode: 'BK'
+        iocDisciplineCode: 'BKB'
       });
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (s:Sport)'),
-        undefined
-      );
+      expect(response.body[1]).toEqual({
+        name: 'Football',
+        alternateName: ['Soccer', 'Association Football'],
+        iocDisciplineCode: 'FBL'
+      });
       expect(mockSession.close).toHaveBeenCalled();
     });
 
-    it('should handle database errors', async () => {
-      mockSession.run.mockRejectedValue(new Error('Database error'));
+    it('should handle database errors gracefully', async () => {
+      const mockSession = {
+        run: jest.fn().mockRejectedValue(new Error('DB Error')),
+        close: jest.fn()
+      };
 
-      const res = await request(sportsApp).get('/api/sports');
+      driver.session.mockReturnValue(mockSession);
 
-      expect(res.statusCode).toBe(500);
-      expect(res.body.message).toBe('Internal server error.');
+      const response = await request(app)
+        .get('/api/sports')
+        .expect(500);
+
+      expect(response.body).toEqual({ message: 'Internal server error.' });
       expect(mockSession.close).toHaveBeenCalled();
     });
   });

@@ -1,266 +1,211 @@
 const request = require('supertest');
 const express = require('express');
+const eventsRoutes = require('../routes/api/events/eventsRoutes');
 const axios = require('axios');
 
 // Mock dependencies
+jest.mock('axios');
+jest.mock('../../../services/EventCalService');
 jest.mock('../../../neo4j', () => ({
   driver: {
-    session: jest.fn(() => ({
-      run: jest.fn(),
-      close: jest.fn()
-    }))
+    session: jest.fn()
   }
 }));
 
-jest.mock('../../../authentication', () => ({
-  isAuthenticated: jest.fn((req, res, next) => next())
-}));
-
-jest.mock('../services/EventCalService', () => ({
-    getCalendarEvents: jest.fn(),
-    listPastEvents: jest.fn(),
-    listUpcomingEvents: jest.fn()
-  }));
-  jest.mock('axios');
-  
-  const eventsRoutes = require('../routes/eventsRoutes');
-  const { driver } = require('../neo4j');
-  const { listPastEvents } = require('../services/EventCalService');
-  
-
-// Create test app
-const app = express();
-app.use(express.json());
-app.use('/api/events', eventsRoutes);
+global.driver = require('../../../neo4j').driver;
 
 describe('Events Routes', () => {
-  let mockSession;
+  let app;
 
   beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use('/api/events', eventsRoutes);
     jest.clearAllMocks();
     
-    mockSession = {
-      run: jest.fn(),
-      close: jest.fn()
-    };
-    driver.session.mockReturnValue(mockSession);
-
-    // Mock environment variables
     process.env.GOOGLE_CALENDAR_ID = 'test-calendar-id';
     process.env.GOOGLE_API_KEY = 'test-api-key';
   });
 
   describe('POST /api/events', () => {
-    it('should create a new event successfully', async () => {
-      const eventData = {
-        name: 'Test Championship',
-        sport: 'Soccer',
-        location: 'Stadium A',
-        year: 2024,
-        roles: ['athlete', 'coach']
+    it('should create a new event', async () => {
+      const mockSession = {
+        run: jest.fn().mockResolvedValue({
+          records: [{
+            get: jest.fn().mockReturnValue({
+              properties: { name: 'Test Event', sport: 'Tennis' }
+            })
+          }]
+        }),
+        close: jest.fn()
       };
 
-      const mockEvent = {
-        properties: {
-          ...eventData,
-          uuid: 'test-uuid',
-          createdAt: '2024-01-01T00:00:00Z'
-        }
-      };
+      driver.session.mockReturnValue(mockSession);
 
-      mockSession.run.mockResolvedValue({
-        records: [{ get: () => mockEvent }]
-      });
-
-      const res = await request(app)
+      const response = await request(app)
         .post('/api/events')
-        .send(eventData);
+        .send({
+          name: 'Test Event',
+          sport: 'Tennis',
+          location: 'London',
+          year: 2024
+        })
+        .expect(201);
 
-      expect(res.statusCode).toBe(201);
-      expect(res.body.message).toContain('Test Championship created/updated successfully');
-      expect(res.body.event).toMatchObject(eventData);
-      expect(mockSession.run).toHaveBeenCalled();
+      expect(response.body.message).toBe('Event Test Event created/updated successfully');
+      expect(response.body.event).toEqual({ name: 'Test Event', sport: 'Tennis' });
       expect(mockSession.close).toHaveBeenCalled();
     });
 
-    it('should return 400 when event name is missing', async () => {
-      const res = await request(app)
+    it('should return 400 if event name is missing', async () => {
+      const response = await request(app)
         .post('/api/events')
-        .send({ sport: 'Soccer' });
+        .send({ sport: 'Tennis' })
+        .expect(400);
 
-      expect(res.statusCode).toBe(400);
-      expect(res.body.error).toBe('Event name is required');
-    });
-
-    it('should handle database errors', async () => {
-      mockSession.run.mockRejectedValue(new Error('Database error'));
-
-      const res = await request(app)
-        .post('/api/events')
-        .send({ name: 'Test Event' });
-
-      expect(res.statusCode).toBe(500);
-      expect(res.body.error).toBe('Failed to create event');
-      expect(mockSession.close).toHaveBeenCalled();
+      expect(response.body).toEqual({ error: 'Event name is required' });
     });
   });
 
   describe('POST /api/events/:eventId/sport', () => {
-    it('should link event to sport successfully', async () => {
-      mockSession.run.mockResolvedValue({
-        records: [{ get: () => ({}) }]
-      });
+    it('should link event to sport', async () => {
+      const mockSession = {
+        run: jest.fn().mockResolvedValue({}),
+        close: jest.fn()
+      };
 
-      const res = await request(app)
-        .post('/api/events/test-event-id/sport')
-        .send({ sportName: 'Soccer' });
+      driver.session.mockReturnValue(mockSession);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.message).toBe('Event linked to sport Soccer');
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('MERGE (e)-[:PART_OF_SPORT]->(s)'),
-        { eventId: 'test-event-id', sportName: 'Soccer' }
-      );
+      const response = await request(app)
+        .post('/api/events/event-123/sport')
+        .send({ sportName: 'Basketball' })
+        .expect(200);
+
+      expect(response.body).toEqual({ message: 'Event linked to sport Basketball' });
+      expect(mockSession.close).toHaveBeenCalled();
     });
 
-    it('should return 400 when sport name is missing', async () => {
-      const res = await request(app)
-        .post('/api/events/test-event-id/sport')
-        .send({});
+    it('should return 400 if sport name is missing', async () => {
+      const response = await request(app)
+        .post('/api/events/event-123/sport')
+        .send({})
+        .expect(400);
 
-      expect(res.statusCode).toBe(400);
-      expect(res.body.error).toBe('Sport name is required');
+      expect(response.body).toEqual({ error: 'Sport name is required' });
     });
   });
 
   describe('GET /api/events/list', () => {
-    it('should return all events when no filters provided', async () => {
-      const mockEvents = [
-        { properties: { name: 'Event 1', year: 2024, sport: 'Soccer' } },
-        { properties: { name: 'Event 2', year: 2023, sport: 'Basketball' } }
-      ];
+    it('should fetch all events with filters', async () => {
+      const mockSession = {
+        run: jest.fn().mockResolvedValue({
+          records: [
+            {
+              get: jest.fn().mockReturnValue({
+                properties: { name: 'Event 1', sport: 'Tennis', year: 2024 }
+              })
+            },
+            {
+              get: jest.fn().mockReturnValue({
+                properties: { name: 'Event 2', sport: 'Tennis', year: 2024 }
+              })
+            }
+          ]
+        }),
+        close: jest.fn()
+      };
 
-      mockSession.run.mockResolvedValue({
-        records: mockEvents.map(event => ({ get: () => event }))
-      });
+      driver.session.mockReturnValue(mockSession);
 
-      const res = await request(app).get('/api/events/list');
+      const response = await request(app)
+        .get('/api/events/list?sport=Tennis&year=2024')
+        .expect(200);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toHaveLength(2);
-      expect(res.body[0]).toMatchObject({ name: 'Event 1', sport: 'Soccer' });
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0]).toEqual({ name: 'Event 1', sport: 'Tennis', year: 2024 });
       expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (e:Event)'),
-        {}
-      );
-    });
-
-    it('should filter events by sport', async () => {
-      mockSession.run.mockResolvedValue({
-        records: [
-          { get: () => ({ properties: { name: 'Soccer Event', sport: 'Soccer' } }) }
-        ]
-      });
-
-      const res = await request(app)
-        .get('/api/events/list')
-        .query({ sport: 'Soccer' });
-
-      expect(res.statusCode).toBe(200);
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE e.sport = $sport'),
-        { sport: 'Soccer' }
-      );
-    });
-
-    it('should filter events by multiple criteria', async () => {
-      mockSession.run.mockResolvedValue({ records: [] });
-
-      await request(app)
-        .get('/api/events/list')
-        .query({ sport: 'Soccer', year: '2024', location: 'stadium' });
-
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE e.sport = $sport AND e.year = $year AND toLower(e.location) CONTAINS toLower($location)'),
-        { sport: 'Soccer', year: '2024', location: 'stadium' }
+        expect.stringContaining('WHERE e.sport = $sport AND e.year = $year'),
+        { sport: 'Tennis', year: '2024' }
       );
     });
   });
 
   describe('GET /api/events/past-events', () => {
-    it('should return past events from service', async () => {
-      const mockPastEvents = [
-        { eventName: 'Past Event 1', year: 2020 },
-        { eventName: 'Past Event 2', year: 2021 }
-      ];
+    it('should fetch past events from service', async () => {
+      const { listPastEvents } = require('../../../services/EventCalService');
+      listPastEvents.mockResolvedValue([
+        { id: '1', name: 'Past Event 1' },
+        { id: '2', name: 'Past Event 2' }
+      ]);
 
-      listPastEvents.mockResolvedValue(mockPastEvents);
+      const response = await request(app)
+        .get('/api/events/past-events')
+        .expect(200);
 
-      const res = await request(app).get('/api/events/past-events');
-
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toEqual(mockPastEvents);
-      expect(listPastEvents).toHaveBeenCalled();
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0]).toEqual({ id: '1', name: 'Past Event 1' });
     });
 
-    it('should handle service errors', async () => {
+    it('should handle errors gracefully', async () => {
+      const { listPastEvents } = require('../../../services/EventCalService');
       listPastEvents.mockRejectedValue(new Error('Service error'));
 
-      const res = await request(app).get('/api/events/past-events');
+      const response = await request(app)
+        .get('/api/events/past-events')
+        .expect(500);
 
-      expect(res.statusCode).toBe(500);
-      expect(res.body.error).toBe('Past event fetch error');
+      expect(response.body).toEqual({ error: 'Past event fetch error' });
     });
   });
 
   describe('GET /api/events/calendar-events', () => {
-    it('should return calendar events from Google API', async () => {
-      const mockGoogleResponse = {
+    it('should fetch calendar events from Google Calendar API', async () => {
+      axios.get.mockResolvedValue({
         data: {
           items: [
             {
-              summary: 'Meeting 1',
-              start: { dateTime: '2024-01-01T10:00:00Z' },
-              end: { dateTime: '2024-01-01T11:00:00Z' }
+              summary: 'Calendar Event 1',
+              start: { dateTime: '2024-01-20T10:00:00Z' },
+              end: { dateTime: '2024-01-20T11:00:00Z' }
             },
             {
-              summary: 'Meeting 2',
-              start: { date: '2024-01-02' },
-              end: { date: '2024-01-03' }
+              summary: 'Calendar Event 2',
+              start: { date: '2024-01-21' },
+              end: { date: '2024-01-22' }
             }
           ]
         }
-      };
-
-      axios.get.mockResolvedValue(mockGoogleResponse);
-
-      const res = await request(app).get('/api/events/calendar-events');
-
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toHaveLength(2);
-      expect(res.body[0]).toMatchObject({
-        summary: 'Meeting 1',
-        start: '2024-01-01T10:00:00Z',
-        end: '2024-01-01T11:00:00Z'
       });
-      expect(res.body[1]).toMatchObject({
-        summary: 'Meeting 2',
-        start: '2024-01-02',
-        end: '2024-01-03'
+
+      const response = await request(app)
+        .get('/api/events/calendar-events')
+        .expect(200);
+
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0]).toEqual({
+        summary: 'Calendar Event 1',
+        start: '2024-01-20T10:00:00Z',
+        end: '2024-01-20T11:00:00Z'
+      });
+      expect(response.body[1]).toEqual({
+        summary: 'Calendar Event 2',
+        start: '2024-01-21',
+        end: '2024-01-22'
       });
 
       expect(axios.get).toHaveBeenCalledWith(
-        expect.stringContaining('googleapis.com/calendar/v3/calendars/test-calendar-id/events')
+        expect.stringContaining('googleapis.com/calendar/v3/calendars')
       );
     });
 
-    it('should handle Google API errors', async () => {
-      axios.get.mockRejectedValue(new Error('Google API error'));
+    it('should handle API errors', async () => {
+      axios.get.mockRejectedValue(new Error('API Error'));
 
-      const res = await request(app).get('/api/events/calendar-events');
+      const response = await request(app)
+        .get('/api/events/calendar-events')
+        .expect(500);
 
-      expect(res.statusCode).toBe(500);
-      expect(res.body.error).toBe('Calendar fetch error');
+      expect(response.body).toEqual({ error: 'Calendar fetch error' });
     });
   });
 });

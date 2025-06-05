@@ -93,6 +93,7 @@ function HomePage({ handleLogout, user, setUser }) {
   const [friendResults, setFriendResults] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [friendStatus, setFriendStatus] = useState(null);
 
   // Right panel view state: 'default' | 'nodeDetails' | 'personDetails' | 'friendSearch' | 'userProfile'
   const [rightPanelView, setRightPanelView] = useState('default');
@@ -181,10 +182,12 @@ function HomePage({ handleLogout, user, setUser }) {
       .then(data => setLikedPlayerNames(Array.isArray(data) ? data.map(p => p.name) : []))
       .catch(err => console.error('Error loading liked players:', err));
 
-    fetch(`${API_BASE}/api/users/friends/${user.username}`)
+      fetch(`${API_BASE}/api/users/pending-incoming/${user.username}`, { credentials: 'include' })
       .then(res => res.json())
-      .then(data => setFriendUsernames(Array.isArray(data) ? data.map(f => f.username) : []))
-      .catch(err => console.error('Error loading friends list:', err));
+      .then(data => {
+        setIncomingRequests(Array.isArray(data?.incoming) ? data.incoming : []);
+      })
+      .catch(err => console.error('Error loading incoming requests:', err));
   }, [user?.username]);
 
   // Fetch top friends for icon bar
@@ -221,6 +224,7 @@ function HomePage({ handleLogout, user, setUser }) {
     setSelectedNode(null);
   };
 
+  // When a top friend is clicked, show their profile in the right panel
   const handleTopFriendClick = (friend) => {
     if (!friend) return;
     setSelectedPerson({
@@ -232,7 +236,16 @@ function HomePage({ handleLogout, user, setUser }) {
     });
     setRightPanelView('userProfile');
     setEditProfile(false);
+    setFriendStatus(null);
+    fetch(`${API_BASE}/api/users/friend-status/${user.username}/${friend.username}`)
+      .then(res => res.json())
+      .then(data => setFriendStatus(data.status))
+      .catch(err => {
+        console.error('Error fetching friend status:', err);
+        setFriendStatus('unknown');
+      });
   };
+
 
   const handleDashboardClick = () => {
     const baseUrl = process.env.BASE_URL;
@@ -705,6 +718,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
 
       setRightPanelView('default');
+      setFriendStatus(null);
 
     } catch (err) {
       console.error('Error fetching liked players:', err);
@@ -720,6 +734,7 @@ function HomePage({ handleLogout, user, setUser }) {
     setCenterGraphData(null);
     setFilterType(null);
     setRightPanelView('default');
+    setFriendStatus(null);
     setSelectedNode(null);
     setSelectedPerson(null);
   };
@@ -729,6 +744,7 @@ function HomePage({ handleLogout, user, setUser }) {
     setEditProfile(false);
     setFilterType(null);
     setRightPanelView('default');
+    setFriendStatus(null);
     setSelectedNode(null);
     setSelectedPerson(null);
 
@@ -778,6 +794,7 @@ function HomePage({ handleLogout, user, setUser }) {
     setEditProfile(false);
     setFilterType(null);
     setRightPanelView('default');
+    setFriendStatus(null);
     setSelectedNode(null);
     setSelectedPerson(null);
 
@@ -808,6 +825,7 @@ function HomePage({ handleLogout, user, setUser }) {
     setCenterGraphData(null);
     setFilterType(null);
     setRightPanelView('default');
+    setFriendStatus(null);
     setSelectedNode(null);
     setSelectedPerson(null);
   };
@@ -817,6 +835,7 @@ function HomePage({ handleLogout, user, setUser }) {
     setEditProfile(false);
     setFilterType(category);
     setRightPanelView('default');
+    setFriendStatus(null);
     setSelectedNode(null);
     setSelectedPerson(null);
 
@@ -1341,6 +1360,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
   const closeFriendSearchPanel = () => {
     setRightPanelView('default');
+    setFriendStatus(null);
     setSearchQuery('');
     setSearchResults([]);
   };
@@ -1406,18 +1426,18 @@ function HomePage({ handleLogout, user, setUser }) {
           <div className="mb-4">
             <h5 className="text-navy">Explore</h5>
             <ul className="list-unstyled">
-                {!user?.roles?.includes('admin') && (
-                  <li
-                    className={`menu-item ${activeView === 'explore' && filterType === 'Friends' ? 'active-menu-item' : ''}`}
-                    onClick={() => handleExplore('Friends')}
-                  >
-                    Friends
-                  </li>
-                )}
+              {!user?.roles?.includes('admin') && (
                 <li
-                  className={`menu-item ${activeView === 'explore' && filterType === 'Player' ? 'active-menu-item' : ''}`}
-                  onClick={() => handleExplore('Player')}
+                  className={`menu-item ${activeView === 'explore' && filterType === 'Friends' ? 'active-menu-item' : ''}`}
+                  onClick={() => handleExplore('Friends')}
                 >
+                  Friends
+                </li>
+              )}
+              <li
+                className={`menu-item ${activeView === 'explore' && filterType === 'Player' ? 'active-menu-item' : ''}`}
+                onClick={() => handleExplore('Player')}
+              >
                 Players
               </li>
               <li
@@ -1909,8 +1929,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
                     {/* Debug info */}
                     <div style={{ fontSize: '10px', color: '#ccc', marginBottom: '8px' }}>
-                      Debug: email={selectedPerson.email || 'none'}, username={selectedPerson.username || 'none'}
-                    </div>
+                      Debug: email={selectedPerson.email || 'none'}, username={selectedPerson.username || 'none'}, status={friendStatus || 'none'}                    </div>
 
                     <div className="mt-2">
                       <button
@@ -1932,8 +1951,8 @@ function HomePage({ handleLogout, user, setUser }) {
                       )}
                       <button
                         className="btn btn-outline-light btn-sm"
-                        onClick={() => setRightPanelView('default')}
-                      >
+                        onClick={() => { setRightPanelView('default'); setFriendStatus(null); }}
+                                              >
                         Cancel
                       </button>
                     </div>
@@ -1948,8 +1967,8 @@ function HomePage({ handleLogout, user, setUser }) {
                     </h6>
                     <button
                       className="btn btn-sm btn-outline-light float-end"
-                      onClick={() => setRightPanelView('default')}
-                    >
+                      onClick={() => { setRightPanelView('default'); setFriendStatus(null); }}
+                                          >
                       ×
                     </button>
                   </div>
@@ -1983,7 +2002,7 @@ function HomePage({ handleLogout, user, setUser }) {
                           </p>
                         )}
                         <div className="mt-3">
-                        {likedPlayerNames.includes(selectedNode.username || selectedNode.name) ? (
+                          {likedPlayerNames.includes(selectedNode.username || selectedNode.name) ? (
                             <button
                               className="btn btn-outline-secondary btn-sm me-2"
                               onClick={() => handleUnlikePlayer(selectedNode.username || selectedNode.name)}

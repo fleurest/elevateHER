@@ -380,6 +380,22 @@ class Person {
         }
     }
 
+    async getFriendStatus(userA, userB) {
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                `MATCH (a:Person {username: $userA})-[r:FRIENDS_WITH]-(b:Person {username: $userB})
+                 RETURN r.status AS status`,
+                { userA, userB }
+            );
+            if (result.records.length > 0) {
+                return result.records[0].get('status');
+            }
+            return null;
+        } finally {
+            await session.close();
+        }
+    }
 
     async searchUsersByName(query) {
         const session = driver.session();

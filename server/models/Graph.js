@@ -122,12 +122,12 @@ class Graph {
                 ORDER BY r.createdAt DESC
                 LIMIT $limit
                 `,
-                { 
-                    email: email, 
-                    limit: neo4j.int(safeLimit) 
+                {
+                    email: email,
+                    limit: neo4j.int(safeLimit)
                 }
             );
-            
+
             return result.records;
         } finally {
             await session.close();
@@ -155,12 +155,12 @@ class Graph {
                 ORDER BY r.createdAt DESC
                 LIMIT $limit
                 `,
-                { 
-                    email: email, 
-                    limit: neo4j.int(safeLimit) 
+                {
+                    email: email,
+                    limit: neo4j.int(safeLimit)
                 }
             );
-            
+
             return result.records;
         } finally {
             await session.close();
@@ -188,53 +188,54 @@ class Graph {
                 ORDER BY r.createdAt DESC
                 LIMIT $limit
                 `,
-                { 
-                    email: email, 
-                    limit: neo4j.int(safeLimit) 
+                {
+                    email: email,
+                    limit: neo4j.int(safeLimit)
                 }
             );
-            
+
             return result.records;
         } finally {
             await session.close();
         }
     }
 
-        /**
-     * Get all liked entities across all users
-     * @param {number} limit - Maximum number of results
-     * @returns {Promise<Array>} Array of liked relationships
-     */
-        async getAllLikes(limit = 50) {
-            const session = this.driver.session();
-            const safeLimit = await this._safeLimit(limit, 50);
-    
-            try {
-                const result = await session.run(
-                    `
+    /**
+ * Get all liked entities across all users
+ * @param {number} limit - Maximum number of results
+ * @returns {Promise<Array>} Array of liked relationships
+ */
+    async getAllLikes(limit = 50) {
+
+        const session = this.driver.session();
+        const safeLimit = await this._safeLimit(limit, 50);
+
+        try {
+            const result = await session.run(
+                `
                     MATCH (user:Person)-[r:LIKES]->(target)
                     RETURN user, r, target, labels(target) AS targetLabels
                     ORDER BY r.createdAt DESC
                     LIMIT $limit
                     `,
-                    {
-                        limit: neo4j.int(safeLimit)
-                    }
-                );
-    
-                return result.records;
-            } finally {
-                await session.close();
-            }
+                {
+                    limit: neo4j.int(safeLimit)
+                }
+            );
+
+            return result.records;
+        } finally {
+            await session.close();
         }
-        
-     /**
-     * Get friends for a user by email
-     * @param {string} email - User's email
-     * @param {number} limit - Maximum number of results
-     * @returns {Promise<Array>} Array of friend relationships
-     */
-     async getFriendsByEmail(email, limit = 50) {
+    }
+
+    /**
+    * Get friends for a user by email
+    * @param {string} email - User's email
+    * @param {number} limit - Maximum number of results
+    * @returns {Promise<Array>} Array of friend relationships
+    */
+    async getFriendsByEmail(email, limit = 50) {
         const session = this.driver.session();
         const safeLimit = await this._safeLimit(limit, 50);
 
@@ -243,19 +244,46 @@ class Graph {
                 `
                 MATCH (user:Person {email: $email})-[r:FRIENDS_WITH]-(friend:Person)
                 WHERE 'user' IN friend.roles
-                RETURN 
+                OPTIONAL MATCH (friend)-[l:LIKES]->(liked)
+                RETURN
                     user,
                     r,
-                    friend
+                    friend,
+                    l,
+                    liked
                 ORDER BY r.createdAt DESC
                 LIMIT $limit
                 `,
-                { 
-                    email: email, 
-                    limit: neo4j.int(safeLimit) 
+                {
+                    email: email,
+                    limit: neo4j.int(safeLimit)
                 }
             );
-            
+
+            return result.records;
+        } finally {
+            await session.close();
+        }
+    }
+
+    /**
+ * Get the organisation with the most PARTICIPATES_IN players and their liked nodes
+ * @returns {Promise<Array>} Query results containing organisation, players and likes
+ */
+    async getTopOrgWithLikes() {
+        const session = this.driver.session();
+        try {
+            const result = await session.run(
+                `
+                    MATCH (o:Organisation)<-[:PARTICIPATES_IN]-(p:Person)
+                    WITH o, count(p) AS playerCount
+                    ORDER BY playerCount DESC
+                    LIMIT 1
+                    MATCH (o)<-[part:PARTICIPATES_IN]-(p:Person)
+                    OPTIONAL MATCH (p)-[like:LIKES]->(liked)
+                    RETURN o, p, part, like, liked
+                    `
+            );
             return result.records;
         } finally {
             await session.close();

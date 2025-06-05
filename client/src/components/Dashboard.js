@@ -786,14 +786,15 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
                     break;
 
                 case 'friends':
-                    if (!user || !user.username) {
+                    if (!user || (!user.email && !user.username)) {
                         setError('Please log in to view your friends network');
                         setGraphData({ nodes: [], edges: [] });
                         return;
                     }
-                    console.log(`Fetching friends for username: ${user.username}`);
+                    const friendIdentifier = encodeURIComponent(user.email || user.username);
+                    console.log(`Fetching friends for identifier: ${friendIdentifier}`);
 
-                    response = await fetch(`${apiBase}/api/graph/friends/${user.username}`, {
+                    response = await fetch(`${apiBase}/api/graph/friends/${friendIdentifier}`, {
                         credentials: 'include'
                     });
                     if (!response.ok) {
@@ -849,10 +850,10 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
             const apiBase = process.env.REACT_APP_API_BASE || '';
             const response = await fetch(`${apiBase}/api/athletes/search?query=${encodeURIComponent(searchTerm)}`);
             if (response.ok) {
-              const data = await response.json();
-              if (Array.isArray(data)) return data;
-              if (Array.isArray(data.players)) return data.players;
-              return [];
+                const data = await response.json();
+                if (Array.isArray(data)) return data;
+                if (Array.isArray(data.players)) return data.players;
+                return [];
             }
             return [];
         } catch (error) {
@@ -996,72 +997,36 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
             setLoading(true);
             const apiBase = process.env.REACT_APP_API_BASE || '';
 
-            console.log('🔍 Starting sport-based community detection...');
-
-            const response = await fetch(`${apiBase}/api/graph?limit=300`);
+            const response = await fetch(`${apiBase}/api/graph/org-community`);
 
             if (!response.ok) {
-                throw new Error(`Failed to load network: ${response.status}`);
+                throw new Error(`Failed to load community: ${response.status}`);
             }
+            const data = await response.json();
 
-            const networkData = await response.json();
-            console.log('Network data loaded for sport analysis');
 
-            const athletes = (networkData.nodes || []).filter(node => {
-                const nodeData = node.data || node;
-                return nodeData.label === 'Person' && nodeData.sport && nodeData.name;
-            });
-
-            if (athletes.length === 0) {
-                alert('❌ No athletes with sports found in the network.');
+            if (!data.nodes || data.nodes.length === 0) {
+                alert('No community data found.');
                 return;
             }
+            setGraphData({ nodes: data.nodes, edges: data.edges || [] });
+            setAllNodes(data.nodes);
 
-            const sportGroups = athletes.reduce((acc, athlete) => {
-                const sport = (athlete.data || athlete).sport;
-                if (!acc[sport]) {
-                    acc[sport] = [];
-                }
-                acc[sport].push(athlete);
-                return acc;
-            }, {});
 
-            const validSports = Object.entries(sportGroups).filter(([sport, athletes]) => athletes.length >= 2);
-
-            if (validSports.length === 0) {
-                alert('❌ No sports with multiple athletes found.');
-                return;
-            }
-
-            const [selectedSport, sportAthletes] = validSports[Math.floor(Math.random() * validSports.length)];
-
-            console.log(`🎯 Selected sport: ${selectedSport} with ${sportAthletes.length} athletes`);
-
-            const athleteIds = new Set(sportAthletes.map(athlete => (athlete.data || athlete).id));
-            const relevantEdges = (networkData.edges || []).filter(edge => {
-                const edgeData = edge.data || edge;
-                return athleteIds.has(edgeData.source) && athleteIds.has(edgeData.target);
-            });
-
-            const sportCommunityGraph = {
-                nodes: sportAthletes,
-                edges: relevantEdges
-            };
-
-            console.log('Sport community graph created:', sportCommunityGraph);
-
-            setGraphData(sportCommunityGraph);
-            setAllNodes(sportAthletes);
             setError(null);
 
-            const athleteNames = sportAthletes.slice(0, 5).map(a => (a.data || a).name).join(', ');
-            const moreCount = sportAthletes.length > 5 ? ` and ${sportAthletes.length - 5} more` : '';
+            const org = data.nodes.find(n => {
+                const t = (n.data || n).type || '';
+                return t === 'organisation' || t === 'organization';
+            });
+            const playerCount = data.nodes.filter(n => (n.data || n).type === 'person').length;
 
-            alert(`Sport Community Detected!\n\n🏆 Sport: ${selectedSport}\n👥 Athletes: ${sportAthletes.length}\n🔗 Connections: ${relevantEdges.length}\n\n🏃‍♂️ Sample Athletes:\n${athleteNames}${moreCount}\n\n💡 Now showing all ${selectedSport} athletes and their connections!`);
+            alert(`Community Detected\n\n🏢 Organisation: ${(org?.data || org)?.name || 'Unknown'}\n👥 Players: ${playerCount}`);
+
 
         } catch (err) {
-            console.error('Sport community detection error:', err);
-            alert(`Failed to detect sport communities: ${err.message}`);
+            console.error('Community detection error:', err);
+            alert(`Failed to detect communities: ${err.message}`);
         } finally {
             setLoading(false);
         }

@@ -14,6 +14,7 @@ class GraphController {
         this.getLikedSummary = this.getLikedSummary.bind(this);
         this.getPageRank = this.getPageRank.bind(this);
         this.calculatePageRank = this.calculatePageRank.bind(this);
+        this.getTopOrgWithLikes = this.getTopOrgWithLikes.bind(this);
     }
 }
 
@@ -141,17 +142,9 @@ async function calculatePageRank(req, res) {
     } catch (error) {
         console.error('PageRank calculation error:', error);
         
-        let errorMessage = error.message;
-        if (error.message.includes('Graph does not exist')) {
-            errorMessage = 'Graph projection not found. The system will attempt to create it automatically.';
-        } else if (error.message.includes('gds.pageRank')) {
-            errorMessage = 'Neo4j Graph Data Science library not available. Please ensure GDS is installed and enabled.';
-        }
-        
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Failed to calculate PageRank',
-            message: errorMessage,
-            details: error.message
+            message: error.message
         });
     }
 }
@@ -351,6 +344,19 @@ async function getFriendsByEmail(req, res, next) {
     }
 }
 
+/**
+ * GET /api/graph/org-community
+ * Build a graph of the organisation with the most PARTICIPATES_IN players and each player's likes
+ */
+async function getTopOrgWithLikes(req, res, next) {
+    try {
+        const data = await graphService.getTopOrgWithLikes();
+        res.status(200).json(data);
+    } catch (err) {
+        console.error('Error in getTopOrgWithLikes:', err);
+        res.status(500).json({ error: 'Failed to get organisation community' });
+    }
+}
 
 module.exports = {
     getGraph,
@@ -365,5 +371,6 @@ module.exports = {
     getLikedSummary,
     getFriendsByEmail,
     getPageRank,
-    calculatePageRank
+    calculatePageRank,
+    getTopOrgWithLikes
 };

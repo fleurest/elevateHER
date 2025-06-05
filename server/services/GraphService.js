@@ -12,6 +12,61 @@ class GraphService {
     this.graphName = 'peopleKinSport';
   }
 
+  /**
+   * Compute PageRank scores locally
+   * @param {Array<Array<string>>} edges - Array of [source, target] pairs.
+   * @param {Object} options - Algorithm options.
+   * @param {number} options.dampingFactor - Damping factor.
+   * @param {number} options.maxIterations - Maximum iterations.
+   * @param {number} options.tolerance - Convergence tolerance.
+   * @returns {Object} Map of node name to PageRank score.
+   */
+  computePageRankLocal(edges, { dampingFactor = 0.85, maxIterations = 20, tolerance = 0.0001 } = {}) {
+    const nodes = new Set();
+    for (const [s, t] of edges) {
+      nodes.add(s);
+      nodes.add(t);
+    }
+
+    const N = nodes.size;
+    if (N === 0) return {};
+
+    const neighbors = {};
+    nodes.forEach(n => { neighbors[n] = new Set(); });
+    for (const [s, t] of edges) {
+      neighbors[s].add(t);
+      neighbors[t].add(s); // treat edges as undirected
+    }
+
+    const outDegree = {};
+    nodes.forEach(n => { outDegree[n] = neighbors[n].size || 1; });
+
+    let ranks = {};
+    nodes.forEach(n => { ranks[n] = 1 / N; });
+
+    const dampingValue = (1 - dampingFactor) / N;
+
+    for (let iter = 0; iter < maxIterations; iter++) {
+      const newRanks = {};
+      nodes.forEach(n => { newRanks[n] = dampingValue; });
+
+      nodes.forEach(n => {
+        const share = ranks[n] / outDegree[n];
+        neighbors[n].forEach(m => {
+          newRanks[m] += dampingFactor * share;
+        });
+      });
+
+      let diff = 0;
+      nodes.forEach(n => { diff += Math.abs(newRanks[n] - ranks[n]); });
+
+      ranks = newRanks;
+      if (diff < tolerance) break;
+    }
+
+    return ranks;
+  }
+
   async computeEmbeddings({ dim = 16, iterations = 10 } = {}) {
     const session = this.driver.session();
     await session.run(
@@ -177,7 +232,6 @@ class GraphService {
   }
 
   /**
-   * Calculate PageRank using GDS library
    * @param {Object} options - PageRank calculation options
    * @returns {Promise<Object>} Calculation results
    */
@@ -189,71 +243,39 @@ class GraphService {
   } = {}) {
     const session = this.driver.session();
     
-    try {
-      await this.ensureGraphProjection();
-      
-      // Calculate PageRank and write to neo4j
-      const result = await session.run(
-        `CALL gds.pageRank.write($graphName, {
-           maxIterations: $maxIterations,
-           dampingFactor: $dampingFactor,
-           tolerance: $tolerance,
-           writeProperty: $writeProperty
-         })
-         YIELD nodePropertiesWritten, ranIterations, didConverge`,
-        { 
-          graphName: this.graphName,
-          maxIterations: neo4j.int(maxIterations),
-          dampingFactor,
-          tolerance,
-          writeProperty
-        }
-      );
-      
-      const record = result.records[0];
-      return {
-        nodePropertiesWritten: record.get('nodePropertiesWritten').toNumber(),
-        ranIterations: record.get('ranIterations').toNumber(),
-        didConverge: record.get('didConverge'),
-        writeProperty
-      };
-    } finally {
-      await session.close();
-    }
-  }
-
-  /**
-   * Ensure graph projection exists for GDS operations
-   */
-  async ensureGraphProjection() {
-    const session = this.driver.session();
     
     try {
-      // Check if projection exists
-      const checkResult = await session.run(
-        `CALL gds.graph.exists($graphName)
-         YIELD exists`,
-        { graphName: this.graphName }
-      );
-      
-      const exists = checkResult.records[0].get('exists');
-      
-      if (!exists) {
-        // Create graph projection
+      // Fetch edges between people
+      const result = await session.run(`
+        MATCH (a:Person)-[:FRIENDS_WITH|PARTICIPATES_IN]-(b:Person)
+        RETURN a.name AS source, b.name AS target
+      `);
+
+      const edges = result.records.map(r => [r.get('source'), r.get('target')]);
+
+      const ranks = this.computePageRankLocal(edges, {
+        dampingFactor,
+        maxIterations,
+        tolerance
+      });
+
+      const rows = Object.entries(ranks).map(([name, score]) => ({ name, score }));
+
+      if (rows.length > 0) {
+
+
         await session.run(
-          `CALL gds.graph.project(
-             $graphName,
-             ['Person', 'Organization'],
-             {
-               FRIENDS_WITH: { orientation: 'UNDIRECTED' },
-               PARTICIPATES_IN: { orientation: 'UNDIRECTED' },
-               LIKES: { orientation: 'UNDIRECTED' }
-             }
-           )`,
-          { graphName: this.graphName }
+          `UNWIND $rows AS row
+           MATCH (p:Person {name: row.name})
+           SET p[$prop] = row.score`,
+          { rows, prop: writeProperty }
         );
-        console.log(`Created graph projection: ${this.graphName}`);
-      }
+        return {
+          nodePropertiesWritten: rows.length,
+          ranIterations: maxIterations,
+          didConverge: true,
+          writeProperty
+        };      }
     } finally {
       await session.close();
     }
@@ -486,6 +508,8 @@ class GraphService {
         const user = record.get('user');
         const friend = record.get('friend');
         const relationship = record.get('r');
+        const likeRel = record.get('l');
+        const likedNode = record.get('liked');
 
         const mapNode = node => {
           const name = node.properties.name || node.properties.email;
@@ -527,6 +551,24 @@ class GraphService {
                 ...relationship.properties
             }
         });
+
+        if (likeRel && likedNode) {
+          if (!nodesMap.has(likedNode.identity.toString())) {
+              nodesMap.set(likedNode.identity.toString(), mapNode(likedNode));
+          }
+          edges.push({
+              data: {
+                  id: likeRel.identity.toString(),
+                  source: friend.identity.toString(),
+                  target: likedNode.identity.toString(),
+                  label: 'likes',
+                  title: 'likes',
+                  relationshipType: 'LIKES',
+                  createdAt: likeRel.properties.createdAt,
+                  ...likeRel.properties
+              }
+          });
+      }
     });
 
     return {
@@ -534,6 +576,57 @@ class GraphService {
         edges,
         totalCount: records.length
     };
+  }
+
+  /**
+   * Build a graph for the organisation with the most PARTICIPATES_IN players
+   * and include each player's LIKES one hop out
+   */
+  async getTopOrgWithLikes() {
+    const records = await this.graphModel.getTopOrgWithLikes();
+
+    const nodesMap = new Map();
+    const edges = [];
+
+    const mapNode = node => ({
+      data: {
+        id: node.identity.toString(),
+        label: (node.properties.name || node.properties.email || node.labels[0]),
+        name: node.properties.name || node.properties.email,
+        image: node.properties.profileImage || this.getWikipediaImageUrl(node.properties.name || node.properties.email),
+        profileImage: node.properties.profileImage || this.getWikipediaImageUrl(node.properties.name || node.properties.email),
+        type: node.labels[0] ? node.labels[0].toLowerCase() : 'unknown',
+        ...node.properties
+      }
+    });
+
+    records.forEach(record => {
+      const org = record.get('o');
+      const player = record.get('p');
+      const part = record.get('part');
+      const likeRel = record.get('like');
+      const liked = record.get('liked');
+
+      if (org && !nodesMap.has(org.identity.toString())) {
+        nodesMap.set(org.identity.toString(), mapNode(org));
+      }
+      if (player && !nodesMap.has(player.identity.toString())) {
+        nodesMap.set(player.identity.toString(), mapNode(player));
+      }
+      if (liked && !nodesMap.has(liked.identity.toString())) {
+        nodesMap.set(liked.identity.toString(), mapNode(liked));
+      }
+
+      if (part) {
+        edges.push({ data: { id: part.identity.toString(), source: player.identity.toString(), target: org.identity.toString(), label: 'participates_in', title: 'participates in', relationshipType: 'PARTICIPATES_IN', ...part.properties } });
+      }
+
+      if (likeRel && liked) {
+        edges.push({ data: { id: likeRel.identity.toString(), source: player.identity.toString(), target: liked.identity.toString(), label: 'likes', title: 'likes', relationshipType: 'LIKES', ...likeRel.properties } });
+      }
+    });
+
+    return { nodes: Array.from(nodesMap.values()), edges };
   }
 
 }

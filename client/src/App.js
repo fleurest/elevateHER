@@ -24,7 +24,7 @@ function AppContent() {
           const data = await res.json();
           if (data.user) {
             // User is authenticated
-            setUser({ username: data.user.identifier, email: data.user.identifier });
+            setUser(data.user);
             setIsAuthenticated(true);
           } else {
             // User is not authenticated
@@ -110,8 +110,14 @@ function AppContent() {
           />
           <Route
             path="/dashboard"
-            element={isAuthenticated ? <Dashboard handleLogout={handleLogout} /> : <Navigate to="/login" />}
-          />
+            element={
+              isAuthenticated ? (
+                <Dashboard handleLogout={handleLogout} user={user} />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+                      />
           <Route
             path="/home"
             element={

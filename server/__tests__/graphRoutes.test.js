@@ -13,7 +13,8 @@ jest.mock('../../../controllers/GraphController', () => ({
   getAllLikes: jest.fn((req, res) => res.json({ likes: [] })),
   getLikedByEmail: jest.fn((req, res) => res.json({ liked: [] })),
   getLikedSummary: jest.fn((req, res) => res.json({ summary: {} })),
-  getFriendsByEmail: jest.fn((req, res) => res.json({ friends: [] }))
+  getFriendsByEmail: jest.fn((req, res) => res.json({ friends: [] })),
+  getTopOrgWithLikes: jest.fn((req, res) => res.json({ community: {} }))
 }));
 
 const graphController = require('../../../controllers/GraphController');
@@ -155,6 +156,17 @@ describe('Graph Routes', () => {
 
       expect(graphController.getFriendsByEmail).toHaveBeenCalled();
       expect(response.body).toEqual({ friends: [] });
+    });
+  });
+
+  describe('GET /api/graph/org-community', () => {
+    it('should call getTopOrgWithLikes controller method', async () => {
+      const response = await request(app)
+        .get('/api/graph/org-community')
+        .expect(200);
+
+      expect(graphController.getTopOrgWithLikes).toHaveBeenCalled();
+      expect(response.body).toEqual({ community: {} });
     });
   });
 });

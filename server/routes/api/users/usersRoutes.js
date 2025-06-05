@@ -242,7 +242,17 @@ router.get('/friends/accepted/:username',
     }
   });
 
-
+// relationship status between two users
+router.get('/friend-status/:userA/:userB', async (req, res) => {
+  const { userA, userB } = req.params;
+  try {
+    const status = await personModel.getFriendStatus(userA, userB);
+    res.json({ status: status || null });
+  } catch (err) {
+    console.error('Error fetching friend status:', err);
+    res.status(500).json({ error: 'Failed to get friend status' });
+  }
+});
 
 router.get('/top-friends/:username', async (req, res) => {
   try {

@@ -50,4 +50,7 @@ router.get('/friends/:email', graphController.getFriendsByEmail);
 // POST /graph/pagerank - Calculate and store PageRank scores
 router.post('/pagerank', graphController.calculatePageRank);
 
+// GET /api/graph/org-community - organisation with most participants and likes
+router.get('/org-community', graphController.getTopOrgWithLikes);
+
 module.exports = router;

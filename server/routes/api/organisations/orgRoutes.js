@@ -11,5 +11,6 @@ const orgController= new OrganisationController(orgService);
 router.post('/', orgController.upsert);
 router.post('/link', orgController.linkTeamToLeague);
 router.get('/', orgController.list);
+router.get('/search', orgController.search);
 
 module.exports = router;

@@ -41,7 +41,9 @@ function getWikipediaImageUrl(name) {
 function getAvatarSrc(src) {
   if (
     src &&
-    (src.includes('afl.com.au') || src.includes('wikipedia.org'))
+    (src.includes('afl.com.au') ||
+      src.includes('wikipedia.org') ||
+      src.includes('wikimedia.org'))
   ) {
     return `${API_BASE}/api/image-proxy?url=${encodeURIComponent(src)}`;
   }
@@ -908,43 +910,45 @@ function HomePage({ handleLogout, user, setUser }) {
       try {
         console.log('Loading Sponsors...');
 
-        const res = await fetch(`${API_BASE}/api/graph?limit=100`, {
+        const res = await fetch(`${API_BASE}/api/organisations/search?roles=sponsor`, {
           credentials: 'include'
         });
 
         if (!res.ok) throw new Error(`Failed: ${res.status}`);
 
-        const data = await res.json();
-        console.log('📊 Graph data received, filtering for sponsors');
+        const orgs = await res.json();
+        console.log(`📊 Received ${orgs.length} sponsor organisations`);
 
-        const sponsorNodes = data.nodes.filter(node => {
-          const nodeData = node.data || node;
-          const roles = nodeData.roles;
-          const label = nodeData.label || '';
+        if (Array.isArray(orgs) && orgs.length > 0) {
+          const sponsorNodes = orgs.map((o, index) => {
+            const wikiImage = getWikipediaImageUrl(o.name);
+            const profileImage = o.image || o.profileImage || wikiImage;
+            const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(
+              (o.name || '').replace(/ /g, '_')
+            )}`;
 
-          return label === 'Organisation' &&
-            (roles === 'sponsor' ||
-              (Array.isArray(roles) && roles.includes('sponsor')));
-        });
-
-        console.log(`💼 Found ${sponsorNodes.length} sponsor organisations`);
-
-        if (sponsorNodes.length > 0) {
-          // Get edges between sponsor nodes if any exist
-          const sponsorNodeIds = new Set(sponsorNodes.map(n => (n.data || n).id));
-          const sponsorEdges = data.edges.filter(edge => {
-            const edgeData = edge.data || edge;
-            return sponsorNodeIds.has(edgeData.source) && sponsorNodeIds.has(edgeData.target);
+            return {
+              data: {
+                id: o.uuid || `sponsor-${index}`,
+                label: o.name,
+                name: o.name,
+                location: o.location,
+                type: 'organisation',
+                roles: o.roles || [],
+                logo: o.logo || logo,
+                wikiUrl
+              }
+            };
           });
 
           setCenterGraphData({
             nodes: sponsorNodes,
-            edges: sponsorEdges
+            edges: []
           });
 
-          console.log(`Sponsors: ${sponsorNodes.length} nodes, ${sponsorEdges.length} edges`);
+          console.log(`Sponsors: ${sponsorNodes.length} nodes`);
         } else {
-          // No sponsors found
+
           setCenterGraphData({
             nodes: [{
               data: {
@@ -1071,13 +1075,18 @@ function HomePage({ handleLogout, user, setUser }) {
           container: cyContainerRef.current,
           elements: [
             ...dataToRender.nodes.map((n) => {
-              console.log('🔍 Processing node:', n.data.label, 'type:', n.data.type, 'profileImage:', n.data.profileImage);
+              console.log('🔍 Processing node:', n.data.label, 'type:', n.data.type, 'logo:', n.data.logo);
 
-              let img = n.data.profileImage || n.data.image;
+              let img =  n.data.profileImage || n.data.image || n.data.logo;
 
               if (!img) {
                 if (n.data.type === 'user' || (n.data.label && n.data.label.includes('@'))) {
-                  // Use app logo for user nodes
+                  img = logo;
+                } else if (
+                  n.data.roles?.includes('sponsor') ||
+                  n.data.type === 'organisation' ||
+                  n.data.type === 'Sponsor'
+                ) {
                   img = logo;
                 } else if (n.data.roles && n.data.roles.includes('athlete')) {
                   // For athletes with names, look at Wikipedia first
@@ -1088,14 +1097,21 @@ function HomePage({ handleLogout, user, setUser }) {
                   const nodeType = n.data.type || n.data.label || 'default';
                   img = getPlaceholderIcon(nodeType);
                 }
-              } else if (img.includes('afl.com.au') || img.includes('wikipedia.org')) {
-                // Proxy external images for CORS issues
+              } else if (
+                img.includes('afl.com.au') ||
+                img.includes('wikipedia.org') ||
+                img.includes('wikimedia.org')
+              ) {
                 img = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(img)}`;
               }
 
               if (!img) {
                 console.warn('Image is null for node:', n.data.label, 'using fallback');
                 img = logo;
+              }
+
+              if (n.data.type === 'event' && n.data.name) {
+                n.data.label = n.data.name;
               }
 
               console.log('🔍 Final image URL for', n.data.label, ':', img);
@@ -1118,6 +1134,13 @@ function HomePage({ handleLogout, user, setUser }) {
                 fontSize: 10,
                 width: 50,
                 height: 50
+              }
+            },
+            {
+              selector: 'node[type="event"]',
+              style: {
+                label: 'data(name)',
+                fontSize: 8
               }
             },
             {
@@ -1397,7 +1420,7 @@ function HomePage({ handleLogout, user, setUser }) {
                 ) : (
                   topFriends.slice(0, 5).map((friend, index) => (
                     <Link
-                    key={`${friend.username || friend.uuid || friend.email}-${index}`}                      to={`/profile/${encodeURIComponent(friend.username || friend.email || friend.uuid)}`}
+                      key={`${friend.username || friend.uuid || friend.email}-${index}`} to={`/profile/${encodeURIComponent(friend.username || friend.email || friend.uuid)}`}
                       style={{
                         display: "flex",
                         flexDirection: "column",
@@ -1829,7 +1852,7 @@ function HomePage({ handleLogout, user, setUser }) {
                     <h6 className="mb-0">
                       {selectedNode.isAthlete ? 'Player Details' : 'Node Details'}
                     </h6>
-                    <button 
+                    <button
                       className="btn btn-sm btn-outline-light float-end"
                       onClick={() => setRightPanelView('default')}
                     >

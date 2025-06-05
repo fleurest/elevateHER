@@ -14,7 +14,19 @@ describe('PersonService (Updated)', () => {
       searchByName: jest.fn(),
       suggestSimilarNames: jest.fn(),
       create: jest.fn(),
-      update: jest.fn()
+      update: jest.fn(),
+      createOrUpdateAthlete: jest.fn(async data => {
+        const session = driver.session();
+        try {
+          const result = await session.run(
+            'MERGE (p:Person {name: $name}) RETURN p',
+            data
+          );
+          return result.records[0].get('p').properties;
+        } finally {
+          await session.close();
+        }
+      })
     };
     service = new PersonService(mockModel, driver);
   });

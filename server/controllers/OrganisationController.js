@@ -11,6 +11,7 @@ class OrganisationController {
     this.list = this.list.bind(this);
     this.upsert = this.upsert.bind(this);
     this.link = this.link.bind(this);
+    this.search = this.search.bind(this);
     this.linkTeamToLeague = this.linkTeamToLeague.bind(this);
   }
 
@@ -55,6 +56,22 @@ class OrganisationController {
       res.json({ message: `${organisationName} linked to league ${leagueName}` });
     } catch (err) {
       console.error('[OrganisationController.linkTeamToLeague] Error:', err);
+      next(err);
+    }
+  }
+
+  async search(req, res, next) {
+    try {
+      const { sport, location, roles } = req.query;
+      const filters = {};
+      if (sport) filters.sport = sport;
+      if (location) filters.location = location;
+      if (roles) filters.roles = roles;
+
+      const orgs = await this.service.searchOrganisations(filters);
+      res.json(orgs);
+    } catch (err) {
+      console.error('[OrganisationController.search] Error:', err);
       next(err);
     }
   }

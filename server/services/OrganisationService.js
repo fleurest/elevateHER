@@ -91,8 +91,9 @@ class OrganisationService {
       }
 
       if (roles) {
-        conditions.push('$role IN o.roles');
-        params.role = roles;
+        const roleList = Array.isArray(roles) ? roles : [roles];
+        conditions.push('ANY(r IN $roles WHERE r IN o.roles)');
+        params.roles = roleList;
       }
 
       if (conditions.length > 0) {

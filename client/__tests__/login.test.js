@@ -14,6 +14,10 @@ describe('Login Component (coverage)', () => {
     console.error.mockRestore();
   });
 
+  afterAll(() => {
+    console.error.mockRestore();
+  });
+
   beforeEach(() => {
     mockOnLogin.mockClear();
     originalFetch = global.fetch;
@@ -34,7 +38,7 @@ describe('Login Component (coverage)', () => {
   });
 
   it('renders login form with proper initial state', () => {
-    expect(screen.getByPlaceholderText(/username/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/email/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /login/i })).toBeDisabled();
     
@@ -45,49 +49,44 @@ describe('Login Component (coverage)', () => {
   });
 
   it('enables login button only when both fields meet requirements', () => {
-    const userInput = screen.getByPlaceholderText(/username/i);
+    const emailInput = screen.getByPlaceholderText(/email/i);
     const passInput = screen.getByPlaceholderText(/password/i);
     const loginBtn = screen.getByRole('button', { name: /login/i });
 
-    // Test bad username length
-    fireEvent.change(userInput, { target: { value: 'usr' } });
     fireEvent.change(passInput, { target: { value: 'password123' } });
     expect(loginBtn).toBeDisabled();
 
-    // Test bad password length  
-    fireEvent.change(userInput, { target: { value: 'user123' } });
-    fireEvent.change(passInput, { target: { value: 'pass' } });
+    fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
+    fireEvent.change(passInput, { target: { value: 'short' } });
     expect(loginBtn).toBeDisabled();
 
-    // Test valid credentials
-    fireEvent.change(userInput, { target: { value: 'user123' } });
     fireEvent.change(passInput, { target: { value: 'password123' } });
     expect(loginBtn).toBeEnabled();
   });
 
   it('calls onLogin with correct credentials when form is valid', () => {
-    const userInput = screen.getByPlaceholderText(/username/i);
+    const emailInput = screen.getByPlaceholderText(/email/i);
     const passInput = screen.getByPlaceholderText(/password/i);
     const loginBtn = screen.getByRole('button', { name: /login/i });
 
-    fireEvent.change(userInput, { target: { value: 'testuser' } });
+    fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
     fireEvent.change(passInput, { target: { value: 'testpassword' } });
     fireEvent.click(loginBtn);
 
-    expect(mockOnLogin).toHaveBeenCalledWith('testuser', 'testpassword');
+    expect(mockOnLogin).toHaveBeenCalledWith({
+      email: 'user@example.com',
+      password: 'testpassword'
+    });
     expect(mockOnLogin).toHaveBeenCalledTimes(1);
   });
 
   it('prevents login submission when credentials are invalid', () => {
-    const userInput = screen.getByPlaceholderText(/username/i);
+    const emailInput = screen.getByPlaceholderText(/email/i);
     const passInput = screen.getByPlaceholderText(/password/i);
     const loginBtn = screen.getByRole('button', { name: /login/i });
 
-    // short username
-    fireEvent.change(userInput, { target: { value: 'u' } });
     fireEvent.change(passInput, { target: { value: 'validpassword' } });
-    
-    // Button should be disabled, so click won't work
+
     expect(loginBtn).toBeDisabled();
     fireEvent.click(loginBtn);
     expect(mockOnLogin).not.toHaveBeenCalled();
@@ -95,7 +94,6 @@ describe('Login Component (coverage)', () => {
 
   describe('Registration Mode', () => {
     beforeEach(() => {
-      // Switch to register mode if switch button exists
       const switchButton = screen.queryByRole('button', { name: /create an account|register/i });
       if (switchButton) {
         fireEvent.click(switchButton);
@@ -114,9 +112,11 @@ describe('Login Component (coverage)', () => {
       const registerBtn = screen.queryByRole('button', { name: /register/i });
       if (!registerBtn) return;
 
+      const emailInput = screen.getByPlaceholderText(/email/i);
       const userInput = screen.getByPlaceholderText(/username/i);
       const passInput = screen.getByPlaceholderText(/password/i);
 
+      fireEvent.change(emailInput, { target: { value: 'new@example.com' } });
       fireEvent.change(userInput, { target: { value: 'newuser123' } });
       fireEvent.change(passInput, { target: { value: 'NewPassword1!' } });
 
@@ -126,13 +126,14 @@ describe('Login Component (coverage)', () => {
     });
 
     it('shows validation feedback for weak inputs', async () => {
+      const emailInput = screen.getByPlaceholderText(/email/i);
       const userInput = screen.getByPlaceholderText(/username/i);
       const passInput = screen.getByPlaceholderText(/password/i);
 
+      fireEvent.change(emailInput, { target: { value: 'bad' } });
       fireEvent.change(userInput, { target: { value: 'u' } });
       fireEvent.change(passInput, { target: { value: 'weak' } });
 
-      // Look for validation messages
       await waitFor(() => {
         const usernameError = screen.queryByText(/username.*4.*character/i) || 
                              screen.queryByText(/too short/i);
@@ -150,6 +151,7 @@ describe('Login Component (coverage)', () => {
       const userInput = screen.getByPlaceholderText(/username/i);
       const passInput = screen.getByPlaceholderText(/password/i);
 
+      fireEvent.change(emailInput, { target: { value: 'new@example.com' } });
       fireEvent.change(userInput, { target: { value: 'newuser' } });
       fireEvent.change(passInput, { target: { value: 'NewPassword1!' } });
 
@@ -168,9 +170,10 @@ describe('Login Component (coverage)', () => {
           expect.objectContaining({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              username: 'newuser', 
-              password: 'NewPassword1!' 
+            body: JSON.stringify({
+              email: 'new@example.com',
+              username: 'newuser',
+              password: 'NewPassword1!'
             })
           })
         );
@@ -184,10 +187,10 @@ describe('Login Component (coverage)', () => {
       const userInput = screen.getByPlaceholderText(/username/i);
       const passInput = screen.getByPlaceholderText(/password/i);
 
+      fireEvent.change(emailInput, { target: { value: 'exists@example.com' } });
       fireEvent.change(userInput, { target: { value: 'existinguser' } });
       fireEvent.change(passInput, { target: { value: 'Password123!' } });
 
-      // Mock registration failure
       global.fetch.mockResolvedValueOnce({
         ok: false,
         json: async () => ({ error: 'Username already exists' })
@@ -208,6 +211,7 @@ describe('Login Component (coverage)', () => {
       const userInput = screen.getByPlaceholderText(/username/i);
       const passInput = screen.getByPlaceholderText(/password/i);
 
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
       fireEvent.change(userInput, { target: { value: 'testuser' } });
       fireEvent.change(passInput, { target: { value: 'TestPassword1!' } });
 
@@ -227,60 +231,20 @@ describe('Login Component (coverage)', () => {
   });
 
   describe('Authentication Integration', () => {
-    it('makes login request to updated API endpoint', async () => {
-      const userInput = screen.getByPlaceholderText(/username/i);
+    it('calls onLogin handler with provided credentials', async () => {
+      const emailInput = screen.getByPlaceholderText(/email/i);
       const passInput = screen.getByPlaceholderText(/password/i);
       const loginBtn = screen.getByRole('button', { name: /login/i });
 
-      // Mock successful login
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ 
-          message: 'Login successful', 
-          user: { username: 'testuser', roles: ['user'] }
-        })
-      });
-
-      fireEvent.change(userInput, { target: { value: 'testuser' } });
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
       fireEvent.change(passInput, { target: { value: 'testpassword' } });
       fireEvent.click(loginBtn);
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/login'),
-          expect.objectContaining({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              username: 'testuser',
-              password: 'testpassword'
-            })
-          })
-        );
-      });
-    });
-
-    it('handles authentication errors appropriately', async () => {
-      const userInput = screen.getByPlaceholderText(/username/i);
-      const passInput = screen.getByPlaceholderText(/password/i);
-      const loginBtn = screen.getByRole('button', { name: /login/i });
-
-      // Mock authentication failure
-      global.fetch.mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-        json: async () => ({ error: 'Invalid credentials' })
-      });
-
-      fireEvent.change(userInput, { target: { value: 'wronguser' } });
-      fireEvent.change(passInput, { target: { value: 'wrongpass' } });
-      fireEvent.click(loginBtn);
-
-      await waitFor(() => {
-        const errorMessage = screen.queryByText(/invalid.*credential/i) ||
-                           screen.queryByText(/login.*failed/i) ||
-                           screen.queryByText(/unauthorized/i);
-        expect(errorMessage).toBeInTheDocument();
+        expect(mockOnLogin).toHaveBeenCalledWith({
+          email: 'test@example.com',
+          password: 'testpassword'
+        });
       });
     });
   });

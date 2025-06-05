@@ -1,216 +1,703 @@
 import React, { useState, useEffect } from 'react';
+import '../style.css';
+
 
 function Search({ user }) {
-  const [query, setQuery] = useState('');
-  const [sport, setSport] = useState('');
-  const [entityType, setEntityType] = useState('person');
-  const [newInputData, setNewInputData] = useState({});
-  const [results, setResults] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
-  const [error, setError] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [formData, setFormData] = useState({});
-
-  const isChanged = (key) => newInputData[key] && newInputData[key] !== formData[key];
-
-  useEffect(() => {
-    setFormData({
-      name: query || '',
-      nationality: '',
-      gender: '',
-      profileImage: '',
-      birthDate: '',
-      roles: '',
-      primaryRole: '',
-      sport: sport || '',
-      description: '',
-      foundingDate: '',
-      location: '',
-      image: '',
-      sameAs: ''
+    const [query, setQuery] = useState('');
+    const [sport, setSport] = useState('');
+    const [entityType, setEntityType] = useState('person');
+    const [results, setResults] = useState([]);
+    const [suggestions, setSuggestions] = useState([]);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [showForm, setShowForm] = useState(false);
+    const [showRelationshipForm, setShowRelationshipForm] = useState(false);
+    const [editId, setEditId] = useState(null);
+    const [formData, setFormData] = useState({});
+    const [relationshipData, setRelationshipData] = useState({
+        sourceId: '',
+        targetId: '',
+        relationshipType: '',
+        sourceType: '',
+        targetType: ''
     });
-  }, [entityType, query, sport]);
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setNewInputData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    setError('');
-    setResults([]);
-    setSuggestions([]);
-    setShowForm(false);
-
-    try {
-      const params = new URLSearchParams({ query });
-      if (sport) params.append('sport', sport);
-      const res = await fetch(`${process.env.API_BASE}/api/search?${params.toString()}`);
-      const data = await res.json();
-      setResults(data.players || []);
-      setSuggestions(data.suggestions || []);
-    } catch (err) {
-      setError('Search failed');
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const merged = {
-      ...formData,
-      ...newInputData,
-      roles: (newInputData.roles || formData.roles || '')
-        .split(',')
-        .map((r) => r.trim())
-        .filter(Boolean)
+    // Available relationship types based on entity combinations
+    const relationshipTypes = {
+        'person-organisation': ['PARTICIPATES_IN', 'PLAYS_FOR', 'MEMBER_OF'],
+        'person-event': ['PARTICIPATES_IN', 'COMPETED_IN'],
+        'person-sport': ['PLAYS', 'SPECIALIZES_IN'],
+        'event-sport': ['PART_OF_SPORT', 'BELONGS_TO'],
+        'event-organisation': ['HOSTED_BY', 'ORGANIZED_BY'],
+        'organisation-sport': ['COMPETES_IN', 'ASSOCIATED_WITH']
     };
 
-    let url = '', method = 'POST', payload = merged;
+    useEffect(() => {
+        initializeFormData();
+    }, [entityType, query, sport]);
 
-    if (entityType === 'person') {
-      url = editId ? `/api/player/uuid/${editId}` : '/api/athlete/create';
-      method = editId ? 'PUT' : 'POST';
-    } else if (entityType === 'organisation') {
-      url = '/api/team/upsert';
-    } else if (entityType === 'sport') {
-      url = '/api/sport';
-      payload = { name: merged.name, type: 'athlete', sportName: merged.sport };
-    } else if (entityType === 'event') {
-      url = '/api/events/create';
-    }
+    const initializeFormData = () => {
+        const baseData = {
+            name: query || '',
+            sport: sport || ''
+        };
 
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+        switch (entityType) {
+            case 'person':
+                setFormData({
+                    ...baseData,
+                    nationality: '',
+                    gender: '',
+                    profileImage: '',
+                    birthDate: '',
+                    roles: '',
+                    primaryRole: '',
+                    description: ''
+                });
+                break;
+            case 'organisation':
+                setFormData({
+                    ...baseData,
+                    description: '',
+                    location: '',
+                    foundingDate: '',
+                    image: '',
+                    sameAs: ''
+                });
+                break;
+            case 'sport':
+                setFormData({
+                    ...baseData,
+                    alternateName: '',
+                    iocDisciplineCode: '',
+                    type: 'Sport',
+                    category: '',
+                    description: ''
+                });
+                break;
+            case 'event':
+                setFormData({
+                    ...baseData,
+                    description: '',
+                    location: '',
+                    year: '',
+                    foundingDate: '',
+                    roles: '',
+                    sameAs: ''
+                });
+                break;
+            default:
+                setFormData(baseData);
+        }
+    };
 
-    const data = await res.json();
-    if (!res.ok) {
-      alert(data.error || 'Failed to save');
-    } else {
-      alert('Saved successfully');
-      setShowForm(false);
-      setEditId(null);
-      setNewInputData({});
-    }
-  };
+    const handleFormChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
 
-  const handleDelete = async (uuid) => {
-    if (!window.confirm('Delete this item?')) return;
-    const res = await fetch(`${process.env.API_BASE}/api/users/uuid/${uuid}`, { method: 'DELETE' });
-    if (res.ok) {
-      alert('Deleted');
-      handleSearch(new Event('submit'));
-    } else {
-      alert('Delete failed');
-    }
-  };
+    const handleRelationshipChange = (e) => {
+        const { name, value } = e.target;
+        setRelationshipData(prev => ({ ...prev, [name]: value }));
+    };
 
-  return (
-    <div className="card mb-4 shadow-sm border-0">
-      <div className="card-header bg-purple text-grey d-flex justify-content-between align-items-center">
-        <h5 className="mb-0">Search & Manage</h5>
-      </div>
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        setError('');
+        setSuccess('');
+        setResults([]);
+        setSuggestions([]);
+        setShowForm(false);
 
-      <div className="card-body bg-grey">
-        <form onSubmit={handleSearch} className="mb-4">
-          <div className="row g-3">
-            <div className="col-md-5">
-              <label className="form-label text-navy fw-bold">Name or Keyword</label>
-              <input
-                type="text"
-                className="form-control"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Enter name..."
-              />
+        try {
+            const params = new URLSearchParams({ query });
+            if (sport) params.append('sport', sport);
+            
+            const endpoint = entityType === 'person' ? 'search' : entityType === 'organisation' ? 'team' : entityType;
+            const res = await fetch(`${API_BASE || ''}/api/${endpoint}?${params.toString()}`);
+            const data = await res.json();
+            
+            if (entityType === 'person') {
+                setResults(data.players || []);
+                setSuggestions(data.suggestions || []);
+            } else {
+                setResults(Array.isArray(data) ? data : [data]);
+            }
+        } catch (err) {
+            setError('Search failed: ' + err.message);
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setSuccess('');
+
+        try {
+            const processedData = { ...formData };
+            
+            // Process roles for person entities
+            if (entityType === 'person' && processedData.roles) {
+                processedData.roles = processedData.roles
+                    .split(',')
+                    .map(r => r.trim())
+                    .filter(Boolean);
+            }
+
+            // Process alternateName for sports
+            if (entityType === 'sport' && processedData.alternateName) {
+                processedData.alternateName = processedData.alternateName
+                    .split(',')
+                    .map(name => name.trim())
+                    .filter(Boolean);
+            }
+
+            let url, method, endpoint;
+
+            switch (entityType) {
+                case 'person':
+                    endpoint = editId ? `/api/athletes/uuid/${editId}` : '/api/athletes';
+                    method = editId ? 'PUT' : 'POST';
+                    break;
+                case 'organisation':
+                    endpoint = '/api/team';
+                    method = 'POST';
+                    break;
+                case 'sport':
+                    endpoint = '/api/sport';
+                    method = 'POST';
+                    break;
+                case 'event':
+                    endpoint = '/api/events';
+                    method = 'POST';
+                    break;
+                default:
+                    throw new Error('Invalid entity type');
+            }
+
+            const res = await fetch(`${API_BASE || ''}${endpoint}`, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(processedData)
+            });
+
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.error || data.message || 'Failed to save');
+            }
+
+            setSuccess(`${entityType} ${editId ? 'updated' : 'created'} successfully!`);
+            setShowForm(false);
+            setEditId(null);
+            initializeFormData();
+            
+            // Refresh search results
+            if (query) {
+                handleSearch(new Event('submit'));
+            }
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    const handleCreateRelationship = async (e) => {
+        e.preventDefault();
+        setError('');
+        setSuccess('');
+
+        const { sourceId, targetId, relationshipType, sourceType, targetType } = relationshipData;
+
+        if (!sourceId || !targetId || !relationshipType) {
+            setError('All relationship fields are required');
+            return;
+        }
+
+        try {
+            let endpoint;
+            let payload = {};
+
+            // Determine the correct endpoint based on relationship type
+            if (sourceType === 'person' && targetType === 'organisation') {
+                endpoint = `/api/athlete/${sourceId}/organisation`;
+                payload = { organisationId: targetId, relationshipType };
+            } else if (sourceType === 'event' && targetType === 'sport') {
+                endpoint = `/api/events/${sourceId}/sport`;
+                payload = { sportName: targetId }; // Assuming targetId is sport name
+            } else {
+                // Generic relationship endpoint (you might need to implement this)
+                endpoint = `/api/relationships`;
+                payload = {
+                    sourceId,
+                    targetId,
+                    sourceType,
+                    targetType,
+                    relationshipType
+                };
+            }
+
+            const res = await fetch(`${process.env.REACT_APP_API_BASE || ''}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to create relationship');
+            }
+
+            setSuccess('Relationship created successfully!');
+            setShowRelationshipForm(false);
+            setRelationshipData({
+                sourceId: '',
+                targetId: '',
+                relationshipType: '',
+                sourceType: '',
+                targetType: ''
+            });
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    const handleEdit = (item) => {
+        setEditId(item.id || item.uuid);
+        const editData = { ...item };
+        
+        // Handle roles array for display
+        if (editData.roles && Array.isArray(editData.roles)) {
+            editData.roles = editData.roles.join(', ');
+        }
+        
+        // Handle alternateName array for display
+        if (editData.alternateName && Array.isArray(editData.alternateName)) {
+            editData.alternateName = editData.alternateName.join(', ');
+        }
+        
+        setFormData(editData);
+        setShowForm(true);
+    };
+
+    const handleDelete = async (uuid) => {
+        if (!window.confirm('Are you sure you want to delete this item?')) return;
+        
+        try {
+            const endpoint = entityType === 'person' ? 'users' : entityType;
+            const res = await fetch(`${process.env.REACT_APP_API_BASE || ''}/api/${endpoint}/uuid/${uuid}`, { 
+                method: 'DELETE' 
+            });
+            
+            if (res.ok) {
+                setSuccess('Item deleted successfully');
+                handleSearch(new Event('submit'));
+            } else {
+                const data = await res.json();
+                throw new Error(data.error || 'Delete failed');
+            }
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    const getRelationshipOptions = () => {
+        const { sourceType, targetType } = relationshipData;
+        const key = `${sourceType}-${targetType}`;
+        return relationshipTypes[key] || [];
+    };
+
+    return (
+        <div className="auth-container">
+            <div className="auth-card" style={{ width: '100%', maxWidth: '900px' }}>
+                <h2 className="auth-title">Search & Manage Entities</h2>
+
+                {/* Alert Messages */}
+                {error && <div className="auth-error" style={{ marginBottom: '20px' }}>{error}</div>}
+                {success && <div style={{ color: 'green', marginBottom: '20px', padding: '10px', background: '#e8f5e8', borderRadius: '5px' }}>{success}</div>}
+
+                {/* Search Form */}
+                <form onSubmit={handleSearch} style={{ width: '100%', marginBottom: '20px' }}>
+                    <input
+                        className="auth-input"
+                        type="text"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Enter search term..."
+                    />
+                    <select className="auth-input" value={sport} onChange={(e) => setSport(e.target.value)}>
+                        <option value="">All Sports</option>
+                        <option value="Soccer">Soccer</option>
+                        <option value="Cricket">Cricket</option>
+                        <option value="Basketball">Basketball</option>
+                        <option value="Tennis">Tennis</option>
+                    </select>
+                    <select className="auth-input" value={entityType} onChange={(e) => setEntityType(e.target.value)}>
+                        <option value="person">Athletes/People</option>
+                        <option value="organisation">Teams/Organizations</option>
+                        <option value="sport">Sports</option>
+                        <option value="event">Events</option>
+                    </select>
+                    <button className="auth-button" type="submit">Search</button>
+                </form>
+
+                {/* Action Buttons */}
+                <div style={{ marginBottom: '20px' }}>
+                    <button 
+                        className="auth-button-alt" 
+                        onClick={() => {
+                            setShowForm(true);
+                            setEditId(null);
+                            initializeFormData();
+                        }}
+                        style={{ marginRight: '10px' }}
+                    >
+                        Add New {entityType}
+                    </button>
+                    <button 
+                        className="auth-button-alt" 
+                        onClick={() => setShowRelationshipForm(true)}
+                    >
+                        Create Relationship
+                    </button>
+                </div>
+
+                {/* Search Results */}
+                {results.length > 0 && (
+                    <div style={{ marginBottom: '20px' }}>
+                        <h3 style={{ color: 'var(--navy)' }}>Search Results:</h3>
+                        {results.map((item) => (
+                            <div key={item.id || item.uuid || item.name} className="profile-panel">
+                                <h4>{item.name}</h4>
+                                <div className="profile-details">
+                                    {item.sport && <p><strong>Sport:</strong> {item.sport}</p>}
+                                    {item.nationality && <p><strong>Nationality:</strong> {item.nationality}</p>}
+                                    {item.location && <p><strong>Location:</strong> {item.location}</p>}
+                                    {item.description && <p><strong>Description:</strong> {item.description}</p>}
+                                    {item.year && <p><strong>Year:</strong> {item.year}</p>}
+                                    {item.iocDisciplineCode && <p><strong>IOC Code:</strong> {item.iocDisciplineCode}</p>}
+                                </div>
+                                <div style={{ marginTop: '10px' }}>
+                                    <button 
+                                        className="auth-button-alt" 
+                                        onClick={() => handleEdit(item)}
+                                        style={{ marginRight: '10px' }}
+                                    >
+                                        Edit
+                                    </button>
+                                    <button 
+                                        className="auth-button" 
+                                        onClick={() => handleDelete(item.id || item.uuid)}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Suggestions */}
+                {suggestions.length > 0 && (
+                    <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ color: 'var(--purple)' }}>Did you mean:</h4>
+                        {suggestions.map((suggestion) => (
+                            <div key={suggestion.id} style={{ padding: '5px', margin: '5px 0', background: '#f0f0f0' }}>
+                                <span>{suggestion.name}</span>
+                                {suggestion.sport && <span> ({suggestion.sport})</span>}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Entity Form */}
+                {showForm && (
+                    <form onSubmit={handleSubmit} style={{ width: '100%', marginTop: '20px', border: '1px solid #ddd', padding: '20px', borderRadius: '5px' }}>
+                        <h3 style={{ color: 'var(--navy)', marginBottom: '15px' }}>
+                            {editId ? 'Edit' : 'Add New'} {entityType.charAt(0).toUpperCase() + entityType.slice(1)}
+                        </h3>
+
+                        {/* Common Fields */}
+                        <input
+                            className="auth-input"
+                            name="name"
+                            value={formData.name || ''}
+                            onChange={handleFormChange}
+                            placeholder="Name"
+                            required
+                        />
+
+                        <input
+                            className="auth-input"
+                            name="sport"
+                            value={formData.sport || ''}
+                            onChange={handleFormChange}
+                            placeholder="Sport"
+                        />
+
+                        {/* Person-specific fields */}
+                        {entityType === 'person' && (
+                            <>
+                                <input
+                                    className="auth-input"
+                                    name="nationality"
+                                    value={formData.nationality || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Nationality"
+                                />
+                                <select
+                                    className="auth-input"
+                                    name="gender"
+                                    value={formData.gender || ''}
+                                    onChange={handleFormChange}
+                                >
+                                    <option value="">Select Gender</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <input
+                                    className="auth-input"
+                                    name="birthDate"
+                                    type="date"
+                                    value={formData.birthDate || ''}
+                                    onChange={handleFormChange}
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="profileImage"
+                                    value={formData.profileImage || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Profile Image URL"
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="roles"
+                                    value={formData.roles || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Roles (comma-separated)"
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="primaryRole"
+                                    value={formData.primaryRole || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Primary Role"
+                                />
+                            </>
+                        )}
+
+                        {/* Organization-specific fields */}
+                        {entityType === 'organisation' && (
+                            <>
+                                <input
+                                    className="auth-input"
+                                    name="location"
+                                    value={formData.location || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Location"
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="foundingDate"
+                                    type="date"
+                                    value={formData.foundingDate || ''}
+                                    onChange={handleFormChange}
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="image"
+                                    value={formData.image || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Image URL"
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="sameAs"
+                                    value={formData.sameAs || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="External Reference URL"
+                                />
+                            </>
+                        )}
+
+                        {/* Sport-specific fields */}
+                        {entityType === 'sport' && (
+                            <>
+                                <input
+                                    className="auth-input"
+                                    name="alternateName"
+                                    value={formData.alternateName || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Alternate Names (comma-separated)"
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="iocDisciplineCode"
+                                    value={formData.iocDisciplineCode || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="IOC Discipline Code"
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="category"
+                                    value={formData.category || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Category"
+                                />
+                            </>
+                        )}
+
+                        {/* Event-specific fields */}
+                        {entityType === 'event' && (
+                            <>
+                                <input
+                                    className="auth-input"
+                                    name="location"
+                                    value={formData.location || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Location"
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="year"
+                                    type="number"
+                                    value={formData.year || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Year"
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="foundingDate"
+                                    type="date"
+                                    value={formData.foundingDate || ''}
+                                    onChange={handleFormChange}
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="roles"
+                                    value={formData.roles || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Associated Roles"
+                                />
+                                <input
+                                    className="auth-input"
+                                    name="sameAs"
+                                    value={formData.sameAs || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="External Reference URL"
+                                />
+                            </>
+                        )}
+
+                        {/* Description field for all except person */}
+                        {entityType !== 'person' && (
+                            <textarea
+                                className="auth-input"
+                                name="description"
+                                value={formData.description || ''}
+                                onChange={handleFormChange}
+                                placeholder="Description"
+                                rows="3"
+                            />
+                        )}
+
+                        <div style={{ marginTop: '15px' }}>
+                            <button className="auth-button" type="submit" style={{ marginRight: '10px' }}>
+                                {editId ? 'Update' : 'Create'}
+                            </button>
+                            <button 
+                                type="button" 
+                                className="auth-button-alt" 
+                                onClick={() => setShowForm(false)}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* Relationship Form */}
+                {showRelationshipForm && (
+                    <form onSubmit={handleCreateRelationship} style={{ width: '100%', marginTop: '20px', border: '1px solid #ddd', padding: '20px', borderRadius: '5px' }}>
+                        <h3 style={{ color: 'var(--navy)', marginBottom: '15px' }}>Create Relationship</h3>
+                        
+                        <select
+                            className="auth-input"
+                            name="sourceType"
+                            value={relationshipData.sourceType}
+                            onChange={handleRelationshipChange}
+                            required
+                        >
+                            <option value="">Select Source Type</option>
+                            <option value="person">Person/Athlete</option>
+                            <option value="organisation">Organization</option>
+                            <option value="sport">Sport</option>
+                            <option value="event">Event</option>
+                        </select>
+
+                        <input
+                            className="auth-input"
+                            name="sourceId"
+                            value={relationshipData.sourceId}
+                            onChange={handleRelationshipChange}
+                            placeholder="Source ID/UUID"
+                            required
+                        />
+
+                        <select
+                            className="auth-input"
+                            name="targetType"
+                            value={relationshipData.targetType}
+                            onChange={handleRelationshipChange}
+                            required
+                        >
+                            <option value="">Select Target Type</option>
+                            <option value="person">Person/Athlete</option>
+                            <option value="organisation">Organization</option>
+                            <option value="sport">Sport</option>
+                            <option value="event">Event</option>
+                        </select>
+
+                        <input
+                            className="auth-input"
+                            name="targetId"
+                            value={relationshipData.targetId}
+                            onChange={handleRelationshipChange}
+                            placeholder="Target ID/UUID"
+                            required
+                        />
+
+                        <select
+                            className="auth-input"
+                            name="relationshipType"
+                            value={relationshipData.relationshipType}
+                            onChange={handleRelationshipChange}
+                            required
+                        >
+                            <option value="">Select Relationship Type</option>
+                            {getRelationshipOptions().map(type => (
+                                <option key={type} value={type}>{type}</option>
+                            ))}
+                        </select>
+
+                        <div style={{ marginTop: '15px' }}>
+                            <button className="auth-button" type="submit" style={{ marginRight: '10px' }}>
+                                Create Relationship
+                            </button>
+                            <button 
+                                type="button" 
+                                className="auth-button-alt" 
+                                onClick={() => setShowRelationshipForm(false)}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                )}
             </div>
-            <div className="col-md-3">
-              <label className="form-label text-navy fw-bold">Sport</label>
-              <select className="form-select" value={sport} onChange={(e) => setSport(e.target.value)}>
-                <option value="">All Sports</option>
-                <option value="Soccer">Soccer</option>
-                <option value="Cricket">Cricket</option>
-              </select>
-            </div>
-            <div className="col-md-3">
-              <label className="form-label text-navy fw-bold">Entity Type</label>
-              <select className="form-select" value={entityType} onChange={(e) => setEntityType(e.target.value)}>
-                <option value="person">Athlete</option>
-                <option value="organisation">Team</option>
-                <option value="sport">Sport</option>
-                <option value="event">Event</option>
-              </select>
-            </div>
-            <div className="col-md-1 d-grid align-items-end">
-              <button type="submit" className="btn fw-bold" style={{ backgroundColor: 'var(--purple)', color: 'white' }}>
-                Go
-              </button>
-            </div>
-          </div>
-        </form>
-
-        {error && <div className="alert alert-danger">{error}</div>}
-
-        {results.map((r) => (
-          <div key={r.id} className="card mb-3">
-            <div className="card-body d-flex justify-content-between align-items-center">
-              <div>
-                <h6 className="text-navy mb-0">{r.name}</h6>
-                <small className="text-muted">
-                  {r.nationality || r.description || 'No description'}
-                </small>
-              </div>
-              <div className="d-flex gap-2">
-                <button className="btn btn-outline-primary btn-sm" onClick={() => {
-                  setEditId(r.id);
-                  setFormData({ ...r, roles: r.roles?.join(', ') || '' });
-                  setNewInputData({});
-                  setShowForm(true);
-                }}>Edit</button>
-                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}>Delete</button>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {showForm && (
-          <form onSubmit={handleSubmit} className="mt-4 border-top pt-4">
-            <h6 className="text-navy fw-bold mb-3">{editId ? 'Edit' : 'Add New'} {entityType}</h6>
-
-            <div className="row g-3">
-              {editId && <label className="form-label text-purple">Current name: {formData.name}</label>}
-              <input className="form-control" name="name" value={newInputData.name || ''} onChange={handleFormChange} placeholder="New name (optional)" />
-
-              {entityType === 'person' && (
-                <>
-                  <input className="form-control" name="nationality" value={newInputData.nationality || ''} onChange={handleFormChange} placeholder="Nationality" />
-                  <input className="form-control" name="gender" value={newInputData.gender || ''} onChange={handleFormChange} placeholder="Gender" />
-                  <input className="form-control" name="birthDate" type="date" value={newInputData.birthDate || ''} onChange={handleFormChange} />
-                  <input className="form-control" name="profileImage" value={newInputData.profileImage || ''} onChange={handleFormChange} placeholder="Image URL" />
-                  <input className="form-control" name="roles" value={newInputData.roles || ''} onChange={handleFormChange} placeholder="Comma-separated roles" />
-                  <input className="form-control" name="primaryRole" value={newInputData.primaryRole || ''} onChange={handleFormChange} placeholder="Primary role" />
-                </>
-              )}
-
-
-              <input className="form-control" name="sport" value={newInputData.sport || ''} onChange={handleFormChange} placeholder="Sport" />
-            </div>
-
-            <div className="mt-3 d-grid">
-              <button className="btn fw-bold" type="submit" style={{ backgroundColor: 'var(--purple)', color: 'white' }}>
-                {editId ? 'Update' : 'Create'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
+        </div>
+    );
 }
 
 export default Search;

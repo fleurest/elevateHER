@@ -200,6 +200,34 @@ class Graph {
         }
     }
 
+        /**
+     * Get all liked entities across all users
+     * @param {number} limit - Maximum number of results
+     * @returns {Promise<Array>} Array of liked relationships
+     */
+        async getAllLikes(limit = 50) {
+            const session = this.driver.session();
+            const safeLimit = await this._safeLimit(limit, 50);
+    
+            try {
+                const result = await session.run(
+                    `
+                    MATCH (user:Person)-[r:LIKES]->(target)
+                    RETURN user, r, target, labels(target) AS targetLabels
+                    ORDER BY r.createdAt DESC
+                    LIMIT $limit
+                    `,
+                    {
+                        limit: neo4j.int(safeLimit)
+                    }
+                );
+    
+                return result.records;
+            } finally {
+                await session.close();
+            }
+        }
+        
      /**
      * Get friends for a user by email
      * @param {string} email - User's email

@@ -67,6 +67,7 @@ function HomePage({ handleLogout, user, setUser }) {
   // Top friends for the icon bar
   const [topFriends, setTopFriends] = useState([]);
   const [showAllFriends, setShowAllFriends] = useState(false);
+  const [incomingRequests, setIncomingRequests] = useState([]);
 
   // "Get Explore" → filterType determines which label to filter by
   const [filterType, setFilterType] = useState(null);
@@ -83,6 +84,8 @@ function HomePage({ handleLogout, user, setUser }) {
 
   // Selected person details (shows when person node is clicked)
   const [selectedPerson, setSelectedPerson] = useState(null);
+  const [likedPlayerNames, setLikedPlayerNames] = useState([]);
+  const [friendUsernames, setFriendUsernames] = useState([]);
 
   // Friend search functionality
   const [showAddFriendPanel, setShowAddFriendPanel] = useState(false);
@@ -154,13 +157,45 @@ function HomePage({ handleLogout, user, setUser }) {
     fetchFullGraph();
   }, []);
 
+  const fetchTopFriends = async () => {
+    if (!user?.username) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/users/friends/${user.username}`, { credentials: 'include' });
+      const data = await res.json();
+      setTopFriends(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error loading top friends:', err);
+    }
+  };
+
+  // Fetch top friends for icon bar
+  useEffect(() => {
+    fetchTopFriends();
+  }, [user?.username]);
+
+  useEffect(() => {
+    if (!user?.username) return;
+
+    fetch(`${API_BASE}/api/users/likes/${user.username}`)
+      .then(res => res.json())
+      .then(data => setLikedPlayerNames(Array.isArray(data) ? data.map(p => p.name) : []))
+      .catch(err => console.error('Error loading liked players:', err));
+
+    fetch(`${API_BASE}/api/users/friends/${user.username}`)
+      .then(res => res.json())
+      .then(data => setFriendUsernames(Array.isArray(data) ? data.map(f => f.username) : []))
+      .catch(err => console.error('Error loading friends list:', err));
+  }, [user?.username]);
+
   // Fetch top friends for icon bar
   useEffect(() => {
     if (!user?.username) return;
-    fetch(`${API_BASE}/api/users/friends/${user.username}`, { credentials: 'include' })
-      .then((res) => res.json())
-      .then((data) => setTopFriends(Array.isArray(data) ? data : []))
-      .catch((err) => console.error('Error loading top friends:', err));
+    fetch(`${API_BASE}/api/users/pending-incoming/${user.username}`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        setIncomingRequests(Array.isArray(data?.incoming) ? data.incoming : []);
+      })
+      .catch(err => console.error('Error loading incoming requests:', err));
   }, [user?.username]);
 
   const handleSpotlightProfile = (athleteObj) => {
@@ -176,13 +211,27 @@ function HomePage({ handleLogout, user, setUser }) {
       location: athlete.nationality || athlete.location || '',
       sport: athlete.sport,
       gender: athlete.gender,
-      uuid: athlete.uuid
+      uuid: athlete.uuid,
+      isAthlete: true
     });
     setRightPanelView('personDetails');
     setEditProfile(false);
     setCenterGraphData(null);
     setFilterType(null);
     setSelectedNode(null);
+  };
+
+  const handleTopFriendClick = (friend) => {
+    if (!friend) return;
+    setSelectedPerson({
+      name: friend.name || friend.username,
+      username: friend.username,
+      email: friend.email,
+      profileImage: friend.profileImage,
+      location: friend.location,
+    });
+    setRightPanelView('userProfile');
+    setEditProfile(false);
   };
 
   const handleDashboardClick = () => {
@@ -222,6 +271,8 @@ function HomePage({ handleLogout, user, setUser }) {
         setLikeMessage('Player Liked!');
         setTimeout(() => setLikeMessage(''), 2000);
 
+        setLikedPlayerNames(prev => Array.from(new Set([...prev, username])));
+
         if (activeView === 'players') {
           handleMyPlayers();
         }
@@ -231,6 +282,29 @@ function HomePage({ handleLogout, user, setUser }) {
       }
     } catch (err) {
       setLikeMessage('Error liking player.');
+      setTimeout(() => setLikeMessage(''), 2000);
+    }
+  };
+
+  const handleUnlikePlayer = async (username) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/likes`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ athleteName: username })
+      });
+      if (res.ok) {
+        setLikedPlayerNames(prev => prev.filter(n => n !== username));
+        setLikeMessage('Player Unliked!');
+        setTimeout(() => setLikeMessage(''), 2000);
+      } else {
+        const data = await res.json();
+        setLikeMessage(data.error || 'Could not unlike player.');
+        setTimeout(() => setLikeMessage(''), 2000);
+      }
+    } catch (err) {
+      setLikeMessage('Error unliking player.');
       setTimeout(() => setLikeMessage(''), 2000);
     }
   };
@@ -312,6 +386,37 @@ function HomePage({ handleLogout, user, setUser }) {
     } catch (err) {
       console.error('Error sending friend request:', err);
       alert('Failed to send friend request. Please try again.');
+    }
+  };
+
+  const handleAcceptRequest = async (fromUsername) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/accept`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromUsername, toUsername: user.username })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setIncomingRequests(prev => prev.filter(u => u !== fromUsername));
+      fetchTopFriends();
+    } catch (err) {
+      console.error('Error accepting friend request:', err);
+    }
+  };
+
+  const handleRejectRequest = async (fromUsername) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/users/reject`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromUsername, toUsername: user.username })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setIncomingRequests(prev => prev.filter(u => u !== fromUsername));
+    } catch (err) {
+      console.error('Error rejecting friend request:', err);
     }
   };
 
@@ -571,19 +676,18 @@ function HomePage({ handleLogout, user, setUser }) {
     }
   };
 
-  const handleViewLikedPlayers = async (userEmail) => {
+  const handleViewLikedPlayers = async (identifier) => {
     try {
-      console.log('👀 Loading liked players for:', userEmail);
+      console.log('👀 Loading liked players for:', identifier);
 
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!userEmail || !emailRegex.test(userEmail)) {
-        console.error('Invalid email format:', userEmail);
-        alert('Cannot load liked players - invalid email format');
+      if (!identifier) {
+        console.error('No user identifier provided');
+        alert('Cannot load liked players - missing identifier');
         return;
       }
 
       const res = await fetch(
-        `${API_BASE}/api/graph/liked/${encodeURIComponent(userEmail)}`,
+        `${API_BASE}/api/users/likes/${encodeURIComponent(identifier)}`,
         { credentials: 'include' }
       );
 
@@ -596,58 +700,9 @@ function HomePage({ handleLogout, user, setUser }) {
       const data = await res.json();
       console.log('Liked players response:', data);
 
-      // Transform the response to cytoscape format if needed
-      if (data.nodes && data.edges) {
-        setActiveView('viewingLikedPlayers');
-        setCenterGraphData(data);
-      } else {
-        const nodesMap = new Map();
-        const edges = [];
+      setActiveView('viewingLikedPlayers');
+      setCenterGraphData(data);
 
-        data.forEach(record => {
-          const user = record.user;
-          const target = record.target;
-          const relationship = record.r;
-
-          const mapNode = (node, labels) => ({
-            data: {
-              id: node.identity?.toString() || node.uuid || node.email,
-              label: labels ? labels[0] : (node.roles ? node.roles[0] : 'Person'),
-              name: node.name || node.username,
-              username: node.username,
-              email: node.email,
-              profileImage: node.profileImage,
-              sport: node.sport,
-              nationality: node.nationality,
-              type: labels ? labels[0].toLowerCase() : 'person',
-              roles: node.roles || [],
-              ...node
-            }
-          });
-
-          const userId = user.identity?.toString() || user.uuid || user.email;
-          const targetId = target.identity?.toString() || target.uuid || target.email;
-
-          if (!nodesMap.has(userId)) nodesMap.set(userId, mapNode(user));
-          if (!nodesMap.has(targetId)) nodesMap.set(targetId, mapNode(target, record.targetLabels));
-
-          edges.push({
-            data: {
-              id: relationship.identity?.toString() || `${userId}-${targetId}`,
-              source: userId,
-              target: targetId,
-              label: 'LIKES',
-              type: 'LIKES'
-            }
-          });
-        });
-
-        setActiveView('viewingLikedPlayers');
-        setCenterGraphData({
-          nodes: Array.from(nodesMap.values()),
-          edges: edges
-        });
-      }
 
       setRightPanelView('default');
 
@@ -706,6 +761,12 @@ function HomePage({ handleLogout, user, setUser }) {
 
       const data = await res.json();
       setCenterGraphData(data);
+      if (data.nodes) {
+        const likedNames = data.nodes
+          .filter(n => n.data?.type === 'athlete' || n.type === 'athlete')
+          .map(n => (n.data?.name || n.name));
+        setLikedPlayerNames(likedNames);
+      }
     } catch (err) {
       console.error('Error fetching liked athletes graph:', err);
       setCenterGraphData(null);
@@ -721,13 +782,20 @@ function HomePage({ handleLogout, user, setUser }) {
     setSelectedPerson(null);
 
     try {
+      const identifier = user.email || user.username;
       const res = await fetch(
-        `${API_BASE}/api/graph/friends/${user.username}`,
+        `${API_BASE}/api/graph/friends/${encodeURIComponent(identifier)}`,
         { credentials: 'include' }
       );
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       setCenterGraphData(data);
+      if (data.nodes) {
+        const friends = data.nodes
+          .filter(n => n.data?.username)
+          .map(n => n.data?.username || n.username);
+        setFriendUsernames(friends);
+      }
     } catch (err) {
       console.error('Error fetching accepted friends graph:', err);
       setCenterGraphData(null);
@@ -1066,6 +1134,12 @@ function HomePage({ handleLogout, user, setUser }) {
 
     const timeout = setTimeout(() => {
       try {
+        const nodeLabelField = (activeView === 'explore' && filterType === 'Friends')
+          ? 'data(name)'
+          : 'data(label)';
+        const nodeFontSize = (activeView === 'explore' && filterType === 'Friends')
+          ? 8
+          : 10;
         if (cyInstanceRef.current) {
           cyInstanceRef.current.destroy();
           cyInstanceRef.current = null;
@@ -1077,7 +1151,7 @@ function HomePage({ handleLogout, user, setUser }) {
             ...dataToRender.nodes.map((n) => {
               console.log('🔍 Processing node:', n.data.label, 'type:', n.data.type, 'logo:', n.data.logo);
 
-              let img =  n.data.profileImage || n.data.image || n.data.logo;
+              let img = n.data.profileImage || n.data.image || n.data.logo;
 
               if (!img) {
                 if (n.data.type === 'user' || (n.data.label && n.data.label.includes('@'))) {
@@ -1130,8 +1204,8 @@ function HomePage({ handleLogout, user, setUser }) {
                 'background-position': 'center',
                 'border-width': 3,
                 'border-color': 'var(--purple)',
-                label: 'data(label)',
-                fontSize: 10,
+                label: nodeLabelField,
+                fontSize: nodeFontSize,
                 width: 50,
                 height: 50
               }
@@ -1332,16 +1406,18 @@ function HomePage({ handleLogout, user, setUser }) {
           <div className="mb-4">
             <h5 className="text-navy">Explore</h5>
             <ul className="list-unstyled">
-              <li
-                className={`menu-item ${activeView === 'explore' && filterType === 'Friends' ? 'active-menu-item' : ''}`}
-                onClick={() => handleExplore('Friends')}
-              >
-                Friends
-              </li>
-              <li
-                className={`menu-item ${activeView === 'explore' && filterType === 'Player' ? 'active-menu-item' : ''}`}
-                onClick={() => handleExplore('Player')}
-              >
+                {!user?.roles?.includes('admin') && (
+                  <li
+                    className={`menu-item ${activeView === 'explore' && filterType === 'Friends' ? 'active-menu-item' : ''}`}
+                    onClick={() => handleExplore('Friends')}
+                  >
+                    Friends
+                  </li>
+                )}
+                <li
+                  className={`menu-item ${activeView === 'explore' && filterType === 'Player' ? 'active-menu-item' : ''}`}
+                  onClick={() => handleExplore('Player')}
+                >
                 Players
               </li>
               <li
@@ -1419,17 +1495,22 @@ function HomePage({ handleLogout, user, setUser }) {
                   <span className="text-navy" style={{ fontSize: "14px" }}>No friends yet!</span>
                 ) : (
                   topFriends.slice(0, 5).map((friend, index) => (
-                    <Link
-                      key={`${friend.username || friend.uuid || friend.email}-${index}`} to={`/profile/${encodeURIComponent(friend.username || friend.email || friend.uuid)}`}
+                    <button
+                      key={`${friend.username || friend.uuid || friend.email}-${index}`}
+                      onClick={() => handleTopFriendClick(friend)}
                       style={{
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
-                        width: "64px"
+                        width: "64px",
+                        background: "transparent",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer"
                       }}
                     >
                       <img
-                        src={getAvatarSrc(friend.profileImage, API_BASE, logo)}
+                        src={getAvatarSrc(friend.profileImage)}
                         alt={friend.username || 'Friend'}
                         className="small-logo"
                         style={{
@@ -1454,10 +1535,24 @@ function HomePage({ handleLogout, user, setUser }) {
                       >
                         {friend.username || 'Unknown'}
                       </span>
-                    </Link>
+                    </button>
                   ))
                 )}
               </div>
+              {incomingRequests.length > 0 && (
+                <div style={{ marginTop: "10px" }}>
+                  <h6 className="text-navy" style={{ textAlign: "center" }}>Pending Requests</h6>
+                  <ul className="list-unstyled d-flex justify-content-center" style={{ gap: "8px" }}>
+                    {incomingRequests.map((req) => (
+                      <li key={req} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <span style={{ fontSize: "12px" }}>{req}</span>
+                        <button className="btn btn-sm btn-success" onClick={() => handleAcceptRequest(req)}>✓</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleRejectRequest(req)}>✕</button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             {/* ── Center Content ────────────────────────────────────────────────── */}
@@ -1746,11 +1841,7 @@ function HomePage({ handleLogout, user, setUser }) {
                     }}
                   >
                     <img
-                      src={
-                        selectedPerson.profileImage
-                          ? getAvatarSrc(selectedPerson.profileImage, API_BASE, logo)
-                          : getWikipediaImageUrl(selectedPerson.name)
-                      }
+                      src={getAvatarSrc(selectedPerson.profileImage)}
                       alt={selectedPerson.name}
                       style={{
                         maxWidth: "100%",
@@ -1828,11 +1919,14 @@ function HomePage({ handleLogout, user, setUser }) {
                       >
                         Send Friend Request
                       </button>
-                      {selectedPerson.email && (
+                      {(selectedPerson.username || selectedPerson.email) && (
                         <button
                           className="btn btn-outline-light btn-sm me-2"
-                          onClick={() => handleViewLikedPlayers(selectedPerson.email)}
-                        >
+                          onClick={() =>
+                            handleViewLikedPlayers(
+                              selectedPerson.username || selectedPerson.email
+                            )
+                          }                        >
                           See Their Liked Players
                         </button>
                       )}
@@ -1889,12 +1983,21 @@ function HomePage({ handleLogout, user, setUser }) {
                           </p>
                         )}
                         <div className="mt-3">
-                          <button
-                            className="btn btn-outline-primary btn-sm me-2"
-                            onClick={() => handleLikePlayer(selectedNode.username || selectedNode.name)}
-                          >
-                            Like Player
-                          </button>
+                        {likedPlayerNames.includes(selectedNode.username || selectedNode.name) ? (
+                            <button
+                              className="btn btn-outline-secondary btn-sm me-2"
+                              onClick={() => handleUnlikePlayer(selectedNode.username || selectedNode.name)}
+                            >
+                              Unlike Player
+                            </button>
+                          ) : !friendUsernames.includes(selectedNode.username) && (
+                            <button
+                              className="btn btn-outline-primary btn-sm me-2"
+                              onClick={() => handleLikePlayer(selectedNode.username || selectedNode.name)}
+                            >
+                              Like Player
+                            </button>
+                          )}
                         </div>
                       </>
                     ) : (
@@ -1959,12 +2062,21 @@ function HomePage({ handleLogout, user, setUser }) {
                     <div className="mt-3">
                       {selectedPerson.isAthlete ? (
                         <>
-                          <button
-                            className="btn btn-outline-primary btn-sm me-2"
-                            onClick={() => handleLikePlayer(selectedPerson.username || selectedPerson.name)}
-                          >
-                            Like Player
-                          </button>
+                          {likedPlayerNames.includes(selectedPerson.username || selectedPerson.name) ? (
+                            <button
+                              className="btn btn-outline-secondary btn-sm me-2"
+                              onClick={() => handleUnlikePlayer(selectedPerson.username || selectedPerson.name)}
+                            >
+                              Unlike Player
+                            </button>
+                          ) : !friendUsernames.includes(selectedPerson.username) && (
+                            <button
+                              className="btn btn-outline-primary btn-sm me-2"
+                              onClick={() => handleLikePlayer(selectedPerson.username || selectedPerson.name)}
+                            >
+                              Like Player
+                            </button>
+                          )}
                           {activeView === 'explore' && filterType === 'Player' && selectedPerson.athleteData && (
                             <button
                               className="btn btn-outline-success btn-sm me-2"
@@ -2078,7 +2190,7 @@ function HomePage({ handleLogout, user, setUser }) {
                       {spotlightAthlete ? (
                         <>
                           <img
-                            src={getAvatarSrc(spotlightAthlete.profileImage, API_BASE, logo)}
+                            src={getAvatarSrc(spotlightAthlete.profileImage)}
                             alt={spotlightAthlete.name}
                             className="rounded-circle mb-2"
                             style={{ width: '60px', height: '60px', border: '2px solid var(--pink)' }}

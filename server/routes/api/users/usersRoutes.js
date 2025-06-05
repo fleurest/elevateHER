@@ -89,16 +89,9 @@ router.get('/likes/:username', async (req, res) => {
   const { username } = req.params;
 
   try {
-    const liked = await personModel.getLikedAthletesByUser(username);
-    console.log('Liked athletes from Neo4j:', liked);
-    const likedPlayers = liked.map(p => ({
-      id: p.identity.toNumber(),
-      name: p.properties.name,
-      description: p.properties.description || null,
-      profileImage: p.properties.profileImage || null
-    }));
-
-    res.json(likedPlayers);
+    const graph = await personModel.getLikedAthletesByUser(username);
+    console.log('Liked athletes from Neo4j:', graph);
+    res.json(graph);
   } catch (err) {
     console.error('Error fetching liked athletes:', err);
     res.status(500).json({ error: 'Failed to fetch liked athletes' });
@@ -118,6 +111,21 @@ router.post('/likes', isAuthenticated, async (req, res) => {
   } catch (err) {
     console.error('Error creating LIKE relationship:', err);
     res.status(500).json({ error: 'Failed to like athlete' });
+  }
+});
+
+router.delete('/likes', isAuthenticated, async (req, res) => {
+  const { athleteName } = req.body;
+  if (!athleteName) {
+    return res.status(400).json({ error: 'Athlete name required' });
+  }
+
+  try {
+    await personModel.unlikePlayer(req.session.user.username, athleteName);
+    res.status(200).json({ message: `${req.session.user.username} unliked ${athleteName}` });
+  } catch (err) {
+    console.error('Error deleting LIKE relationship:', err);
+    res.status(500).json({ error: 'Failed to unlike athlete' });
   }
 });
 
@@ -181,6 +189,19 @@ router.post('/accept', async (req, res) => {
   } catch (err) {
     console.error('Error accepting friend request:', err);
     res.status(500).json({ error: 'Failed to accept friend request' });
+  }
+});
+
+// friend request rejected
+router.post('/reject', async (req, res) => {
+  const { fromUsername, toUsername } = req.body;
+
+  try {
+    await personModel.rejectFriendRequest(fromUsername, toUsername);
+    res.json({ message: 'Friend request rejected' });
+  } catch (err) {
+    console.error('Error rejecting friend request:', err);
+    res.status(500).json({ error: 'Failed to reject friend request' });
   }
 });
 

@@ -37,6 +37,7 @@ router.get(
 );
 
 // NEW: GET /api/graph/liked/:email - Get liked entities for a user
+router.get('/liked', graphController.getAllLikes);
 router.get('/liked/:email', graphController.getLikedByEmail);
 
 // NEW: GET /api/graph/liked/:email/summary - Get liked summary for a user

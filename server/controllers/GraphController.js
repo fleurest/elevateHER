@@ -259,6 +259,34 @@ async function getLikedByEmail(req, res, next) {
 }
 
 /**
+ * GET /api/graph/liked
+ * Get liked entities across all users
+ * Query parameters:
+ * - limit: number of results (default: 50)
+ */
+async function getAllLikes(req, res, next) {
+    try {
+        const limit = parseInt(req.query.limit, 10) || 50;
+
+        const data = await graphService.getAllLikes({ limit });
+
+        if (data.totalCount === 0) {
+            return res.status(200).json({
+                nodes: [],
+                edges: [],
+                totalCount: 0,
+                message: 'No liked entities found'
+            });
+        }
+
+        res.status(200).json(data);
+    } catch (err) {
+        console.error('Error in getAllLikes:', err);
+        res.status(500).json({ error: 'Failed to get liked entities' });
+    }
+}
+
+/**
  * GET /api/graph/liked/:email/summary
  * Get summary of liked entities for a user
  */
@@ -332,6 +360,7 @@ module.exports = {
     getCommunities,
     exportEdges,
     getParticipationGraph,
+    getAllLikes,
     getLikedByEmail,
     getLikedSummary,
     getFriendsByEmail,

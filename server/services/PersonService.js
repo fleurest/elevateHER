@@ -51,14 +51,14 @@ class PersonService {
         const hash = await this.getPasswordHashByEmail(email);
         if (!hash) return false;
         return bcrypt.compare(password, hash);
-      }
+    }
 
     async getTopUsers(limit = 5) {
         const session = this.driver.session();
         try {
             const result = await session.run(
                 `MATCH (p:Person)
-             WHERE p.roles IS NOT NULL AND 'user' IN p.roles
+            WHERE p.roles IS NOT NULL AND 'user' IN p.roles AND NOT 'admin' IN p.roles
              RETURN p
              ORDER BY p.name
              LIMIT $limit`,
@@ -172,7 +172,7 @@ class PersonService {
                 `,
                 { identifier, limit: neo4j.int(limit) }
             );
-    
+
             return result.records.map(record => {
                 const node = record.get('friend');
                 return {
@@ -186,13 +186,13 @@ class PersonService {
             await session.close();
         }
     }
-    
+
 
     async getSuggestedUsers(currentUsername) {
         const session = this.driver.session();
         const query = `
           MATCH (p:Person)
-          WHERE 'user' IN p.roles AND p.username <> $username
+          WHERE 'user' IN p.roles AND NOT 'admin' IN p.roles AND p.username <> $username
           RETURN p
           LIMIT 10
         `;

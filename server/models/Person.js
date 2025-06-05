@@ -189,14 +189,14 @@ class Person {
                 `,
                 { identifier }
             );
-            
+
             const nodes = [];
             const edges = [];
-            
+
             result.records.forEach(record => {
                 const user = record.get('user');
                 const athlete = record.get('athlete');
-                
+
                 // Add user node (avoid duplicates)
                 if (!nodes.find(n => n.data.id === user.properties.uuid || user.properties.username)) {
                     nodes.push({
@@ -209,7 +209,7 @@ class Person {
                         }
                     });
                 }
-                
+
                 // Add athlete node (avoid duplicates)
                 if (!nodes.find(n => n.data.id === athlete.properties.uuid)) {
                     nodes.push({
@@ -227,7 +227,7 @@ class Person {
                         }
                     });
                 }
-                
+
                 // Add edge
                 edges.push({
                     data: {
@@ -237,7 +237,7 @@ class Person {
                     }
                 });
             });
-            
+
             return { nodes, edges };
         } finally {
             await session.close();
@@ -272,12 +272,26 @@ class Person {
             await session.close();
         }
     }
-    
+
+    async unlikePlayer(username, playerName) {
+        const session = this.driver.session();
+        try {
+            await session.run(
+                `
+                MATCH (u:Person {username: $username})-[r:LIKES]->(p:Person {name: $playerName})
+                DELETE r
+                `,
+                { username, playerName }
+            );
+        } finally {
+            await session.close();
+        }
+    }
 
     // friend request
     async sendFriendRequest(fromUsername, toUsername) {
         const session = this.driver.session();
-        
+
         try {
             const query = `
         MATCH (p1:Person {username: $fromUsername})
@@ -301,6 +315,20 @@ class Person {
         MATCH (p1:Person {username: $fromUsername})- [r:FRIENDS_WITH {status: "pending"}] -> (p2:Person {username: $toUsername})
         SET r.status = "accepted", r.acceptedAt = datetime()
       `;
+            await session.run(query, { fromUsername, toUsername });
+        } finally {
+            await session.close();
+        }
+    }
+
+    // reject friend request
+    async rejectFriendRequest(fromUsername, toUsername) {
+        const session = this.driver.session();
+        try {
+            const query = `
+            MATCH (p1:Person {username: $fromUsername})-[r:FRIENDS_WITH {status: "pending"}]->(p2:Person {username: $toUsername})
+            DELETE r
+          `;
             await session.run(query, { fromUsername, toUsername });
         } finally {
             await session.close();
@@ -359,7 +387,7 @@ class Person {
             const cypher = `
             MATCH (p:Person)
             WHERE toLower(p.name) CONTAINS toLower($query)
-              AND "user" IN p.roles
+            AND "user" IN p.roles AND NOT "admin" IN p.roles
             RETURN p
           `;
             const result = await session.run(cypher, { query });
@@ -381,7 +409,7 @@ class Person {
             const result = await session.run(
                 `
                 MATCH (p:Person)
-                WHERE 'user' IN p.roles
+                WHERE 'user' IN p.roles AND NOT 'admin' IN p.roles
                   AND p.username <> $excludeUsername
                   AND NOT EXISTS {
                     MATCH (:Person {username: $excludeUsername})-[:FRIENDS_WITH]-(:Person {username: p.username})

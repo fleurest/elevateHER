@@ -387,6 +387,69 @@ class GraphService {
   }
 
   /**
+   * Get all liked entities across all users
+   * @param {Object} options - Options object
+   * @param {number} options.limit - Maximum number of results
+   * @returns {Promise<Object>} Graph structure with nodes and edges
+   */
+  async getAllLikes({ limit = 50 } = {}) {
+    const records = await this.graphModel.getAllLikes(limit);
+
+    const nodesMap = new Map();
+    const edges = [];
+
+    records.forEach(record => {
+      const user = record.get('user');
+      const target = record.get('target');
+      const relationship = record.get('r');
+
+      const mapNode = node => {
+        const name = node.properties.name || node.properties.email;
+        const profileImage = node.properties.profileImage;
+
+        return {
+          data: {
+            id: node.identity.toString(),
+            label: name || node.labels[0],
+            name: name,
+            image: profileImage || this.getWikipediaImageUrl(name),
+            profileImage: profileImage || this.getWikipediaImageUrl(name),
+            type: node.labels[0]?.toLowerCase() || 'unknown',
+            ...node.properties
+          }
+        };
+      };
+
+      if (!nodesMap.has(user.identity.toString())) {
+        nodesMap.set(user.identity.toString(), mapNode(user));
+      }
+
+      if (!nodesMap.has(target.identity.toString())) {
+        nodesMap.set(target.identity.toString(), mapNode(target));
+      }
+
+      edges.push({
+        data: {
+          id: relationship.identity.toString(),
+          source: user.identity.toString(),
+          target: target.identity.toString(),
+          label: 'likes',
+          title: 'likes',
+          relationshipType: 'LIKES',
+          createdAt: relationship.properties.createdAt,
+          ...relationship.properties
+        }
+      });
+    });
+
+    return {
+      nodes: Array.from(nodesMap.values()),
+      edges,
+      totalCount: records.length
+    };
+  }
+  
+  /**
    * Get liked entities summary for a user
    * @param {string} email - User's email
    * @returns {Promise<Object>} Summary of liked entities

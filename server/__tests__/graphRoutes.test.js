@@ -10,6 +10,7 @@ jest.mock('../../../controllers/GraphController', () => ({
   postKnn: jest.fn((req, res) => res.json({ success: true })),
   getCommunities: jest.fn((req, res) => res.json({ communities: [] })),
   exportEdges: jest.fn((req, res) => res.json({ edges: [] })),
+  getAllLikes: jest.fn((req, res) => res.json({ likes: [] })),
   getLikedByEmail: jest.fn((req, res) => res.json({ liked: [] })),
   getLikedSummary: jest.fn((req, res) => res.json({ summary: {} })),
   getFriendsByEmail: jest.fn((req, res) => res.json({ friends: [] }))

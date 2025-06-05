@@ -771,22 +771,12 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
                     break;
 
                 case 'liked':
-                    if (!user) {
-                        setError('Please log in to view your liked entities');
-                        setGraphData({ nodes: [], edges: [] });
-                        return;
-                    }
-
-                    // Use email if available, fallback to username
-                    const likedIdentifier = user.email || user.username;
-                    console.log(`Fetching liked entities for: ${likedIdentifier}`);
-
-                    response = await fetch(`${apiBase}/api/graph/liked/${encodeURIComponent(likedIdentifier)}`, {
-                        credentials: 'include'
+                    console.log('Fetching liked entities');
+                    response = await fetch(`${apiBase}/api/graph/liked`, {
                     });
                     if (!response.ok) {
                         if (response.status === 404) {
-                            data = { nodes: [], edges: [], totalCount: 0, message: 'No liked entities found for this user' };
+                            data = { nodes: [], edges: [], totalCount: 0, message: 'No liked entities found' };
                         } else {
                             throw new Error(`Failed to load liked entities: ${response.status}`);
                         }

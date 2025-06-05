@@ -11,6 +11,7 @@ ElevateHER is a full-stack application designed to visualise and interact with d
 - 🏢 **Organisation & Team Linking**: Create teams, link athletes to teams, and associate teams with leagues for graph modelling.
 - 📈 **Graph Algorithms & Analytics**: Compute PageRank, detect communities, and export graph data to CSV and other formats.
 - 🌐 **Graph Visualization**: Integration with **cytoscape** for graph data visualization.
+- 🖼️ **Image Proxy**: Fetch external images through `/api/image-proxy` to avoid CORS issues.
 - 🗃️ **Neo4j Database Integration**: Backend connected to a Neo4j graph database for storing and querying data.
 
 ## Tech Stack

@@ -244,6 +244,16 @@ class PersonService {
         }
     }
 
+    // Search athletes by name with optional sport filter
+    async searchByName({ query, sport }) {
+        return this.personModel.searchByName({ query, sport });
+    }
+
+    // Suggest similar athlete names when no direct match is found
+    async suggestSimilarNames(query) {
+        return this.personModel.suggestSimilarNames(query);
+    }
+
     async searchUsersByName(q) { return this.personModel.searchByName({ query: q, sport: null }) }
 
     async listAthletes({ random = false, athleteCount = 5 }) {

@@ -68,30 +68,33 @@ app.use(passport.session());
 app.get('/api/image-proxy', async (req, res) => {
   try {
     const { url } = req.query;
-    
+    if (!url) {
+      return res.status(400).send('Missing url parameter');
+    }
     // Set CORS headers
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET');
     res.header('Cross-Origin-Resource-Policy', 'cross-origin');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
-    
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ImageProxy/1.0)'
       }
     });
-    
+
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      console.error('Image proxy upstream error:', response.status);
+      return res.status(response.status).send('Image not found');
     }
-    
+
     res.header('Content-Type', response.headers.get('content-type') || 'image/jpeg');
-    
+
     response.body.pipe(res);
-    
+
   } catch (error) {
     console.error('Image proxy error:', error);
-    res.status(404).send('Image not found');
+    res.status(502).send('Image proxy fetch error');
   }
 });
 

@@ -786,6 +786,7 @@ function HomePage({ handleLogout, user, setUser }) {
               email: athlete.email,
               description: athlete.description,
               gender: athlete.gender,
+              alternateName: athlete.alternateName,
               ...athlete
             }
           }));
@@ -926,7 +927,7 @@ function HomePage({ handleLogout, user, setUser }) {
               (Array.isArray(roles) && roles.includes('sponsor')));
         });
 
-        console.log(`💼 Found ${sponsorNodes.length} sponsor organizations`);
+        console.log(`💼 Found ${sponsorNodes.length} sponsor organisations`);
 
         if (sponsorNodes.length > 0) {
           // Get edges between sponsor nodes if any exist
@@ -1187,23 +1188,12 @@ function HomePage({ handleLogout, user, setUser }) {
             }
             setSelectedNode(null);
           } else if (nodeData.type === "athlete" || nodeData.roles?.includes('athlete')) {
-            // For athletes, show full athlete info with explore option
-            setSelectedPerson({
-              name: nodeData.name || nodeData.label,
-              description: nodeData.description,
-              profileImage: nodeData.profileImage || nodeData.image,
-              username: nodeData.username,
-              sport: nodeData.sport,
-              nationality: nodeData.nationality,
-              gender: nodeData.gender,
-              id: nodeData.id,
-              uuid: nodeData.uuid,
-              email: nodeData.email,
-              isAthlete: true,
-              athleteData: nodeData
+            setSelectedNode({
+              ...nodeData,
+              isAthlete: true
             });
-            setRightPanelView('personDetails');
-            setSelectedNode(null);
+            setRightPanelView('nodeDetails');
+            setSelectedPerson(null);
           } else {
             setSelectedNode(nodeData);
             setRightPanelView('nodeDetails');
@@ -1407,8 +1397,7 @@ function HomePage({ handleLogout, user, setUser }) {
                 ) : (
                   topFriends.slice(0, 5).map((friend, index) => (
                     <Link
-                      key={friend.username || friend.uuid || friend.email || `top-friend-${index}`}
-                      to={`/profile/${encodeURIComponent(friend.username || friend.email || friend.uuid)}`}
+                    key={`${friend.username || friend.uuid || friend.email}-${index}`}                      to={`/profile/${encodeURIComponent(friend.username || friend.email || friend.uuid)}`}
                       style={{
                         display: "flex",
                         flexDirection: "column",
@@ -1837,8 +1826,10 @@ function HomePage({ handleLogout, user, setUser }) {
                 // ───── Show selected node details ───
                 <div className="card">
                   <div className="card-header bg-purple text-grey">
-                    <h6 className="mb-0">Node Details</h6>
-                    <button
+                    <h6 className="mb-0">
+                      {selectedNode.isAthlete ? 'Player Details' : 'Node Details'}
+                    </h6>
+                    <button 
                       className="btn btn-sm btn-outline-light float-end"
                       onClick={() => setRightPanelView('default')}
                     >
@@ -1846,11 +1837,51 @@ function HomePage({ handleLogout, user, setUser }) {
                     </button>
                   </div>
                   <div className="card-body" style={{ backgroundColor: 'var(--grey)' }}>
-                    {Object.entries(selectedNode).map(([key, value], index) => (
-                      <p key={`node-detail-${key}-${index}`} className="text-navy mb-2">
-                        <strong>{key}:</strong> {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                      </p>
-                    ))}
+                    {selectedNode.isAthlete ? (
+                      // Show filtered athlete details
+                      <>
+                        {selectedNode.name && (
+                          <p className="text-navy mb-2">
+                            <strong>Name:</strong> {selectedNode.name}
+                          </p>
+                        )}
+                        {selectedNode.alternateName && (
+                          <p className="text-navy mb-2">
+                            <strong>Alternate Name:</strong> {selectedNode.alternateName}
+                          </p>
+                        )}
+                        {selectedNode.sport && (
+                          <p className="text-navy mb-2">
+                            <strong>Sport:</strong> {selectedNode.sport}
+                          </p>
+                        )}
+                        {selectedNode.nationality && (
+                          <p className="text-navy mb-2">
+                            <strong>Nationality:</strong> {selectedNode.nationality}
+                          </p>
+                        )}
+                        {selectedNode.description && (
+                          <p className="text-navy mb-2">
+                            <strong>Description:</strong> {selectedNode.description}
+                          </p>
+                        )}
+                        <div className="mt-3">
+                          <button
+                            className="btn btn-outline-primary btn-sm me-2"
+                            onClick={() => handleLikePlayer(selectedNode.username || selectedNode.name)}
+                          >
+                            Like Player
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      // Show all node details for non-athletes
+                      Object.entries(selectedNode).map(([key, value], index) => (
+                        <p key={`node-detail-${key}-${index}`} className="text-navy mb-2">
+                          <strong>{key}:</strong> {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        </p>
+                      ))
+                    )}
                   </div>
                 </div>
               ) : rightPanelView === 'personDetails' && selectedPerson ? (

@@ -25,7 +25,6 @@ const personController = new PersonController(personService);
 router.get('/', personController.listAthletes);
 router.get(
     '/search',
-    isAuthenticated,
     personController.searchAthletes
   );
 

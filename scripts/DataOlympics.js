@@ -31,6 +31,7 @@ const CONCURRENCY = 5;
     });
 
     const femaleAthletes = [];
+    
     await new Promise((resolve) => {
       fs.createReadStream(ATHLETE_CSV)
         .pipe(csv())
@@ -64,7 +65,7 @@ const CONCURRENCY = 5;
       femaleAthletes.map((athlete) =>
         limit(async () => {
           try {
-            await axios.post(`${API_BASE}/athlete/create`, athlete, {
+            await axios.post(`${API_BASE}/athletes/create`, athlete, {
               headers: { 'Content-Type': 'application/json' }
             });
             console.log(`Upserted: ${athlete.name}`);

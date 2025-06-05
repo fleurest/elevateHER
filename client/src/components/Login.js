@@ -242,12 +242,10 @@ const Login = ({ onLogin }) => {
             Register
           </button>
         ) : (
-          <button
+          <button type="submit"
             onClick={handleLogin}
             className="auth-button"
-            type="button"
-            disabled={!passwordValid || !email}
-          >
+            disabled={!passwordValid || !email}          >
             Login
           </button>
         )}

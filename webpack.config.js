@@ -79,5 +79,6 @@ module.exports = {
       publicPath: basePath,
     }),
   ],
+  
   mode: process.env.NODE_ENV || 'development',
 };

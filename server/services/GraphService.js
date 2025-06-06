@@ -2,8 +2,7 @@ const neo4j = require('neo4j-driver');
 
 const fs = require('fs');
 const path = require('path');
-const driver = require('../neo4j');
-const Graph = require('../models/Graph')
+
 
 class GraphService {
   constructor(graphModel, driver) {

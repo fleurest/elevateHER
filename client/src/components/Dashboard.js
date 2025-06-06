@@ -62,6 +62,12 @@ const TrendingUpIcon = () => (
     </svg>
 );
 
+const StarIcon = () => (
+    <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.966a1 1 0 00.95.69h4.18c.969 0 1.371 1.24.588 1.81l-3.385 2.46a1 1 0 00-.364 1.118l1.286 3.966c.3.921-.755 1.688-1.538 1.118l-3.385-2.46a1 1 0 00-1.176 0l-3.385 2.46c-.783.57-1.838-.197-1.538-1.118l1.286-3.966a1 1 0 00-.364-1.118L2.044 9.394c-.783-.57-.381-1.81.588-1.81h4.18a1 1 0 00.95-.69l1.286-3.966z" />
+    </svg>
+);
+
 const NetworkIcon = () => (
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -133,6 +139,13 @@ const ModeSelector = ({ currentMode, onModeChange, user }) => {
             label: 'Network Explorer',
             icon: TrendingUpIcon,
             description: 'Explore connections radiating out from your likes',
+            requiresAuth: false
+        },
+        {
+            id: 'pagerank',
+            label: 'PageRank Graph',
+            icon: StarIcon,
+            description: 'View top influencers by PageRank',
             requiresAuth: false
         }
     ];
@@ -818,6 +831,60 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
                     data = { nodes: [], edges: [] };
                     console.log('Similar mode - starting with empty graph');
                     break;
+                    case 'pagerank':
+                        console.log('Fetching PageRank scores...');
+                        response = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
+                        if (!response.ok) {
+                            if (response.status === 404 || response.status === 500) {
+                                console.log('No PageRank scores found or retrieval failed, calculating new ones...');
+                                const calcRes = await fetch(`${apiBase}/api/graph/pagerank`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ maxIterations: 20, dampingFactor: 0.85, writeProperty: 'pagerank' })
+                                });
+                                if (!calcRes.ok) {
+                                    const errText = await calcRes.text();
+                                    throw new Error(`Failed to calculate PageRank: ${calcRes.status} ${errText}`);
+                                }
+                                await calcRes.json();
+                                response = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
+                                if (!response.ok) {
+                                    throw new Error(`Failed to fetch PageRank scores after calculation: ${response.status}`);
+                                }
+                            } else {
+                                throw new Error(`Failed to get PageRank: ${response.status}`);
+                            }
+                        }
+    
+                        const prData = await response.json();
+    
+                        if (Array.isArray(prData) && prData.length) {
+                            const prNodes = prData.map((person, index) => ({
+                                data: {
+                                    id: person.id || `pagerank-${index}`,
+                                    label: person.name,
+                                    name: person.name,
+                                    sport: person.sport,
+                                    nationality: person.nationality,
+                                    type: 'person',
+                                    image: person.profileImage || person.image,
+                                    profileImage: person.profileImage || person.image,
+                                    pagerank: person.score,
+                                    ...person
+                                }
+                            }));
+    
+                            const prGraph = { nodes: prNodes.slice(0, 20), edges: [] };
+                            const topPersons = prData.slice(0, 5).map(p => `${p.name} (${p.score.toFixed(4)})`).join('\n');
+    
+                            alert(`🎯 PageRank Analysis Complete!\n\n📊 Results:\n• Analyzed ${prData.length} people\n• Found most influential individuals\n• Scores range from ${prData[prData.length - 1]?.score.toFixed(4)} to ${prData[0]?.score.toFixed(4)}\n\n🏆 Top 5 Most Influential:\n${topPersons}`);
+    
+                            data = prGraph;
+                        } else {
+                            alert('No PageRank data found.');
+                            data = { nodes: [], edges: [], message: 'No PageRank scores found' };
+                        }
+                        break;
 
                 default:
                     data = { nodes: [], edges: [] };
@@ -904,92 +971,9 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
         }
     };
 
-    const handlePageRank = async () => {
-        try {
-            setLoading(true);
-            const apiBase = process.env.REACT_APP_API_BASE || '';
+    const handlePageRank = () => {
+        setMode('pagerank');
 
-            console.log('🔍 Starting PageRank analysis...');
-
-            let pageRankResponse = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
-
-            if (!pageRankResponse.ok) {
-                if (pageRankResponse.status === 404) {
-                    console.log('No existing PageRank scores found, calculating new ones...');
-
-                    const calculateResponse = await fetch(`${apiBase}/api/graph/pagerank`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            maxIterations: 20,
-                            dampingFactor: 0.85,
-                            writeProperty: 'pagerank'
-                        })
-                    });
-
-                    if (!calculateResponse.ok) {
-                        const errorText = await calculateResponse.text();
-                        throw new Error(`Failed to calculate PageRank: ${calculateResponse.status} ${errorText}`);
-                    }
-
-                    const calculationResult = await calculateResponse.json();
-                    console.log('PageRank calculated:', calculationResult);
-
-                    pageRankResponse = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
-
-                    if (!pageRankResponse.ok) {
-                        throw new Error('Failed to fetch PageRank scores after calculation');
-                    }
-                } else {
-                    throw new Error(`Failed to get PageRank: ${pageRankResponse.status}`);
-                }
-            }
-
-            const pageRankData = await pageRankResponse.json();
-            console.log('PageRank data retrieved:', pageRankData);
-
-            if (Array.isArray(pageRankData) && pageRankData.length > 0) {
-                const pageRankNodes = pageRankData.map((person, index) => ({
-                    data: {
-                        id: person.id || `pagerank-${index}`,
-                        label: person.name,
-                        name: person.name,
-                        sport: person.sport,
-                        nationality: person.nationality,
-                        type: 'person',
-                        image: person.profileImage || person.image,
-                        profileImage: person.profileImage || person.image,
-                        pagerank: person.score,
-                        ...person
-                    }
-                }));
-
-                const pageRankGraph = {
-                    nodes: pageRankNodes.slice(0, 20),
-                    edges: []
-                };
-
-                console.log('✅ PageRank graph created:', pageRankGraph);
-
-                setGraphData(pageRankGraph);
-                setAllNodes(pageRankNodes);
-                setError(null);
-
-                const topPersons = pageRankData.slice(0, 5).map(p => `${p.name} (${p.score.toFixed(4)})`).join('\n');
-
-                alert(`🎯 PageRank Analysis Complete!\n\n📊 Results:\n• Analyzed ${pageRankData.length} people\n• Found most influential individuals\n• Scores range from ${pageRankData[pageRankData.length - 1]?.score.toFixed(4)} to ${pageRankData[0]?.score.toFixed(4)}\n\n🏆 Top 5 Most Influential:\n${topPersons}\n\n💡 Higher PageRank scores indicate more influential people in the network!`);
-
-            } else {
-                alert('No PageRank data found.\n\n💡 This could mean:\n• No Person nodes in the database\n• PageRank has not been calculated\n• Insufficient connections in the graph');
-            }
-        } catch (err) {
-            console.error('PageRank analysis error:', err);
-            alert(`Failed to analyze PageRank: ${err.message}\n\n💡 Make sure:\n• Your Neo4j database has the Graph Data Science library installed\n• Person nodes exist with connections\n• The database is accessible`);
-        } finally {
-            setLoading(false);
-        }
     };
 
     const handleCommunities = async () => {
@@ -1082,8 +1066,9 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
         a.download = fileName;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        if (document.body.contains(a)) {
+            document.body.removeChild(a);
+        }
     };
 
     const handleExport = (format) => {

@@ -3,7 +3,7 @@ const Graph = require('../models/Graph');
 const { driver } = require('../neo4j');
 
 const graphModel = new Graph(driver);
-const graphService = new GraphService(new Graph(driver));
+const graphService = new GraphService(graphModel, driver);
 
 class GraphController {
     constructor(graphService) {

@@ -102,16 +102,21 @@ const EditProfileForm = ({ user, setUser, onCancel, onSave }) => {
     try {
       const updateUrl = `${API_BASE}/api/users/update`;
 
+      const payload = {
+        email: formData.email,
+        location: formData.location,
+        bio: formData.bio,
+        profileImage: formData.profileImage,
+      };
+      if (!user?.username && formData.username) {
+        payload.username = formData.username;
+      }
+
       const res = await fetch(updateUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          email: formData.email,
-          location: formData.location,
-          bio: formData.bio,
-          profileImage: formData.profileImage,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -342,11 +347,12 @@ const EditProfileForm = ({ user, setUser, onCancel, onSave }) => {
                 value={formData.username || ''}
                 onChange={(e) => handleChange('username', e.target.value)}
                 placeholder="Enter your username"
-                disabled
-                style={{ backgroundColor: '#f8f9fa' }}
+                disabled={Boolean(user?.username)}
+                style={{ backgroundColor: user?.username ? '#f8f9fa' : undefined }}
               />
-              <div className="form-text">Username cannot be changed</div>
-            </div>
+{user?.username && (
+                <div className="form-text">Username cannot be changed</div>
+              )}            </div>
 
             <div className="mb-3">
               <label htmlFor="edit-email" className="form-label text-navy fw-bold">

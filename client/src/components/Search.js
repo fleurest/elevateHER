@@ -37,11 +37,12 @@ function Search({ user }) {
     }, [entityType, query, sport]);
 
     const initializeFormData = () => {
-        const baseData = {
-            name: query || '',
-            sport: sport || ''
+        let baseData = {
+            name: query || ''
         };
-
+        if (entityType !== 'sport') {
+            baseData.sport = sport || '';
+        }
         switch (entityType) {
             case 'person':
                 setFormData({
@@ -67,12 +68,9 @@ function Search({ user }) {
                 break;
             case 'sport':
                 setFormData({
-                    ...baseData,
+                    name: query || '',
                     alternateName: '',
-                    iocDisciplineCode: '',
-                    type: 'Sport',
-                    category: '',
-                    description: ''
+                    iocDisciplineCode: ''
                 });
                 break;
             case 'event':
@@ -112,11 +110,11 @@ function Search({ user }) {
         try {
             const params = new URLSearchParams({ query });
             if (sport) params.append('sport', sport);
-            
+
             const endpoint = entityType === 'person' ? 'search' : entityType === 'organisation' ? 'team' : entityType;
             const res = await fetch(`${API_BASE || ''}/api/${endpoint}?${params.toString()}`);
             const data = await res.json();
-            
+
             if (entityType === 'person') {
                 setResults(data.players || []);
                 setSuggestions(data.suggestions || []);
@@ -135,7 +133,7 @@ function Search({ user }) {
 
         try {
             const processedData = { ...formData };
-            
+
             // Process roles for person entities
             if (entityType === 'person' && processedData.roles) {
                 processedData.roles = processedData.roles
@@ -160,11 +158,11 @@ function Search({ user }) {
                     method = editId ? 'PUT' : 'POST';
                     break;
                 case 'organisation':
-                    endpoint = '/api/team';
+                    endpoint = '/api/organisations';
                     method = 'POST';
                     break;
                 case 'sport':
-                    endpoint = '/api/sport';
+                    endpoint = '/api/sports';
                     method = 'POST';
                     break;
                 case 'event':
@@ -182,7 +180,7 @@ function Search({ user }) {
             });
 
             const data = await res.json();
-            
+
             if (!res.ok) {
                 throw new Error(data.error || data.message || 'Failed to save');
             }
@@ -191,7 +189,7 @@ function Search({ user }) {
             setShowForm(false);
             setEditId(null);
             initializeFormData();
-            
+
             // Refresh search results
             if (query) {
                 handleSearch(new Event('submit'));
@@ -217,15 +215,14 @@ function Search({ user }) {
             let endpoint;
             let payload = {};
 
-            // Determine the correct endpoint based on relationship type
+            // Find the endpoint based on relationship type
             if (sourceType === 'person' && targetType === 'organisation') {
-                endpoint = `/api/athlete/${sourceId}/organisation`;
+                endpoint = `/api/athletes/${sourceId}/organisations`;
                 payload = { organisationId: targetId, relationshipType };
             } else if (sourceType === 'event' && targetType === 'sport') {
                 endpoint = `/api/events/${sourceId}/sport`;
                 payload = { sportName: targetId }; // Assuming targetId is sport name
             } else {
-                // Generic relationship endpoint (you might need to implement this)
                 endpoint = `/api/relationships`;
                 payload = {
                     sourceId,
@@ -243,7 +240,7 @@ function Search({ user }) {
             });
 
             const data = await res.json();
-            
+
             if (!res.ok) {
                 throw new Error(data.error || 'Failed to create relationship');
             }
@@ -265,30 +262,30 @@ function Search({ user }) {
     const handleEdit = (item) => {
         setEditId(item.id || item.uuid);
         const editData = { ...item };
-        
+
         // Handle roles array for display
         if (editData.roles && Array.isArray(editData.roles)) {
             editData.roles = editData.roles.join(', ');
         }
-        
+
         // Handle alternateName array for display
         if (editData.alternateName && Array.isArray(editData.alternateName)) {
             editData.alternateName = editData.alternateName.join(', ');
         }
-        
+
         setFormData(editData);
         setShowForm(true);
     };
 
     const handleDelete = async (uuid) => {
         if (!window.confirm('Are you sure you want to delete this item?')) return;
-        
+
         try {
             const endpoint = entityType === 'person' ? 'users' : entityType;
-            const res = await fetch(`${process.env.REACT_APP_API_BASE || ''}/api/${endpoint}/uuid/${uuid}`, { 
-                method: 'DELETE' 
+            const res = await fetch(`${process.env.REACT_APP_API_BASE || ''}/api/${endpoint}/uuid/${uuid}`, {
+                method: 'DELETE'
             });
-            
+
             if (res.ok) {
                 setSuccess('Item deleted successfully');
                 handleSearch(new Event('submit'));
@@ -343,8 +340,8 @@ function Search({ user }) {
 
                 {/* Action Buttons */}
                 <div style={{ marginBottom: '20px' }}>
-                    <button 
-                        className="auth-button-alt" 
+                    <button
+                        className="auth-button-alt"
                         onClick={() => {
                             setShowForm(true);
                             setEditId(null);
@@ -354,8 +351,8 @@ function Search({ user }) {
                     >
                         Add New {entityType}
                     </button>
-                    <button 
-                        className="auth-button-alt" 
+                    <button
+                        className="auth-button-alt"
                         onClick={() => setShowRelationshipForm(true)}
                     >
                         Create Relationship
@@ -378,15 +375,15 @@ function Search({ user }) {
                                     {item.iocDisciplineCode && <p><strong>IOC Code:</strong> {item.iocDisciplineCode}</p>}
                                 </div>
                                 <div style={{ marginTop: '10px' }}>
-                                    <button 
-                                        className="auth-button-alt" 
+                                    <button
+                                        className="auth-button-alt"
                                         onClick={() => handleEdit(item)}
                                         style={{ marginRight: '10px' }}
                                     >
                                         Edit
                                     </button>
-                                    <button 
-                                        className="auth-button" 
+                                    <button
+                                        className="auth-button"
                                         onClick={() => handleDelete(item.id || item.uuid)}
                                     >
                                         Delete
@@ -427,13 +424,15 @@ function Search({ user }) {
                             required
                         />
 
-                        <input
-                            className="auth-input"
-                            name="sport"
-                            value={formData.sport || ''}
-                            onChange={handleFormChange}
-                            placeholder="Sport"
-                        />
+                        {entityType !== 'sport' && (
+                            <input
+                                className="auth-input"
+                                name="sport"
+                                value={formData.sport || ''}
+                                onChange={handleFormChange}
+                                placeholder="Sport"
+                            />
+                        )}
 
                         {/* Person-specific fields */}
                         {entityType === 'person' && (
@@ -536,14 +535,7 @@ function Search({ user }) {
                                     name="iocDisciplineCode"
                                     value={formData.iocDisciplineCode || ''}
                                     onChange={handleFormChange}
-                                    placeholder="IOC Discipline Code"
-                                />
-                                <input
-                                    className="auth-input"
-                                    name="category"
-                                    value={formData.category || ''}
-                                    onChange={handleFormChange}
-                                    placeholder="Category"
+                                    placeholder="IOC Code"
                                 />
                             </>
                         )}
@@ -591,24 +583,23 @@ function Search({ user }) {
                         )}
 
                         {/* Description field for all except person */}
-                        {entityType !== 'person' && (
-                            <textarea
-                                className="auth-input"
-                                name="description"
-                                value={formData.description || ''}
-                                onChange={handleFormChange}
-                                placeholder="Description"
-                                rows="3"
-                            />
+                        {entityType !== 'person' && entityType !== 'sport' && (<textarea
+                            className="auth-input"
+                            name="description"
+                            value={formData.description || ''}
+                            onChange={handleFormChange}
+                            placeholder="Description"
+                            rows="3"
+                        />
                         )}
 
                         <div style={{ marginTop: '15px' }}>
                             <button className="auth-button" type="submit" style={{ marginRight: '10px' }}>
                                 {editId ? 'Update' : 'Create'}
                             </button>
-                            <button 
-                                type="button" 
-                                className="auth-button-alt" 
+                            <button
+                                type="button"
+                                className="auth-button-alt"
                                 onClick={() => setShowForm(false)}
                             >
                                 Cancel
@@ -621,7 +612,7 @@ function Search({ user }) {
                 {showRelationshipForm && (
                     <form onSubmit={handleCreateRelationship} style={{ width: '100%', marginTop: '20px', border: '1px solid #ddd', padding: '20px', borderRadius: '5px' }}>
                         <h3 style={{ color: 'var(--navy)', marginBottom: '15px' }}>Create Relationship</h3>
-                        
+
                         <select
                             className="auth-input"
                             name="sourceType"
@@ -685,9 +676,9 @@ function Search({ user }) {
                             <button className="auth-button" type="submit" style={{ marginRight: '10px' }}>
                                 Create Relationship
                             </button>
-                            <button 
-                                type="button" 
-                                className="auth-button-alt" 
+                            <button
+                                type="button"
+                                className="auth-button-alt"
                                 onClick={() => setShowRelationshipForm(false)}
                             >
                                 Cancel

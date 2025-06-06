@@ -182,7 +182,7 @@ function HomePage({ handleLogout, user, setUser }) {
       .then(data => setLikedPlayerNames(Array.isArray(data) ? data.map(p => p.name) : []))
       .catch(err => console.error('Error loading liked players:', err));
 
-      fetch(`${API_BASE}/api/users/pending-incoming/${user.username}`, { credentials: 'include' })
+    fetch(`${API_BASE}/api/users/pending-incoming/${user.username}`, { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         setIncomingRequests(Array.isArray(data?.incoming) ? data.incoming : []);
@@ -675,6 +675,33 @@ function HomePage({ handleLogout, user, setUser }) {
     }
   };
 
+  const handleExploreSponsorRelationships = (sponsor) => {
+    if (!graphData) return;
+
+    const sponsorId = sponsor.id;
+    const sponsorEdges = graphData.edges.filter((edge) => {
+      const e = edge.data || edge;
+      return (
+        e.label === 'sponsored by' &&
+        (e.source === sponsorId || e.target === sponsorId)
+      );
+    });
+
+    const nodeIds = new Set([sponsorId]);
+    sponsorEdges.forEach((edge) => {
+      const e = edge.data || edge;
+      nodeIds.add(e.source);
+      nodeIds.add(e.target);
+    });
+
+    const nodes = graphData.nodes.filter((n) => {
+      const d = n.data || n;
+      return nodeIds.has(d.id);
+    });
+
+    setCenterGraphData({ nodes, edges: sponsorEdges });
+  };
+
   const handleNewRandomPlayerForExplore = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/athletes?random=true&athleteCount=1`);
@@ -1022,6 +1049,7 @@ function HomePage({ handleLogout, user, setUser }) {
                 location: o.location,
                 type: 'organisation',
                 roles: o.roles || [],
+                profileImage,
                 logo: o.logo || logo,
                 wikiUrl
               }
@@ -1219,8 +1247,10 @@ function HomePage({ handleLogout, user, setUser }) {
               style: {
                 'background-color': '#fff',
                 'background-image': 'data(image)',
-                'background-fit': 'cover',
+                'background-fit': 'contain',
                 'background-position': 'center',
+                'background-width': '70%',
+                'background-height': '70%',              
                 'border-width': 3,
                 'border-color': 'var(--purple)',
                 label: nodeLabelField,
@@ -1310,6 +1340,11 @@ function HomePage({ handleLogout, user, setUser }) {
             });
             setRightPanelView('nodeDetails');
             setSelectedPerson(null);
+          } else if (nodeData.roles?.includes('sponsor')) {
+            setSelectedNode(nodeData);
+            setRightPanelView('nodeDetails');
+            setSelectedPerson(null);
+            handleExploreSponsorRelationships(nodeData);
           } else {
             setSelectedNode(nodeData);
             setRightPanelView('nodeDetails');
@@ -1952,7 +1987,7 @@ function HomePage({ handleLogout, user, setUser }) {
                       <button
                         className="btn btn-outline-light btn-sm"
                         onClick={() => { setRightPanelView('default'); setFriendStatus(null); }}
-                                              >
+                      >
                         Cancel
                       </button>
                     </div>
@@ -1968,7 +2003,7 @@ function HomePage({ handleLogout, user, setUser }) {
                     <button
                       className="btn btn-sm btn-outline-light float-end"
                       onClick={() => { setRightPanelView('default'); setFriendStatus(null); }}
-                                          >
+                    >
                       ×
                     </button>
                   </div>
@@ -2018,6 +2053,19 @@ function HomePage({ handleLogout, user, setUser }) {
                             </button>
                           )}
                         </div>
+                      </>
+                    ) : selectedNode.roles?.includes('sponsor') ? (
+                      <>
+                        {selectedNode.name && (
+                          <p className="text-navy mb-2">
+                            <strong>Name:</strong> {selectedNode.name}
+                          </p>
+                        )}
+                        {selectedNode.location && (
+                          <p className="text-navy mb-2">
+                            <strong>Location:</strong> {selectedNode.location}
+                          </p>
+                        )}
                       </>
                     ) : (
                       // Show all node details for non-athletes

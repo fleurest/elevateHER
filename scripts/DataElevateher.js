@@ -133,6 +133,12 @@ function normaliseHeaders(headers) {
         else if (lower.includes('award') && !lower.includes('date')) {
             normalised.awardName = header;
         }
+
+        // Sponsor name
+        else if (lower.includes('sponsor')) {
+            normalised.sponsor = header;
+        }
+
         else if (lower.includes('awarded')) {
             normalised.awardYear = header;
         }
@@ -148,6 +154,14 @@ function normaliseHeaders(headers) {
         else if (lower.includes('gender') || lower.includes('sex')) {
             normalised.gender = header;
         }
+        // Position
+        else if (lower.includes('position')) {
+            normalised.position = header;
+        }
+        // Profile image
+        else if (lower.includes('image') || lower.includes('photo')) {
+            normalised.profileImage = header;
+        }
     });
 
     return normalised;
@@ -159,15 +173,38 @@ function normaliseHeaders(headers) {
 async function processAthletes(rows, headerMap) {
     const athletes = rows
         .filter(row => row[headerMap.name]?.trim())
-        .map(row => ({
-            name: row[headerMap.name]?.trim(),
-            sport: row[headerMap.sport]?.trim() || 'Unknown',
-            nationality: row[headerMap.location]?.trim() || '',
-            birthDate: row[headerMap.birthDate] || row[headerMap.date]?.trim() || null,
-            gender: row[headerMap.gender]?.trim() || 'Female',
-            profileImage: null,
-            organisation: row[headerMap.organisation]?.trim() || null,
-        }));
+        .map(row => {
+            let altRaw = row[headerMap.alternateName];
+            let alternateNames = [];
+            if (altRaw && typeof altRaw === 'string') {
+                alternateNames = altRaw.split(/[;,]/).map(s => s.trim()).filter(Boolean);
+            } else if (Array.isArray(altRaw)) {
+                alternateNames = altRaw.map(s => s.trim()).filter(Boolean);
+            }
+            if (alternateNames.length === 0 && row[headerMap.name]) {
+                alternateNames = [row[headerMap.name].trim()];
+            }
+
+            let rolesRaw = row[headerMap.roles];
+            let roles = ['athlete'];
+            if (rolesRaw && typeof rolesRaw === 'string') {
+                const parsed = rolesRaw.split(/[;,]/).map(r => r.trim()).filter(Boolean);
+                if (parsed.length > 0) roles = parsed;
+            }
+
+            return {
+                name: row[headerMap.name]?.trim(),
+                sport: row[headerMap.sport]?.trim() || 'Unknown',
+                nationality: row[headerMap.location]?.trim() || '',
+                birthDate: row[headerMap.birthDate] || row[headerMap.date]?.trim() || null,
+                gender: row[headerMap.gender]?.trim() || 'Female',
+                profileImage: row[headerMap.profileImage]?.trim() || null,
+                position: row[headerMap.position]?.trim() || null,
+                roles,
+                alternateNames,
+                organisation: row[headerMap.organisation]?.trim() || null,
+            };
+        });
 
     console.log(`👤 Processing ${athletes.length} athletes`);
 
@@ -177,6 +214,21 @@ async function processAthletes(rows, headerMap) {
         athletes.map(athlete =>
             limit(async () => {
                 try {
+                    let exists = false;
+                    try {
+                        const res = await axios.get(`${API_BASE}/athletes/search`, {
+                            params: { query: athlete.name, sport: athlete.sport },
+                            timeout: 5000
+                        });
+                        exists = res.data?.players?.some(p => p.name.toLowerCase() === athlete.name.toLowerCase());
+                    } catch (searchErr) {
+                        console.error(`🔍 Search failed for ${athlete.name}:`, searchErr.response?.data || searchErr.message);
+                    }
+
+                    if (exists) {
+                        console.log(`👤 Skipping existing athlete: ${athlete.name}`);
+                        return;
+                    }
                     // 1. Create or update the athlete
                     const response = await axios.post(`${API_BASE}/athletes/`, {
                         name: athlete.name,
@@ -185,6 +237,9 @@ async function processAthletes(rows, headerMap) {
                         gender: athlete.gender,
                         profileImage: athlete.profileImage,
                         birthDate: athlete.birthDate,
+                        position: athlete.position,
+                        roles: athlete.roles,
+                        alternateNames: athlete.alternateNames,
                     }, {
                         timeout: 5000
                     });
@@ -238,6 +293,7 @@ async function processEvents(rows, headerMap) {
                 roles: roles,
                 year: row[headerMap.year] || row[headerMap.awardYear] || row[headerMap.date]?.trim() || extractYearFromName(name),
                 sameAs: row[headerMap.sameAs]?.trim() || generateWikipediaUrl(name),
+                profileImage: row[headerMap.profileImage]?.trim() || null,
             };
         });
 
@@ -246,7 +302,7 @@ async function processEvents(rows, headerMap) {
     // First, check if the events endpoint exists
     try {
         await axios.get(`${API_BASE}/events/list`, { timeout: 2000 });
-        console.log(`   ✅ Events API endpoint is available`);
+        console.log(`Events API endpoint is available`);
 
         // Process events with API calls
         const limit = pLimit(CONCURRENCY);
@@ -261,6 +317,7 @@ async function processEvents(rows, headerMap) {
                             roles: event.roles,
                             year: event.year,
                             sameAs: event.sameAs,
+                            profileImage: event.profileImage,
                         }, {
                             timeout: 5000
                         });
@@ -297,18 +354,50 @@ async function processAwards(rows, headerMap) {
             year: row[headerMap.year] || row[headerMap.awardYear]?.trim() || null,
             sport: row[headerMap.sport]?.trim() || null,
             event: row[headerMap.event]?.trim() || null,
+            sponsor: row[headerMap.sponsor]?.trim() || null,
         }));
 
     console.log(`🏆 Processing ${awards.length} awards`);
 
-    // Awards might be created as Events with roles="award"
-    awards.forEach(award => {
-        console.log(`🏆 Award: ${award.name}`);
-        if (award.year) console.log(`   📅 Year: ${award.year}`);
-        if (award.sport) console.log(`   ⚽ Sport: ${award.sport}`);
-        if (award.event) console.log(`   📅 Event: ${award.event}`);
-        console.log(`   💡 Consider creating as Event node with roles="award"`);
-    });
+    const limit = pLimit(CONCURRENCY);
+
+    await Promise.allSettled(
+        awards.map(award =>
+            limit(async () => {
+                try {
+                    await axios.post(`${API_BASE}/events/`, {
+                        name: award.name,
+                        sport: award.sport,
+                        location: null,
+                        roles: 'award',
+                        year: null,
+                        sameAs: null,
+                    }, { timeout: 5000 });
+                    console.log(`🏆 Created award event: ${award.name}`);
+
+                    if (award.sponsor) {
+                        try {
+                            await axios.post(`${API_BASE}/organisations/`, {
+                                name: award.sponsor,
+                                sport: award.sport,
+                                roles: 'Sponsor',
+                            }, { timeout: 5000 });
+                            console.log(`   ↳ Created sponsor: ${award.sponsor}`);
+                        } catch (orgErr) {
+                            if (orgErr.response && orgErr.response.status === 409) {
+                                console.log(`   ↳ Sponsor exists: ${award.sponsor}`);
+                            } else {
+                                console.error(`   ⚠️  Error creating sponsor ${award.sponsor}:`, orgErr.response?.data || orgErr.message);
+                            }
+                        }
+                    }
+
+                } catch (err) {
+                    console.error(`❗️ Error processing award ${award.name}:`, err.response?.data || err.message);
+                }
+            })
+        )
+    );
 }
 
 /**
@@ -316,7 +405,7 @@ async function processAwards(rows, headerMap) {
  * Fields: name (string), alternateName (array), iocDisciplineCode (string)
  */
 async function processSports(rows, headerMap) {
-    // Prepare each sport object
+    // Prep sport object
     const sports = rows
         .filter(row => row[headerMap.name]?.trim())
         .map(row => {

@@ -134,7 +134,7 @@ class PersonController {
         console.log('req.user:', req.user);
         console.log('req.session:', req.session);
         console.log('req.session.user:', req.session?.user);
-    
+
         if (req.user || req.session?.user) {
             const user = req.user || req.session.user;
             return res.status(200).json({
@@ -532,21 +532,32 @@ class PersonController {
 
     async updateProfile(req, res, next) {
         try {
-            if (!req.session?.user?.username) {
+            if (!req.session?.user) {
                 return res.status(401).json({ error: 'Not authenticated' });
             }
 
-            const { email, location, bio, profileImage } = req.body;
-            const currentUsername = req.session.user.username;
+            const { username, email, location, bio, profileImage } = req.body;
+            const userEmail = email || req.session.user.email;
 
-            const currentUser = await this.personService.findByEmail(email);
+            const currentUser = await this.personService.findByEmail(userEmail); const currentUsername = req.session.user.username;
+
             if (!currentUser) {
                 return res.status(404).json({ error: 'User not found' });
             }
 
+            let finalUsername = currentUser.username || req.session.user.username;
+
+            if ((!currentUser.username || currentUser.username.trim() === '') && username) {
+                const exists = await this.personService.usernameExists(username);
+                if (exists) {
+                    return res.status(400).json({ error: 'Username already taken' });
+                }
+                finalUsername = username;
+            }
+
             const updatedUser = await this.personService.createOrUpdateUser({
-                username: currentUsername,
-                email: email,
+                username: finalUsername,
+                email: userEmail,
                 passwordHash: currentUser.password || currentUser.passwordHash,
                 roles: currentUser.roles || ['user'],
                 location: location,
@@ -554,6 +565,7 @@ class PersonController {
                 profileImage: profileImage
             });
 
+            req.session.user.username = finalUsername;
             res.json(updatedUser);
 
         } catch (err) {

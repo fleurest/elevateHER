@@ -305,6 +305,33 @@ throw new Error('Athletes POST endpoint not working');
 }
 }
 
+/**
+ * Load mapping of NOC codes to regions/nationalities
+ */
+async function loadNocRegions() {
+  if (!fs.existsSync(NOC_CSV)) {
+    console.log(` NOC regions file not found: ${NOC_CSV}`);
+    return {};
+  }
+
+  return new Promise((resolve) => {
+    const mapping = {};
+    fs.createReadStream(NOC_CSV)
+      .pipe(csv())
+      .on('data', (row) => {
+        const noc = row.NOC || row.noc || row.code;
+        const region = row.region || row.Region || row.country;
+        if (noc && region) {
+          mapping[noc.trim()] = region.trim();
+        }
+      })
+      .on('end', () => resolve(mapping))
+      .on('error', (err) => {
+        console.error(`Error reading NOC regions file:`, err.message);
+        resolve(mapping);
+      });
+  });
+}
 
 /**
 * Process Olympic athlete data directly from athlete_events.csv
@@ -394,6 +421,16 @@ const age = row[headerMap.age] || row['Age'] || row['age'] || null;
 const height = row[headerMap.height] || row['Height'] || row['height'] || null;
 const weight = row[headerMap.weight] || row['Weight'] || row['weight'] || null;
 
+ // Determine athlete nationality using team, NOC code and mapping
+ let nationality = '';
+ if (team && team !== 'NA') {
+   nationality = team.trim();
+ } else if (noc && nocRegions[noc]) {
+   nationality = nocRegions[noc];
+ } else if (noc && noc !== 'NA') {
+   nationality = noc;
+ }
+
 if (!fullName?.trim()) {
   return;
 }
@@ -435,8 +472,7 @@ if (sport && sport.trim()) {
   
   // Create relationship: Athlete PARTICIPATES_IN Sport
   try {
-      await axios.post(`${API_BASE}/api/thletes/${athleteId}/sport`, {
-          sportName: sport.trim(),
+      await axios.post(`${API_BASE}/api/athletes/${athleteId}/sport`, {          sportName: sport.trim(),
           relationship: 'PARTICIPATES_IN'
       }, { timeout: 5000 });
       console.log(`   🔗 Created PARTICIPATES_IN relationship with sport: ${sport}`);

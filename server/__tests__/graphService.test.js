@@ -8,8 +8,8 @@ describe('GraphService (Updated)', () => {
 
   beforeEach(() => {
     const mockModel = { driver };
-    service = new GraphService(mockModel);
-  });
+    service = new GraphService(mockModel, driver);
+    });
 
   afterAll(async () => {
     await driver.close();

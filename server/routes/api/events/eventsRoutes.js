@@ -4,6 +4,7 @@ const { getCalendarEvents } = require('../../../services/EventCalService');
 const { listPastEvents } = require('../../../services/EventService');
 const axios = require('axios');
 const neo4j = require('neo4j-driver');
+const { convertNeo4jIntegers } = require('../../../utils/neo4jHelpers');
 
 const driver = neo4j.driver(
   process.env.NEO4J_URI,
@@ -11,7 +12,7 @@ const driver = neo4j.driver(
 );
 
 const calendarId = process.env.GOOGLE_CALENDAR_ID;
-const apiKey    = process.env.GOOGLE_API_KEY;
+const apiKey = process.env.GOOGLE_API_KEY;
 
 router.post('/', async (req, res) => {
   const { name, sport, location, roles, year, sameAs } = req.body;
@@ -52,10 +53,10 @@ router.post('/', async (req, res) => {
     });
 
     const event = result.records[0]?.get('e').properties;
-    
-    res.status(201).json({ 
+
+    res.status(201).json({
       message: `Event ${name} created/updated successfully`,
-      event: event 
+      event: event
     });
 
   } catch (err) {
@@ -87,8 +88,8 @@ router.post('/:eventId/sport', async (req, res) => {
 
     await session.run(cypher, { eventId, sportName });
 
-    res.json({ 
-      message: `Event linked to sport ${sportName}` 
+    res.json({
+      message: `Event linked to sport ${sportName}`
     });
 
   } catch (err) {
@@ -102,12 +103,12 @@ router.post('/:eventId/sport', async (req, res) => {
 // GET ALL EVENTS
 router.get('/list', async (req, res) => {
   const { sport, year, location } = req.query;
-  
+
   const session = driver.session();
   try {
     let cypher = `MATCH (e:Event)`;
     let params = {};
-    
+
     // Add filters if provided
     const conditions = [];
     if (sport) {
@@ -122,15 +123,17 @@ router.get('/list', async (req, res) => {
       conditions.push('toLower(e.location) CONTAINS toLower($location)');
       params.location = location;
     }
-    
+
     if (conditions.length > 0) {
       cypher += ` WHERE ${conditions.join(' AND ')}`;
     }
-    
+
     cypher += ` RETURN e ORDER BY e.year DESC, e.name`;
 
     const result = await session.run(cypher, params);
-    const events = result.records.map(record => record.get('e').properties);
+    const events = result.records.map(record =>
+      convertNeo4jIntegers(record.get('e').properties)
+    );
 
     res.json(events);
 
@@ -147,8 +150,9 @@ router.get('/past-events', async (req, res) => {
   const session = driver.session();
   try {
     const eventProperties = await listPastEvents(session);
-    
-    const events = eventProperties.map(eventProps => {
+
+    const events = eventProperties.map(rawProps => {
+      const eventProps = convertNeo4jIntegers(rawProps);
       return {
         id: eventProps.uuid || Math.random().toString(36),
         title: eventProps.name,
@@ -176,28 +180,28 @@ router.get('/past-events', async (req, res) => {
 
 //events calendar
 router.get('/calendar-events', async (req, res) => {
-    try {
-      const calendarId = process.env.GOOGLE_CALENDAR_ID;
-      const apiKey = process.env.GOOGLE_API_KEY;
-      const timeMin = new Date().toISOString();
-  
-      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}&timeMin=${timeMin}&singleEvents=true&orderBy=startTime`;
-      const response = await axios.get(url);
-  
-      const events = response.data.items.map(event => ({
-        id: event.id,
-        summary: event.summary,
-        start: event.start.dateTime || event.start.date,
-        end: event.end.dateTime || event.end.date,
-        location: event.location,
-        description: event.description
-      }));
-  
-      res.json(events);
-    } catch (err) {
-      console.error('Failed to fetch calendar events:', err);
-      res.status(500).json({ error: 'Calendar fetch error' });
-    }
-  });
-  
+  try {
+    const calendarId = process.env.GOOGLE_CALENDAR_ID;
+    const apiKey = process.env.GOOGLE_API_KEY;
+    const timeMin = new Date().toISOString();
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}&timeMin=${timeMin}&singleEvents=true&orderBy=startTime`;
+    const response = await axios.get(url);
+
+    const events = response.data.items.map(event => ({
+      id: event.id,
+      summary: event.summary,
+      start: event.start.dateTime || event.start.date,
+      end: event.end.dateTime || event.end.date,
+      location: event.location,
+      description: event.description
+    }));
+
+    res.json(events);
+  } catch (err) {
+    console.error('Failed to fetch calendar events:', err);
+    res.status(500).json({ error: 'Calendar fetch error' });
+  }
+});
+
 module.exports = router;

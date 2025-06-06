@@ -190,17 +190,6 @@ function HomePage({ handleLogout, user, setUser }) {
       .catch(err => console.error('Error loading incoming requests:', err));
   }, [user?.username]);
 
-  // Fetch top friends for icon bar
-  useEffect(() => {
-    if (!user?.username) return;
-    fetch(`${API_BASE}/api/users/pending-incoming/${user.username}`, { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        setIncomingRequests(Array.isArray(data?.incoming) ? data.incoming : []);
-      })
-      .catch(err => console.error('Error loading incoming requests:', err));
-  }, [user?.username]);
-
   const handleSpotlightProfile = (athleteObj) => {
     const athlete = athleteObj || spotlightAthlete;
     if (!athlete) return;

@@ -2439,3 +2439,10 @@
   background-color: var(--grey);
   position: relative;
 }
+
+/* Button for loading a new set of 15 athletes */
+.new-athletes-btn {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  margin-right: 0.5rem;
+}

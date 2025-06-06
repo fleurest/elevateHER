@@ -1,6 +1,6 @@
 async function listPastEvents(session) {
   const result = await session.run(
-    'MATCH (e:Event) WHERE e.date < date() RETURN e ORDER BY e.date DESC LIMIT 25'
+    'MATCH (e:Event) RETURN e ORDER BY e.date DESC'
   );
   return result.records.map(r => r.get('e').properties);
 }

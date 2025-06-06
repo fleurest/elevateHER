@@ -53,7 +53,7 @@ class PersonService {
         return bcrypt.compare(password, hash);
     }
 
-    async getTopUsers(limit = 5) {
+    async getTopUsers(limit = 15) {
         const session = this.driver.session();
         try {
             const result = await session.run(

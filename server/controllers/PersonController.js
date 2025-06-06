@@ -33,7 +33,7 @@ class PersonController {
         this.linkAthleteToOrg = this.linkAthleteToOrg.bind(this);
         this.removeAthleteOrganisation = this.removeAthleteOrganisation.bind(this);
 
-
+        this.getAthleteNetwork = this.getAthleteNetwork.bind(this);
         this.listUsers = this.listUsers.bind(this);
         this.getSuggestedUsers = this.getSuggestedUsers.bind(this);
         this.searchUsers = this.searchUsers.bind(this);
@@ -428,6 +428,102 @@ class PersonController {
         }
     }
 
+    async getAthleteNetwork(req, res, next) {
+        const { id } = req.params;
+
+        const session = driver.session();
+        try {
+            const result = await session.run(
+                `
+                MATCH (athlete:Person {uuid: $id})
+                OPTIONAL MATCH (athlete)-[r1]-(hop1)
+                OPTIONAL MATCH (hop1)-[r2]-(hop2)
+                WHERE hop2 <> athlete
+                WITH athlete,
+                     collect(DISTINCT hop1) as hop1Nodes,
+                     collect(DISTINCT hop2)[0..15] as hop2Nodes,
+                     collect(DISTINCT r1) as hop1Rels,
+                     collect(DISTINCT r2) as hop2Rels
+                RETURN athlete, hop1Nodes, hop2Nodes, hop1Rels, hop2Rels
+                `,
+                { id }
+            );
+
+            if (result.records.length === 0) {
+                return res.status(404).json({ error: 'Athlete not found' });
+            }
+
+            const record = result.records[0];
+            const athlete = record.get('athlete');
+            const hop1Nodes = record.get('hop1Nodes');
+            const hop2Nodes = record.get('hop2Nodes');
+            const hop1Rels = record.get('hop1Rels');
+            const hop2Rels = record.get('hop2Rels');
+
+            const nodes = [];
+            const edges = [];
+            const processedNodeIds = new Set();
+            const processedEdgeIds = new Set();
+
+            const athleteId = athlete.identity.toString();
+            nodes.push({
+                data: {
+                    id: athleteId,
+                    label: athlete.properties.name || 'Unknown Athlete',
+                    name: athlete.properties.name,
+                    sport: athlete.properties.sport,
+                    nationality: athlete.properties.nationality,
+                    type: 'athlete',
+                    roles: athlete.properties.roles,
+                    profileImage: athlete.properties.profileImage,
+                    isCenter: true
+                }
+            });
+            processedNodeIds.add(athleteId);
+
+            [...hop1Nodes, ...hop2Nodes].forEach(node => {
+                if (node && !processedNodeIds.has(node.identity.toString())) {
+                    nodes.push({
+                        data: {
+                            id: node.identity.toString(),
+                            label: node.properties.name || node.properties.label || 'Unknown',
+                            name: node.properties.name,
+                            sport: node.properties.sport,
+                            nationality: node.properties.nationality,
+                            type: node.labels[0]?.toLowerCase() || 'person',
+                            roles: node.properties.roles,
+                            profileImage: node.properties.profileImage
+                        }
+                    });
+                    processedNodeIds.add(node.identity.toString());
+                }
+            });
+
+            [...hop1Rels, ...hop2Rels].forEach(rel => {
+                if (rel && !processedEdgeIds.has(rel.identity.toString()) &&
+                    processedNodeIds.has(rel.start.toString()) &&
+                    processedNodeIds.has(rel.end.toString())) {
+                    edges.push({
+                        data: {
+                            id: rel.identity.toString(),
+                            source: rel.start.toString(),
+                            target: rel.end.toString(),
+                            label: rel.type,
+                            relationship: rel.type
+                        }
+                    });
+                    processedEdgeIds.add(rel.identity.toString());
+                }
+            });
+
+            res.json({ nodes, edges });
+        } catch (err) {
+            next(err);
+        } finally {
+            await session.close();
+        }
+    }
+
     async searchAthletes(req, res, next) {
         const { query, sport } = req.query;
         if (!query || query.trim() === '') {
@@ -481,8 +577,8 @@ class PersonController {
 
     async getTopUsers(req, res, next) {
         try {
-            const users = await this.personService.getTopUsers();
-            res.json(users);
+            const limit = parseInt(req.query.limit, 10) || undefined;
+            const users = await this.personService.getTopUsers(limit); res.json(users);
         } catch (error) {
             console.error('[SERVER] Error fetching top users:', error);
             next(error);

@@ -729,11 +729,11 @@ async function processCsvFile(filename) {
                 const headerMap = normaliseHeaders(headers);
                 console.log(`   Mapped headers:`, headerMap);
 
-                // Debug: Show which relationship type column was detected
+                // Show which relationship type column was detected
                 if (csvType === 'relationships') {
                     console.log(`   Relationship type column: ${headerMap.relationshipType || 'NOT FOUND'}`);
                     if (!headerMap.relationshipType) {
-                        console.log(`   ⚠️  Warning: No relationship type column found. Will use default 'PARTICIPATES_IN'`);
+                        console.log(`Warning: No relationship type column found. Will use default 'PARTICIPATES_IN'`);
                     }
                 }
 

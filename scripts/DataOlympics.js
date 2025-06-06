@@ -245,12 +245,15 @@ console.log('🔍 Testing API endpoints...\n');
 
 // Test basic connectivity
 try {
-const response = await axios.get(`${API_BASE}/`, { timeout: 3000 });
-console.log('Server is running on port 3001');
+  const response = await axios.get(`${API_BASE}/`, {
+    timeout: 3000,
+    validateStatus: () => true,
+  });
+  console.log(`Server responded on port 3001 (status ${response.status})`);
 } catch (err) {
-console.log('Cannot connect to server on port 3001');
-console.log(`   Error: ${err.message}`);
-throw new Error('API server not accessible');
+  console.log('Cannot connect to server on port 3001');
+  console.log(`   Error: ${err.message}`);
+  throw new Error('API server not accessible');
 }
 
 // Test athletes endpoint

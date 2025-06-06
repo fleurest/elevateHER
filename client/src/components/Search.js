@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import '../style.css';
-
+import { API_BASE } from '../config';
 
 function Search({ user }) {
     const [query, setQuery] = useState('');
@@ -313,8 +314,12 @@ function Search({ user }) {
     return (
         <div className="auth-container">
             <div className="auth-card" style={{ width: '100%', maxWidth: '900px' }}>
-                <h2 className="auth-title">Search & Manage Entities</h2>
-
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <h2 className="auth-title" style={{ marginBottom: 0 }}>Search and Create</h2>
+                    <Link to="/home" className="events-back-btn">
+                        ← Back to Home
+                    </Link>
+                </div>
                 {/* Alert Messages */}
                 {error && <div className="auth-error" style={{ marginBottom: '20px' }}>{error}</div>}
                 {success && <div style={{ color: 'green', marginBottom: '20px', padding: '10px', background: '#e8f5e8', borderRadius: '5px' }}>{success}</div>}
@@ -659,9 +664,9 @@ function Search({ user }) {
                         <select
                             className="auth-input"
                             nname="targetName"
-                            value={relationshipData.targetName}
+                            name="targetType"
+                            value={relationshipData.targetType}
                             onChange={handleRelationshipChange}
-                            placeholder="Target Name"
                             required
                         >
                             <option value="">Select Target Type</option>
@@ -670,13 +675,12 @@ function Search({ user }) {
                             <option value="sport">Sport</option>
                             <option value="event">Event</option>
                         </select>
-
                         <input
                             className="auth-input"
-                            name="targetId"
-                            value={relationshipData.targetId}
+                            name="targetName"
+                            value={relationshipData.targetName}
                             onChange={handleRelationshipChange}
-                            placeholder="Target ID/UUID"
+                            placeholder="Target Name"
                             required
                         />
 

@@ -159,8 +159,8 @@ router.get('/past-events', async (req, res) => {
         eventType: eventProps.eventType,
         description: `${eventProps.eventType || 'Event'} - ${eventProps.year || 'Year not specified'}`,
 
-        date: eventProps.year ? `${eventProps.year}-01-01` : null,
-        start: eventProps.year ? `${eventProps.year}-01-01` : null
+        date: eventProps.date || null,
+        start: eventProps.date || null
       };
     });
 

@@ -716,18 +716,18 @@ function HomePage({ handleLogout, user, setUser }) {
     }
   };
 
-  const handleViewLikedPlayers = async (identifier) => {
+  const handleViewLikedPlayers = async (email) => {
     try {
-      console.log('👀 Loading liked players for:', identifier);
+      console.log('👀 Loading liked players for:', email);
 
-      if (!identifier) {
+      if (!email) {
         console.error('No user identifier provided');
         alert('Cannot load liked players - missing identifier');
         return;
       }
 
       const res = await fetch(
-        `${API_BASE}/api/users/likes/${encodeURIComponent(identifier)}`,
+        `${API_BASE}/api/graph/liked/${encodeURIComponent(email)}`,
         { credentials: 'include' }
       );
 
@@ -777,19 +777,16 @@ function HomePage({ handleLogout, user, setUser }) {
 
     try {
       // Use email if available, fallback to username
-      const identifier = user.email || user.username;
-
-      if (!identifier) {
-        throw new Error('No user identifier available');
+      if (!user.email) {
+        throw new Error('No email available for current user');
       }
-
-      const encodedIdentifier = encodeURIComponent(identifier);
-      console.log('Using identifier:', identifier);
-      console.log('Encoded identifier:', encodedIdentifier);
-      console.log('Full URL:', `${API_BASE}/api/graph/liked/${encodedIdentifier}`);
+      const encodedEmail = encodeURIComponent(user.email);
+      console.log('Using email:', user.email);
+      console.log('Encoded email:', encodedEmail);
+      console.log('Full URL:', `${API_BASE}/api/graph/liked/${encodedEmail}`);
 
       const res = await fetch(
-        `${API_BASE}/api/graph/liked/${encodedIdentifier}`,
+        `${API_BASE}/api/graph/liked/${encodedEmail}`,
         { credentials: 'include' }
       );
 
@@ -826,9 +823,12 @@ function HomePage({ handleLogout, user, setUser }) {
     setSelectedPerson(null);
 
     try {
-      const identifier = user.email || user.username;
-      const res = await fetch(
-        `${API_BASE}/api/graph/friends/${encodeURIComponent(identifier)}`,
+      if (!user.email) {
+        throw new Error('No email available for current user');
+      }
+
+      const encodedEmail = encodeURIComponent(user.email); const res = await fetch(
+        `${API_BASE}/api/graph/friends/${encodedEmail}`,
         { credentials: 'include' }
       );
       if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -958,8 +958,7 @@ function HomePage({ handleLogout, user, setUser }) {
       try {
         console.log('🤝 Loading Friend Suggestions...');
 
-        const res = await fetch(`${API_BASE}/api/users/top`, {
-          credentials: 'include'
+        const res = await fetch(`${API_BASE}/api/users/top?limit=15`, {          credentials: 'include'
         });
 
         if (!res.ok) {
@@ -1181,7 +1180,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
     const timeout = setTimeout(() => {
       try {
-        const nodeLabelField = (activeView === 'explore' && filterType === 'Friends')
+        const nodeLabelField = activeView === 'explore' && (filterType === 'Friends')
           ? 'data(name)'
           : 'data(label)';
         const nodeFontSize = (activeView === 'explore' && filterType === 'Friends')
@@ -1250,7 +1249,7 @@ function HomePage({ handleLogout, user, setUser }) {
                 'background-fit': 'contain',
                 'background-position': 'center',
                 'background-width': '70%',
-                'background-height': '70%',              
+                'background-height': '70%',
                 'border-width': 3,
                 'border-color': 'var(--purple)',
                 label: nodeLabelField,
@@ -1376,8 +1375,7 @@ function HomePage({ handleLogout, user, setUser }) {
   // ─── "Suggested Friends" (for right sidebar) ───────────────────────────────
   const fetchSuggestedFriends = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/users/top`, { credentials: 'include' });
-      const text = await res.text();
+      const res = await fetch(`${API_BASE}/api/users/top?limit=15`, { credentials: 'include' });      const text = await res.text();
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = JSON.parse(text);
       setSuggestedFriends(data);
@@ -1534,10 +1532,10 @@ function HomePage({ handleLogout, user, setUser }) {
             <div className="home-page-column home-page-center mb-3">
               <div className="icon-bar-wrapper">
                 <div className="center-top-icons">
-                  <Link to="/home" className="icon-link my-icon home-icon" />
-                  <Link to="/dashboard" className="icon-link my-icon players-icon" />
-                  <Link to="/events" className="icon-link my-icon events-icon" />
-                  <Link to="/search" className="icon-link my-icon pages-icon" />
+                  <Link to="/home" title="Home" className="icon-link my-icon home-icon" />
+                  <Link to="/dashboard" title="Dashboard" className="icon-link my-icon players-icon" />
+                  <Link to="/events" title="Events" className="icon-link my-icon events-icon" />
+                  <Link to="/search" title="Search" className="icon-link my-icon pages-icon" />
                 </div>
               </div>
             </div>
@@ -1757,7 +1755,7 @@ function HomePage({ handleLogout, user, setUser }) {
                   backgroundColor: '#f5f5f5',
                   borderRadius: '3px'
                 }}>
-                  Debug: {centerGraphData ?
+                  {centerGraphData ?
                     `${centerGraphData.nodes?.length || 0} nodes, ${centerGraphData.edges?.length || 0} edges` :
                     'No data loaded'
                   }
@@ -1825,7 +1823,7 @@ function HomePage({ handleLogout, user, setUser }) {
                   ) : filterType === 'Player' ? (
                     <>
                       <button
-                        className="btn btn-outline-primary me-2"
+                        className="btn btn-outline-primary me-2 new-athletes-btn"
                         onClick={() => handleExplore('Player')}
                       >
                         🔄 New 15 Athletes
@@ -1964,7 +1962,7 @@ function HomePage({ handleLogout, user, setUser }) {
 
                     {/* Debug info */}
                     <div style={{ fontSize: '10px', color: '#ccc', marginBottom: '8px' }}>
-                      Debug: email={selectedPerson.email || 'none'}, username={selectedPerson.username || 'none'}, status={friendStatus || 'none'}                    </div>
+                      {selectedPerson.email || 'none'},  {selectedPerson.username || 'none'}, status={friendStatus || 'none'}                    </div>
 
                     <div className="mt-2">
                       <button
@@ -1973,12 +1971,12 @@ function HomePage({ handleLogout, user, setUser }) {
                       >
                         Send Friend Request
                       </button>
-                      {(selectedPerson.username || selectedPerson.email) && (
+                      {selectedPerson.email && (
                         <button
                           className="btn btn-outline-light btn-sm me-2"
                           onClick={() =>
                             handleViewLikedPlayers(
-                              selectedPerson.username || selectedPerson.email
+                              selectedPerson.email
                             )
                           }                        >
                           See Their Liked Players
@@ -2350,12 +2348,17 @@ function HomePage({ handleLogout, user, setUser }) {
                       <div className="card-body" style={{ backgroundColor: 'var(--grey)' }}>
                         <ul className="list-unstyled">
                           {pastEvents.slice(0, 3).map((event, index) => (
-                            <li key={event.id || event.eventName || `past-${index}`} className="mb-2">
-                              <strong className="text-navy">{event.eventName || 'Unnamed Event'}</strong><br />
-                              <small className="text-navy">
-                                {event.year ? Number(event.year.low ?? event.year) : 'Unknown Year'}
-                              </small><br />
-                              {event.location && <small className="text-navy">{event.location}</small>}
+                            <li key={event.id || event.title || `past-${index}`} className="mb-2">
+                            <strong className="text-navy">{event.title || 'Unnamed Event'}</strong><br />
+                            {event.date && (
+                              <small className="text-navy">{event.date}</small>
+                            )}
+                            { !event.date && event.year && (
+                              <small className="text-navy">{event.year}</small>
+                            )}
+                            {event.location && (
+                              <><br /><small className="text-navy">{event.location}</small></>
+                            )}
                             </li>
                           ))}
                         </ul>

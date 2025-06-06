@@ -831,60 +831,60 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
                     data = { nodes: [], edges: [] };
                     console.log('Similar mode - starting with empty graph');
                     break;
-                    case 'pagerank':
-                        console.log('Fetching PageRank scores...');
-                        response = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
-                        if (!response.ok) {
-                            if (response.status === 404 || response.status === 500) {
-                                console.log('No PageRank scores found or retrieval failed, calculating new ones...');
-                                const calcRes = await fetch(`${apiBase}/api/graph/pagerank`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ maxIterations: 20, dampingFactor: 0.85, writeProperty: 'pagerank' })
-                                });
-                                if (!calcRes.ok) {
-                                    const errText = await calcRes.text();
-                                    throw new Error(`Failed to calculate PageRank: ${calcRes.status} ${errText}`);
-                                }
-                                await calcRes.json();
-                                response = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
-                                if (!response.ok) {
-                                    throw new Error(`Failed to fetch PageRank scores after calculation: ${response.status}`);
-                                }
-                            } else {
-                                throw new Error(`Failed to get PageRank: ${response.status}`);
+                case 'pagerank':
+                    console.log('Fetching PageRank scores...');
+                    response = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
+                    if (!response.ok) {
+                        if (response.status === 404 || response.status === 500) {
+                            console.log('No PageRank scores found or retrieval failed, calculating new ones...');
+                            const calcRes = await fetch(`${apiBase}/api/graph/pagerank`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ maxIterations: 20, dampingFactor: 0.85, writeProperty: 'pagerank' })
+                            });
+                            if (!calcRes.ok) {
+                                const errText = await calcRes.text();
+                                throw new Error(`Failed to calculate PageRank: ${calcRes.status} ${errText}`);
                             }
-                        }
-    
-                        const prData = await response.json();
-    
-                        if (Array.isArray(prData) && prData.length) {
-                            const prNodes = prData.map((person, index) => ({
-                                data: {
-                                    id: person.id || `pagerank-${index}`,
-                                    label: person.name,
-                                    name: person.name,
-                                    sport: person.sport,
-                                    nationality: person.nationality,
-                                    type: 'person',
-                                    image: person.profileImage || person.image,
-                                    profileImage: person.profileImage || person.image,
-                                    pagerank: person.score,
-                                    ...person
-                                }
-                            }));
-    
-                            const prGraph = { nodes: prNodes.slice(0, 20), edges: [] };
-                            const topPersons = prData.slice(0, 5).map(p => `${p.name} (${p.score.toFixed(4)})`).join('\n');
-    
-                            alert(`🎯 PageRank Analysis Complete!\n\n📊 Results:\n• Analyzed ${prData.length} people\n• Found most influential individuals\n• Scores range from ${prData[prData.length - 1]?.score.toFixed(4)} to ${prData[0]?.score.toFixed(4)}\n\n🏆 Top 5 Most Influential:\n${topPersons}`);
-    
-                            data = prGraph;
+                            await calcRes.json();
+                            response = await fetch(`${apiBase}/api/graph/pagerank?limit=50`);
+                            if (!response.ok) {
+                                throw new Error(`Failed to fetch PageRank scores after calculation: ${response.status}`);
+                            }
                         } else {
-                            alert('No PageRank data found.');
-                            data = { nodes: [], edges: [], message: 'No PageRank scores found' };
+                            throw new Error(`Failed to get PageRank: ${response.status}`);
                         }
-                        break;
+                    }
+
+                    const prData = await response.json();
+
+                    if (Array.isArray(prData) && prData.length) {
+                        const prNodes = prData.map((person, index) => ({
+                            data: {
+                                id: person.id || `pagerank-${index}`,
+                                label: person.name,
+                                name: person.name,
+                                sport: person.sport,
+                                nationality: person.nationality,
+                                type: 'person',
+                                image: person.profileImage || person.image,
+                                profileImage: person.profileImage || person.image,
+                                pagerank: person.score,
+                                ...person
+                            }
+                        }));
+
+                        const prGraph = { nodes: prNodes.slice(0, 20), edges: [] };
+                        const topPersons = prData.slice(0, 5).map(p => `${p.name} (${p.score.toFixed(4)})`).join('\n');
+
+                        alert(`🎯 PageRank Analysis Complete!\n\n📊 Results:\n• Analyzed ${prData.length} people\n• Found most influential individuals\n• Scores range from ${prData[prData.length - 1]?.score.toFixed(4)} to ${prData[0]?.score.toFixed(4)}\n\n🏆 Top 5 Most Influential:\n${topPersons}`);
+
+                        data = prGraph;
+                    } else {
+                        alert('No PageRank data found.');
+                        data = { nodes: [], edges: [], message: 'No PageRank scores found' };
+                    }
+                    break;
 
                 default:
                     data = { nodes: [], edges: [] };
@@ -929,7 +929,7 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
         }
     };
 
-    const handleAddAthlete = (athlete) => {
+    const handleAddAthlete = async (athlete) => {
         console.log('Adding athlete to network:', athlete);
 
         if (mode === 'dynamic') {
@@ -954,10 +954,34 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
                 return;
             }
 
-            const updatedGraphData = {
-                nodes: [...graphData.nodes, newNode],
-                edges: [...graphData.edges]
-            };
+            let updatedNodes = [...graphData.nodes, newNode];
+            let updatedEdges = [...graphData.edges];
+
+            try {
+                const apiBase = process.env.REACT_APP_API_BASE || '';
+                const res = await fetch(`${apiBase}/api/athletes/${encodeURIComponent(nodeId)}/network`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.nodes && data.edges) {
+                        data.nodes.forEach(n => {
+                            const id = n.data?.id || n.id;
+                            if (!updatedNodes.some(ex => (ex.data?.id || ex.id) === id)) {
+                                updatedNodes.push(n);
+                            }
+                        });
+                        data.edges.forEach(e => {
+                            const id = e.data?.id || e.id;
+                            if (!updatedEdges.some(ex => (ex.data?.id || ex.id) === id)) {
+                                updatedEdges.push(e);
+                            }
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch athlete network:', err);
+            }
+
+            const updatedGraphData = { nodes: updatedNodes, edges: updatedEdges };
 
             setGraphData(updatedGraphData);
             setAddedNodes([...addedNodes, nodeId]);
@@ -1028,8 +1052,12 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
 
             console.log('🔍 Step 1: Getting your liked entities...');
 
-            const likedIdentifier = user.email || user.username;
-            const likedResponse = await fetch(`${apiBase}/api/graph/liked/${encodeURIComponent(likedIdentifier)}`, {
+            if (!user.email) {
+                throw new Error('No email available for current user');
+            }
+
+            const likedEmail = encodeURIComponent(user.email);
+            const likedResponse = await fetch(`${apiBase}/api/graph/liked/${likedEmail}`, {
                 credentials: 'include'
             });
 

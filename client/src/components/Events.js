@@ -74,9 +74,9 @@ function Events() {
             day = eventDate.getDate();
             month = eventDate.toLocaleString('default', { month: 'short' });
             year = eventDate.getFullYear();
-            time = eventDate.toLocaleTimeString('default', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
+            time = eventDate.toLocaleTimeString('default', {
+              hour: '2-digit',
+              minute: '2-digit'
             });
           }
 
@@ -96,8 +96,7 @@ function Events() {
                       <div className="event-date-box me-3">
                         <div className="event-date-day">-</div>
                         <div className="event-date-month">
-                          No Date
-                        </div>
+                        {event.date || event.start?.dateTime || event.start || 'No Date'}                        </div>
                       </div>
                     )}
                     <div className="flex-grow-1">

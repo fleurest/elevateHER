@@ -3,16 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 const BackToHome = ({ onBackToHome }) => (
     <button
         onClick={() => window.location.href = '/home'}
-        style={{
-            padding: '8px 16px',
-            backgroundColor: '#575a7b',
-            color: '#f1f2f3',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500'
-        }}
+        className="network-back-btn bg-purple text-grey"
     >
         ← Back to Home
     </button>
@@ -151,7 +142,7 @@ const ModeSelector = ({ currentMode, onModeChange, user }) => {
     ];
 
     return (
-        <div className="network-mode-selector">
+        <div className="network-mode-selector bg-grey">
             {modes.map(({ id, label, icon: Icon, description, requiresAuth }) => {
                 const isDisabled = requiresAuth && !user;
                 const displayDescription = isDisabled ? 'Login required for this feature' : description;
@@ -160,9 +151,24 @@ const ModeSelector = ({ currentMode, onModeChange, user }) => {
                     <button
                         key={id}
                         onClick={() => !isDisabled && onModeChange(id)}
-                        className={`network-mode-tab ${currentMode === id ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
+                        className={`network-mode-tab ${currentMode === id ? 'active bg-purple text-grey' : 'bg-light-purple text-navy'} ${isDisabled ? 'disabled' : ''}`}
                         title={displayDescription}
                         disabled={isDisabled}
+                        style={{
+                            borderRadius: '6px',
+                            margin: '0 6px',
+                            padding: '10px 18px',
+                            border: currentMode === id ? '2px solid var(--purple)' : '2px solid transparent',
+                            boxShadow: currentMode === id ? '0 2px 8px rgba(87,90,123,0.08)' : 'none',
+                            fontWeight: 600,
+                            fontSize: '15px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            opacity: isDisabled ? 0.5 : 1,
+                            transition: 'all 0.2s',
+                        }}
                     >
                         <Icon />
                         <span>{label}</span>
@@ -222,8 +228,9 @@ const SearchPanel = ({ searchTerm, setSearchTerm, athletes, onAddAthlete, isVisi
         return (
             <button
                 onClick={onToggle}
-                className="network-search-toggle"
+                className="network-search-toggle bg-purple text-grey"
                 title="Show search panel"
+                style={{ borderRadius: '50%', padding: '10px', boxShadow: '0 2px 8px rgba(87,90,123,0.08)' }}
             >
                 <SearchIcon />
             </button>
@@ -231,18 +238,18 @@ const SearchPanel = ({ searchTerm, setSearchTerm, athletes, onAddAthlete, isVisi
     }
 
     return (
-        <div className="network-search-panel">
+        <div className="network-search-panel bg-grey" style={{ borderRadius: '12px', boxShadow: '0 2px 12px rgba(53,55,75,0.08)', padding: '18px', maxWidth: '340px', position: 'absolute', left: '24px', top: '90px', zIndex: 10 }}>
             <div className="network-search-header">
-                <h3>
+                <h3 className="text-purple" style={{ fontWeight: 700, fontSize: '18px' }}>
                     {mode === 'dynamic' ? 'Add to Network' :
                         mode === 'general' ? 'Search Network' :
                             'Search & Filter'}
                 </h3>
-                <button onClick={onToggle} className="network-panel-close">
+                <button onClick={onToggle} className="network-panel-close bg-light-purple text-navy" style={{ borderRadius: '50%', padding: '6px' }}>
                     <XIcon />
                 </button>
             </div>
-            <div className="network-search-input-container">
+            <div className="network-search-input-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                 <SearchIcon />
                 <input
                     type="text"
@@ -254,49 +261,53 @@ const SearchPanel = ({ searchTerm, setSearchTerm, athletes, onAddAthlete, isVisi
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className="network-search-input"
+                    className="network-search-input bg-grey text-navy"
                     disabled={isSearching}
+                    style={{ border: '1px solid var(--light-purple)', borderRadius: '6px', padding: '8px', flex: 1 }}
                 />
                 <button
                     onClick={handleSearch}
-                    className="network-search-btn"
+                    className="network-search-btn bg-purple text-grey"
                     disabled={isSearching || !searchTerm.trim()}
+                    style={{ borderRadius: '6px', padding: '8px 14px', fontWeight: 600 }}
                 >
                     {isSearching ? '⏳' : 'Search'}
                 </button>
             </div>
             <div className="network-search-results">
                 {isSearching ? (
-                    <div className="network-search-loading">Searching...</div>
+                    <div className="network-search-loading text-purple">Searching...</div>
                 ) : displayItems.length > 0 ? (
                     displayItems.map((athlete, index) => (
                         <div
                             key={`${athlete.id || athlete.name}-${index}`}
                             onClick={() => onAddAthlete(athlete)}
-                            className="network-search-item"
+                            className="network-search-item bg-light-purple text-navy"
+                            style={{ borderRadius: '8px', marginBottom: '8px', padding: '8px', display: 'flex', alignItems: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(87,90,123,0.06)' }}
                         >
                             <img
                                 src={athlete.image || athlete.profileImage || iconPlayer}
                                 alt={athlete.name || athlete.label}
                                 className="network-search-avatar"
+                                style={{ width: '40px', height: '40px', borderRadius: '50%', marginRight: '12px', background: 'var(--grey)' }}
                                 onError={(e) => { e.target.src = iconPlayer; }}
                             />
-                            <div className="network-search-info">
-                                <p className="network-search-name">{athlete.name || athlete.label}</p>
-                                <p className="network-search-details">
+                            <div className="network-search-info" style={{ flex: 1 }}>
+                                <p className="network-search-name" style={{ fontWeight: 600, margin: 0 }}>{athlete.name || athlete.label}</p>
+                                <p className="network-search-details" style={{ fontSize: '13px', margin: 0 }}>
                                     {athlete.sport && `${athlete.sport} • `}
                                     {athlete.nationality || athlete.type || 'Unknown'}
                                 </p>
                             </div>
                             {mode === 'dynamic' && (
-                                <button className="network-search-add-btn">
+                                <button className="network-search-add-btn bg-purple text-grey" style={{ borderRadius: '50%', padding: '6px', marginLeft: '8px' }}>
                                     <PlusIcon />
                                 </button>
                             )}
                         </div>
                     ))
                 ) : (
-                    <div className="network-search-empty">
+                    <div className="network-search-empty text-purple">
                         {searchTerm ? 'No results found matching your search.' : 'Enter a search term to find athletes.'}
                     </div>
                 )}
@@ -335,33 +346,35 @@ const ControlPanel = ({ onCommunities, onExport, onLoadSimilar, onPageRank, isOp
     ];
 
     return (
-        <div className="network-control-panel">
+        <div className="network-control-panel" style={{ position: 'absolute', right: '24px', top: '90px', zIndex: 10 }}>
             {!isOpen ? (
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="network-control-toggle"
+                    className="network-control-toggle bg-purple text-grey"
                     title="Open controls"
+                    style={{ borderRadius: '50%', padding: '10px', boxShadow: '0 2px 8px rgba(87,90,123,0.08)' }}
                 >
                     <MenuIcon />
                 </button>
             ) : (
-                <div className="network-control-menu">
+                <div className="network-control-menu bg-grey" style={{ borderRadius: '12px', boxShadow: '0 2px 12px rgba(53,55,75,0.08)', padding: '18px', minWidth: '260px' }}>
                     <div className="network-control-header">
-                        <h3>Network Controls</h3>
-                        <button onClick={() => setIsOpen(false)} className="network-panel-close">
+                        <h3 className="text-purple" style={{ fontWeight: 700, fontSize: '18px' }}>Network Controls</h3>
+                        <button onClick={() => setIsOpen(false)} className="network-panel-close bg-light-purple text-navy" style={{ borderRadius: '50%', padding: '6px' }}>
                             <XIcon />
                         </button>
                     </div>
 
                     <div className="network-control-section">
-                        <h4>AI Analysis</h4>
+                        <h4 className="text-navy" style={{ fontWeight: 600, fontSize: '15px' }}>AI Analysis</h4>
                         {controls.map(({ label, action, icon: Icon, needsUser, description }) => (
                             <button
                                 key={label}
                                 onClick={action}
                                 disabled={needsUser && !user}
-                                className={`network-control-button ${needsUser && !user ? 'disabled' : ''}`}
+                                className={`network-control-button ${needsUser && !user ? 'disabled' : 'bg-purple text-grey'}`}
                                 title={description}
+                                style={{ borderRadius: '6px', margin: '6px 0', padding: '10px 14px', fontWeight: 600, fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', opacity: needsUser && !user ? 0.5 : 1, cursor: needsUser && !user ? 'not-allowed' : 'pointer' }}
                             >
                                 <Icon />
                                 <span>{label}</span>
@@ -370,13 +383,14 @@ const ControlPanel = ({ onCommunities, onExport, onLoadSimilar, onPageRank, isOp
                     </div>
 
                     <div className="network-control-section">
-                        <h4>Export Data</h4>
+                        <h4 className="text-navy" style={{ fontWeight: 600, fontSize: '15px' }}>Export Data</h4>
                         {exportOptions.map(({ label, action, format }) => (
                             <button
                                 key={format}
                                 onClick={action}
-                                className="network-control-button"
+                                className="network-control-button bg-light-purple text-navy"
                                 title={`Download current network as ${format} file`}
+                                style={{ borderRadius: '6px', margin: '6px 0', padding: '10px 14px', fontWeight: 600, fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}
                             >
                                 <DownloadIcon />
                                 <span>{label}</span>
@@ -390,11 +404,11 @@ const ControlPanel = ({ onCommunities, onExport, onLoadSimilar, onPageRank, isOp
 };
 
 const ZoomControls = ({ onZoomIn, onZoomOut, onReset }) => (
-    <div className="network-zoom-controls">
-        <button onClick={onZoomIn} title="Zoom in" className="zoom-btn">+</button>
+    <div className="network-zoom-controls" style={{ position: 'absolute', right: '24px', bottom: '24px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <button onClick={onZoomIn} title="Zoom in" className="zoom-btn bg-purple text-grey" style={{ borderRadius: '50%', padding: '10px', fontWeight: 700, fontSize: '18px' }}>+</button>
         <div className="zoom-rail"></div>
-        <button onClick={onReset} title="Reset view" className="zoom-btn">⟲</button>
-        <button onClick={onZoomOut} title="Zoom out" className="zoom-btn">-</button>
+        <button onClick={onReset} title="Reset view" className="zoom-btn bg-light-purple text-navy" style={{ borderRadius: '50%', padding: '10px', fontWeight: 700, fontSize: '18px' }}>⟲</button>
+        <button onClick={onZoomOut} title="Zoom out" className="zoom-btn bg-purple text-grey" style={{ borderRadius: '50%', padding: '10px', fontWeight: 700, fontSize: '18px' }}>-</button>
     </div>
 );
 
@@ -405,24 +419,30 @@ const InfoTooltip = ({ person, position, isHover = false }) => {
 
     return (
         <div
-            className={`network-tooltip ${isHover ? 'hover' : 'click'}`}
+            className={`network-tooltip ${isHover ? 'hover' : 'click'} bg-grey text-navy`}
             style={{
                 left: `${position.x}px`,
                 top: `${position.y}px`,
-                transform: 'translate(-50%, -100%)'
+                transform: 'translate(-50%, -100%)',
+                borderRadius: '10px',
+                boxShadow: '0 2px 12px rgba(53,55,75,0.12)',
+                padding: '14px',
+                minWidth: '220px',
+                zIndex: 20
             }}
         >
             <div className="network-tooltip-content">
-                <div className="network-tooltip-header">
+                <div className="network-tooltip-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <img
                         src={person.image || person.profileImage || iconPlayer}
                         alt={person.name || person.label}
                         className="network-tooltip-avatar"
+                        style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--grey)' }}
                         onError={(e) => { e.target.src = iconPlayer; }}
                     />
                     <div className="network-tooltip-info">
-                        <h4>{person.name || person.label}</h4>
-                        <div className="network-tooltip-details">
+                        <h4 style={{ margin: 0, fontWeight: 700 }}>{person.name || person.label}</h4>
+                        <div className="network-tooltip-details" style={{ fontSize: '14px', marginTop: '4px' }}>
                             {person.role && <p>Role: {person.role}</p>}
                             {person.sport && <p>Sport: {person.sport}</p>}
                             {person.nationality && <p>Nationality: {person.nationality}</p>}
@@ -434,7 +454,8 @@ const InfoTooltip = ({ person, position, isHover = false }) => {
                                 href={wikiUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="network-tooltip-link"
+                                className="network-tooltip-link text-purple"
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', fontWeight: 600 }}
                             >
                                 <ExternalLinkIcon />
                                 <span>View on Wikipedia</span>
@@ -464,57 +485,73 @@ const NetworkVisualization = ({ mode, data, onNodeClick, onNodeHover, onNodeLeav
     console.log(`NetworkVisualization - Mode: ${mode}, Nodes: ${nodes.length}, Edges: ${edges.length}`);
 
     return (
-        <div className="mock-network-container">
+        <div className="mock-network-container bg-grey" style={{ borderRadius: '16px', boxShadow: '0 2px 16px rgba(53,55,75,0.10)', padding: '24px', margin: '32px auto', maxWidth: '900px', minHeight: '420px', position: 'relative' }}>
             <div className="mock-network-title">
-                <h3>Athlete Network - {mode.charAt(0).toUpperCase() + mode.slice(1)} Mode</h3>
-                <p>{nodes.length} entities • {edges.length} connections</p>
+                <h3 className="text-purple" style={{ fontWeight: 700, fontSize: '22px' }}>Athlete Network - {mode.charAt(0).toUpperCase() + mode.slice(1)} Mode</h3>
+                <p className="text-navy" style={{ fontSize: '15px', marginBottom: '6px' }}>{nodes.length} entities • {edges.length} connections</p>
                 {mode === 'dynamic' && addedNodes.length > 0 && (
-                    <small style={{ color: '#575a7b', display: 'block', marginTop: '4px' }}>
+                    <small className="text-purple" style={{ display: 'block', marginTop: '4px' }}>
                         Added {addedNodes.length} athletes to dynamic network
                     </small>
                 )}
                 {mode === 'liked' && nodes.length > 0 && (
-                    <small style={{ color: '#575a7b', display: 'block', marginTop: '4px' }}>
+                    <small className="text-purple" style={{ display: 'block', marginTop: '4px' }}>
                         Showing athletes and organisations you have LIKED
                     </small>
                 )}
                 {mode === 'friends' && nodes.length > 0 && (
-                    <small style={{ color: '#575a7b', display: 'block', marginTop: '4px' }}>
+                    <small className="text-purple" style={{ display: 'block', marginTop: '4px' }}>
                         Showing your FRIENDS_WITH connections
                     </small>
                 )}
             </div>
 
             {loading ? (
-                <div className="mock-network-empty">
+                <div className="mock-network-empty bg-light-purple text-navy" style={{ borderRadius: '12px', padding: '32px', textAlign: 'center' }}>
                     <div className="network-loading-spinner"></div>
-                    <h4>Loading network data...</h4>
+                    <h4 style={{ fontWeight: 700 }}>Loading network data...</h4>
                     <p>Please wait while we fetch the latest data from the database.</p>
                 </div>
             ) : nodes.length > 0 ? (
-                <div className="mock-network-grid">
+                <div className="mock-network-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '32px', marginTop: '24px' }}>
                     {nodes.slice(0, 16).map((node, index) => {
                         const nodeData = node.data || node;
                         return (
                             <div
                                 key={nodeData.id}
-                                className={`mock-node ${mode === 'dynamic' && addedNodes.includes(nodeData.id) ? 'added-node' : ''}`}
+                                className={`mock-node bg-light-purple text-navy ${mode === 'dynamic' && addedNodes.includes(nodeData.id) ? 'added-node' : ''}`}
                                 onClick={(e) => handleNodeClick(node, e)}
                                 onMouseEnter={(e) => handleNodeHover(node, e)}
                                 onMouseLeave={onNodeLeave}
                                 style={{
+                                    borderRadius: '10px',
+                                    boxShadow: '0 1px 6px rgba(87,90,123,0.10)',
+                                    padding: '18px',
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    position: 'absolute',
                                     left: `${20 + (index % 4) * 200}px`,
-                                    top: `${50 + Math.floor(index / 4) * 150}px`
+                                    top: `${50 + Math.floor(index / 4) * 150}px`,
+                                    width: '140px',
+                                    minHeight: '120px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    border: mode === 'dynamic' && addedNodes.includes(nodeData.id) ? '2px solid var(--purple)' : '2px solid transparent',
+                                    zIndex: 2
                                 }}
                                 title={`${nodeData.label || nodeData.name} (${nodeData.type || 'unknown'})`}
                             >
                                 <img
                                     src={nodeData.image || nodeData.profileImage || iconPlayer}
                                     alt={nodeData.label || nodeData.name}
+                                    style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--grey)', marginBottom: '8px' }}
                                     onError={(e) => { e.target.src = iconPlayer; }}
                                 />
-                                <span>{nodeData.label || nodeData.name}</span>
-                                <small>{nodeData.type || 'person'}</small>
+                                <span style={{ fontWeight: 600 }}>{nodeData.label || nodeData.name}</span>
+                                <small style={{ fontSize: '13px' }}>{nodeData.type || 'person'}</small>
                             </div>
                         );
                     })}
@@ -553,9 +590,9 @@ const NetworkVisualization = ({ mode, data, onNodeClick, onNodeHover, onNodeLeav
                     )}
                 </div>
             ) : (
-                <div className="mock-network-empty">
+                <div className="mock-network-empty bg-light-purple text-navy" style={{ borderRadius: '12px', padding: '32px', textAlign: 'center' }}>
                     <NetworkIcon />
-                    <h4>
+                    <h4 style={{ fontWeight: 700 }}>
                         {mode === 'dynamic' ? 'Dynamic Network' :
                             mode === 'general' ? 'No data available' :
                                 mode === 'liked' ? 'No liked entities' :
@@ -1207,13 +1244,13 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
     }, [mode]);
 
     return (
-        <div className="network-dashboard" data-mode={mode}>
+        <div className="network-dashboard bg-grey" data-mode={mode} style={{ minHeight: '100vh', fontFamily: 'Inter, Arial, sans-serif' }}>
             {/* Header */}
-            <header className="network-header">
-                <div className="network-header-content">
+            <header className="network-header bg-purple text-grey" style={{ padding: '24px 0', boxShadow: '0 2px 8px rgba(87,90,123,0.08)' }}>
+                <div className="network-header-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: '1100px', margin: '0 auto' }}>
                     <div className="network-header-info">
-                        <h1>Athlete Explorer</h1>
-                        <p>
+                        <h1 style={{ fontWeight: 800, fontSize: '32px', margin: 0 }}>Athlete Explorer</h1>
+                        <p style={{ fontSize: '16px', margin: '6px 0 0 0' }}>
                             Discover connections in the world of sports
                         </p>
                     </div>
@@ -1227,20 +1264,20 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
             <ModeSelector currentMode={mode} onModeChange={setMode} user={user} />
 
             {/* Main Content */}
-            <div className="network-main-content">
+            <div className="network-main-content" style={{ position: 'relative', maxWidth: '1100px', margin: '0 auto', padding: '32px 0' }}>
                 {/* Loading overlay */}
                 {loading && (
-                    <div className="network-loading-overlay">
-                        <div className="network-loading-card">
+                    <div className="network-loading-overlay" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(53,55,75,0.08)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div className="network-loading-card bg-light-purple text-navy" style={{ borderRadius: '12px', padding: '32px', boxShadow: '0 2px 12px rgba(53,55,75,0.12)', textAlign: 'center' }}>
                             <div className="network-loading-spinner"></div>
-                            <p>Loading network data...</p>
+                            <p style={{ fontWeight: 600, fontSize: '18px' }}>Loading network data...</p>
                         </div>
                     </div>
                 )}
 
                 {/* Error message */}
                 {error && (
-                    <div className="network-error-message">
+                    <div className="network-error-message bg-pink text-navy" style={{ borderRadius: '8px', padding: '14px', marginBottom: '18px', fontWeight: 600, boxShadow: '0 1px 6px rgba(219,189,197,0.10)' }}>
                         {error}
                     </div>
                 )}
@@ -1304,8 +1341,8 @@ const Dashboard = ({ onBackToHome = () => console.log('Back to home'), user = nu
                 )}
 
                 {/* Instructions */}
-                <div className="network-instructions">
-                    <p>
+                <div className="network-instructions bg-light-purple text-navy" style={{ borderRadius: '8px', padding: '12px', marginTop: '24px', fontWeight: 500, fontSize: '15px', boxShadow: '0 1px 6px rgba(121,124,160,0.08)' }}>
+                    <p style={{ margin: 0 }}>
                         {mode === 'dynamic' && "🔍 Use the search panel to add athletes and view their connections"}
                         {mode === 'general' && "Click on nodes to explore connections"}
                         {mode === 'liked' && "Your liked people and organisations"}

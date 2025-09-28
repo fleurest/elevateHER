@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
@@ -7,6 +7,38 @@ import Home from './components/Home';
 import Search from './components/Search';
 import Events from './components/Events';
 import { BASE_PATH } from './config';
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    this.setState({ error, errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '32px', textAlign: 'center', color: '#b00020' }}>
+          <h2>Something went wrong.</h2>
+          <details style={{ whiteSpace: 'pre-wrap', marginTop: '16px' }}>
+            {this.state.error && this.state.error.toString()}
+            <br />
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </details>
+          <button onClick={() => window.location.reload()} style={{ marginTop: '24px', padding: '8px 16px', fontWeight: 600 }}>Reload</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function AppContent() {
   const navigate = useNavigate();
@@ -93,58 +125,60 @@ function AppContent() {
 
 
   return (
-    <>
-      {loading ? (
-        <div>Loading...</div>
-      ) : (
-        <Routes>
-          <Route
-            path="/"
-            element={
-              isAuthenticated ? <Navigate to="/home" /> : <Login onLogin={handleLogin} />
-            }
-          />
-          <Route
-            path="/login"
-            element={<Login onLogin={handleLogin} />}
-          />
-          <Route
-            path="/dashboard"
-            element={
-              isAuthenticated ? (
-                <Dashboard handleLogout={handleLogout} user={user} />
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-                      />
-          <Route
-            path="/home"
-            element={
-              loading ? (
-                <div>Loading...</div>
-              ) : isAuthenticated && user ? (
-                <Home handleLogout={handleLogout} user={user} setUser={setUser} />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
-          <Route path="/search" element={<Search />} />
-          <Route
-            path="/events"
-            element={
-              isAuthenticated ? (
-                <Events />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      )}
-    </>
+    <ErrorBoundary>
+      <>
+        {loading ? (
+          <div>Loading...</div>
+        ) : (
+          <Routes>
+            <Route
+              path="/"
+              element={
+                isAuthenticated ? <Navigate to="/home" /> : <Login onLogin={handleLogin} />
+              }
+            />
+            <Route
+              path="/login"
+              element={<Login onLogin={handleLogin} />}
+            />
+            <Route
+              path="/dashboard"
+              element={
+                isAuthenticated ? (
+                  <Dashboard handleLogout={handleLogout} user={user} />
+                ) : (
+                  <Navigate to="/login" />
+                )
+              }
+                        />
+            <Route
+              path="/home"
+              element={
+                loading ? (
+                  <div>Loading...</div>
+                ) : isAuthenticated && user ? (
+                  <Home handleLogout={handleLogout} user={user} setUser={setUser} />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            <Route path="/search" element={<Search />} />
+            <Route
+              path="/events"
+              element={
+                isAuthenticated ? (
+                  <Events />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        )}
+      </>
+    </ErrorBoundary>
   );
 }
 

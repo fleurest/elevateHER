@@ -41,8 +41,13 @@ if (useHttps && process.env.NODE_ENV === 'production') {
 // CORS
 app.use(cors({
   origin: 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Preflight CORS for image-proxy
+app.options('/api/image-proxy', cors());
 
 // parsing & cookies
 app.use(express.json());
@@ -71,27 +76,43 @@ app.get('/api/image-proxy', async (req, res) => {
     if (!url) {
       return res.status(400).send('Missing url parameter');
     }
-    // Set CORS headers
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET');
+    // Set CORS headers for image responses
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; ImageProxy/1.0)'
-      }
-    });
+    // node-fetch and stream pipeline error handling
+    const fetch = require('node-fetch');
+    const { pipeline } = require('stream');
+    const { promisify } = require('util');
+    const streamPipeline = promisify(pipeline);
+
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ImageProxy/1.0)'
+        }
+      });
+    } catch (err) {
+      console.error('Image proxy upstream fetch error:', err);
+      return res.status(502).send('Upstream image fetch failed');
+    }
 
     if (!response.ok) {
-      console.error('Image proxy upstream error:', response.status);
-      return res.status(response.status).send('Image not found');
+      console.error('Image proxy upstream error:', response.status, await response.text());
+      return res.status(response.status).send('Image not found or upstream error');
     }
 
     res.header('Content-Type', response.headers.get('content-type') || 'image/jpeg');
-
-    response.body.pipe(res);
-
+    try {
+      await streamPipeline(response.body, res);
+    } catch (err) {
+      console.error('Image proxy stream error:', err);
+      res.status(500).send('Image stream error');
+    }
   } catch (error) {
     console.error('Image proxy error:', error);
     res.status(502).send('Image proxy fetch error');

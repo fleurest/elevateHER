@@ -374,6 +374,12 @@ function HomePage({ handleLogout, user, setUser }) {
   };
 
   const handleSendFriendRequest = async (username) => {
+    // Check authentication before sending request
+    if (!user || !user.username) {
+      alert('You must be logged in to send a friend request. Please log in.');
+      navigate('/login');
+      return;
+    }
     try {
       const res = await fetch(`${API_BASE}/api/users/friend-request`, {
         method: 'POST',
@@ -387,15 +393,19 @@ function HomePage({ handleLogout, user, setUser }) {
         })
       });
 
+      if (res.status === 401) {
+        alert('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
 
       const data = await res.json();
       console.log('Friend request sent:', data);
-
       alert(`Friend request sent to ${username}!`);
-
     } catch (err) {
       console.error('Error sending friend request:', err);
       alert('Failed to send friend request. Please try again.');
